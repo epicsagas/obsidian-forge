@@ -1,7 +1,3 @@
-# CLAUDE.md
-
-Guidance for Claude Code when working in this repository.
-
 ## What This Is
 
 `obsidian-forge` is a standalone Rust CLI tool that creates, automates, and manages Obsidian vaults. It supports multiple vaults from a single binary/daemon.
