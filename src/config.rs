@@ -52,7 +52,7 @@ impl GlobalConfig {
         dirs_home().join(GLOBAL_DIR)
     }
 
-    /// Path to the global templates store: `~/.config/obsidian-forge/templates/`
+    /// Path to the global templates store: `~/.obsidian-forge/templates/`
     pub fn templates_dir() -> PathBuf {
         dirs_home().join(GLOBAL_DIR).join("templates")
     }

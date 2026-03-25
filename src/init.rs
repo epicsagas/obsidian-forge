@@ -315,7 +315,7 @@ fn link_global_templates(
     Ok(())
 }
 
-/// Apply global settings from `~/.config/obsidian-forge/` to a vault's `.obsidian/`.
+/// Apply global settings from `~/.obsidian-forge/` to a vault's `.obsidian/`.
 pub fn apply_global_settings(target: &Path) -> Result<()> {
     let store = GlobalConfig::settings_dir();
     if !GlobalConfig::has_settings() {

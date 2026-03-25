@@ -246,7 +246,7 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
         DaemonAction::Install => {
             let exe = std::env::current_exe()
                 .unwrap_or_else(|_| PathBuf::from("obsidian-forge"));
-            let log_dir = dirs_home().join(".config/obsidian-forge/logs");
+            let log_dir = dirs_home().join(".obsidian-forge/logs");
             fs::create_dir_all(&log_dir)?;
 
             let plist = build_plist(&label, &exe, &log_dir);
