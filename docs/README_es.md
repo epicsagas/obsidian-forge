@@ -165,7 +165,7 @@ obsidian-forge daemon stop
 obsidian-forge daemon status      # muestra PID y último código de salida
 ```
 
-> Registros → `~/Library/Logs/obsidian-forge/forge.log`
+> Registros → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
 
 ### Vigilancia en primer plano
 
@@ -214,7 +214,7 @@ model    = "gemma3"
 
 [daemon]
 label   = "com.obsidian-forge.watch"
-log_dir = "~/Library/Logs"
+log_dir = "~/.obsidian-forge/logs"
 ```
 
 **Prioridad de clave API:** variable de entorno → `vault.toml api_key` (se prefiere variable de entorno para evitar confirmar secretos)

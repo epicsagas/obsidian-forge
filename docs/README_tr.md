@@ -165,7 +165,7 @@ obsidian-forge daemon stop
 obsidian-forge daemon status      # PID ve son çıkış kodunu gösterir
 ```
 
-> Günlükler → `~/Library/Logs/obsidian-forge/forge.log`
+> Günlükler → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
 
 ### Ön Planda İzleme
 
@@ -214,7 +214,7 @@ model    = "gemma3"
 
 [daemon]
 label   = "com.obsidian-forge.watch"
-log_dir = "~/Library/Logs"
+log_dir = "~/.obsidian-forge/logs"
 ```
 
 **API anahtarı önceliği:** ortam değişkeni → `vault.toml api_key` (sırları commit etmemek için ortam değişkeni tercih edilir)

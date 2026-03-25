@@ -165,7 +165,7 @@ obsidian-forge daemon stop
 obsidian-forge daemon status      # 显示 PID 和最后退出代码
 ```
 
-> 日志 → `~/Library/Logs/obsidian-forge/forge.log`
+> 日志 → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
 
 ### 前台监控
 
@@ -214,7 +214,7 @@ model    = "gemma3"
 
 [daemon]
 label   = "com.obsidian-forge.watch"
-log_dir = "~/Library/Logs"
+log_dir = "~/.obsidian-forge/logs"
 ```
 
 **API 密钥优先级：** 环境变量 → `vault.toml api_key`（优先使用环境变量以避免提交密钥）

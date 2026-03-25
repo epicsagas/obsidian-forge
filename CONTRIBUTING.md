@@ -74,7 +74,7 @@ Open an issue at [github.com/epicsagas/obsidian-forge/issues](https://github.com
 - OS and Rust version (`rustc --version`)
 - The command you ran
 - Expected vs actual behavior
-- Relevant log output (`~/Library/Logs/obsidian-forge/forge.log`)
+- Relevant log output (`~/.obsidian-forge/logs/obsidian-forge/forge.log`)
 
 ## Feature Requests
 

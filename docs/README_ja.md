@@ -165,7 +165,7 @@ obsidian-forge daemon stop
 obsidian-forge daemon status      # PID と最後の終了コードを表示
 ```
 
-> ログ → `~/Library/Logs/obsidian-forge/forge.log`
+> ログ → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
 
 ### フォアグラウンド監視
 
@@ -214,7 +214,7 @@ model    = "gemma3"
 
 [daemon]
 label   = "com.obsidian-forge.watch"
-log_dir = "~/Library/Logs"
+log_dir = "~/.obsidian-forge/logs"
 ```
 
 **API キーの優先順位：** 環境変数 → `vault.toml api_key`（シークレットのコミット防止のため環境変数を推奨）

@@ -165,7 +165,7 @@ obsidian-forge daemon stop
 obsidian-forge daemon status      # PID 및 마지막 종료 코드 표시
 ```
 
-> 로그 → `~/Library/Logs/obsidian-forge/forge.log`
+> 로그 → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
 
 ### 포그라운드 감시
 
@@ -214,7 +214,7 @@ model    = "gemma3"
 
 [daemon]
 label   = "com.obsidian-forge.watch"
-log_dir = "~/Library/Logs"
+log_dir = "~/.obsidian-forge/logs"
 ```
 
 **API 키 우선순위:** 환경 변수 → `vault.toml api_key` (시크릿 커밋 방지를 위해 환경 변수 권장)

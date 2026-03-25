@@ -165,7 +165,7 @@ obsidian-forge daemon stop
 obsidian-forge daemon status      # shows PID and last exit code
 ```
 
-> Logs → `~/Library/Logs/obsidian-forge/forge.log`
+> Logs → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
 
 ### Foreground Watch
 
@@ -203,18 +203,18 @@ related_projects = true
 [sync]
 git_auto_commit  = true
 git_auto_push    = true
-interval_minutes = 5
+interval_minutes = 60
 
 [ai]
 # provider: ollama | openai | openrouter | lmstudio | openai-compatible
 provider = "ollama"
 model    = "gemma3"
-# base_url = "http://localhost:1234/v1"  # required for openai-compatible; others have defaults
+base_url = "http://192.168.0.28:1234/v1"  # required for openai-compatible; others have defaults
 # api_key  = ""                          # optional — env var is preferred (see below)
 
 [daemon]
 label   = "com.obsidian-forge.watch"
-log_dir = "~/Library/Logs"
+log_dir = "~/.obsidian-forge/logs"
 ```
 
 **API key priority:** env var → `vault.toml api_key` (env var preferred to avoid committing secrets)

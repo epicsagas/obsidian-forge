@@ -61,5 +61,5 @@ of vault remove <name>          # unregister (files kept)
 
 - Config hierarchy: `vault.toml` (per-vault) overrides nothing — it IS the source of truth
 - PARA folders: `Inbox/` → `01-Projects/` `02-Areas/` `03-Resources/` `99-Archives/`
-- Daemon logs: `~/Library/Logs/of/forge.log`
+- Daemon logs: `~/.obsidian-forge/logs/of/forge.log`
 - `graph.*` bools in `vault.toml` gate each graph operation individually
