@@ -131,7 +131,7 @@ fn adopt_directory_verbose(
         skipped,
     )?;
 
-    // ── vault.toml ───────────────────────────────────────────────────────
+    // ── vault.toml ���──────────────────────────────────────────────────────
     if !vault_root.join(CONFIG_FILE).exists() {
         let config_content = format!(r#"# Vault-specific configuration
 # Values here override ~/.obsidian-forge/config.toml defaults
@@ -161,7 +161,7 @@ concepts = []
 # [sync]
 # git_auto_commit = false
 # git_auto_push = false
-# interval_minutes = 5
+# interval_minutes = 60
 
 # AI settings (overrides global config)
 # [ai]
@@ -175,7 +175,7 @@ concepts = []
 # [daemon]
 # label = "com.obsidian-forge.watch"
 # log_dir = "~/.obsidian-forge/logs"
-# interval_seconds = 300
+# interval_seconds = 3600
 "#, name);
         fs::write(vault_root.join(CONFIG_FILE), config_content)?;
         created.push(CONFIG_FILE.into());

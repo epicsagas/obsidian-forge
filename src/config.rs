@@ -271,10 +271,10 @@ fn default_detect() -> String {
     "top-level-dirs".into()
 }
 fn default_interval_option() -> Option<u64> {
-    Some(5)
+    Some(60) // 60 minutes
 }
 fn default_interval_seconds_option() -> Option<u64> {
-    Some(300)
+    Some(3600) // 60 minutes in seconds
 }
 fn default_provider() -> String {
     "ollama".into()
