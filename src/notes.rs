@@ -287,10 +287,14 @@ fn resolve_dest_dir(
 }
 
 fn split_frontmatter(input: &str) -> Result<(Option<Frontmatter>, String)> {
-    let re = Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").unwrap();
+    use std::sync::OnceLock;
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").expect("valid frontmatter regex")
+    });
     if let Some(caps) = re.captures(input) {
-        let yaml = caps.get(1).unwrap().as_str();
-        let body = caps.get(2).unwrap().as_str().to_string();
+        let yaml = caps.get(1).expect("capture group 1 always present").as_str();
+        let body = caps.get(2).expect("capture group 2 always present").as_str().to_string();
         let fm: Frontmatter = serde_yaml::from_str(yaml).unwrap_or_default();
         Ok((Some(fm), body))
     } else {
@@ -314,4 +318,90 @@ fn merge_vec(mut a: Vec<String>, b: Vec<String>) -> Vec<String> {
 
 fn iso_now() -> String {
     chrono::Utc::now().to_rfc3339()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_frontmatter_with_frontmatter() {
+        let input = "---\nstatus: processed\ntags: [rust, test]\n---\n# Hello\n\nBody text.";
+        let (fm, body) = split_frontmatter(input).unwrap();
+        assert!(fm.is_some());
+        let fm = fm.unwrap();
+        assert_eq!(fm.status.as_deref(), Some("processed"));
+        assert_eq!(body, "# Hello\n\nBody text.");
+    }
+
+    #[test]
+    fn test_split_frontmatter_without_frontmatter() {
+        let input = "# Hello\n\nNo frontmatter here.";
+        let (fm, body) = split_frontmatter(input).unwrap();
+        assert!(fm.is_none());
+        assert_eq!(body, input);
+    }
+
+    #[test]
+    fn test_split_frontmatter_empty_input() {
+        let (fm, body) = split_frontmatter("").unwrap();
+        assert!(fm.is_none());
+        assert_eq!(body, "");
+    }
+
+    #[test]
+    fn test_join_frontmatter_roundtrip() {
+        let fm = Frontmatter {
+            status: Some("processed".into()),
+            tags: Some(vec!["rust".into(), "test".into()]),
+            ..Default::default()
+        };
+        let body = "# Title\n\nContent.";
+        let joined = join_frontmatter(&fm, body);
+        assert!(joined.starts_with("---\n"));
+        assert!(joined.contains("status: processed"));
+        assert!(joined.contains(body));
+    }
+
+    #[test]
+    fn test_merge_vec_no_duplicates() {
+        let a = vec!["rust".to_string(), "test".to_string()];
+        let b = vec!["test".to_string(), "new".to_string()];
+        let result = merge_vec(a, b);
+        assert_eq!(result, vec!["rust", "test", "new"]);
+    }
+
+    #[test]
+    fn test_merge_vec_empty() {
+        let result = merge_vec(vec![], vec!["a".into(), "b".into()]);
+        assert_eq!(result, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_is_markdown() {
+        use std::fs::File;
+        let dir = std::env::temp_dir();
+        let md = dir.join("obsidian_forge_test_note.md");
+        let txt = dir.join("obsidian_forge_test_note.txt");
+        File::create(&md).unwrap();
+        File::create(&txt).unwrap();
+        assert!(is_markdown(&md));
+        assert!(!is_markdown(&txt));
+        let _ = std::fs::remove_file(&md);
+        let _ = std::fs::remove_file(&txt);
+    }
+
+    #[test]
+    fn test_is_pdf() {
+        use std::fs::File;
+        let dir = std::env::temp_dir();
+        let pdf = dir.join("obsidian_forge_test_doc.pdf");
+        let md = dir.join("obsidian_forge_test_doc.md");
+        File::create(&pdf).unwrap();
+        File::create(&md).unwrap();
+        assert!(is_pdf(&pdf));
+        assert!(!is_pdf(&md));
+        let _ = std::fs::remove_file(&pdf);
+        let _ = std::fs::remove_file(&md);
+    }
 }

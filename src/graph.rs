@@ -428,8 +428,13 @@ fn update_related_projects(
 // ---------------------------------------------------------------------------
 
 fn auto_tag_documents(profiles: &[ProjectProfile], config: &ForgeConfig) -> Result<()> {
-    let fm_re = Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").unwrap();
-    let tags_re = Regex::new(r"(?m)^tags:\s*\[").unwrap();
+    use std::sync::OnceLock;
+    static FM_RE: OnceLock<Regex> = OnceLock::new();
+    static TAGS_RE: OnceLock<Regex> = OnceLock::new();
+    let fm_re = FM_RE.get_or_init(|| {
+        Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").expect("valid frontmatter regex")
+    });
+    let tags_re = TAGS_RE.get_or_init(|| Regex::new(r"(?m)^tags:\s*\[").expect("valid tags regex"));
 
     // Use atomic counter for thread-safe counting
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -498,8 +503,14 @@ fn auto_tag_documents(profiles: &[ProjectProfile], config: &ForgeConfig) -> Resu
             let tags_str = tags.into_iter().collect::<Vec<_>>().join(", ");
 
             let new_content = if let Some(caps) = fm_re.captures(&content) {
-                let yaml = caps.get(1).unwrap().as_str();
-                let body = caps.get(2).unwrap().as_str();
+                let yaml = caps
+                    .get(1)
+                    .expect("capture group 1 always present")
+                    .as_str();
+                let body = caps
+                    .get(2)
+                    .expect("capture group 2 always present")
+                    .as_str();
                 if yaml.contains("tags:") {
                     return;
                 }

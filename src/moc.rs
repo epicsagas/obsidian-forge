@@ -264,3 +264,59 @@ fn capitalize(s: &str) -> String {
 fn capitalize_path(s: &str) -> String {
     s.split('/').map(capitalize).collect::<Vec<_>>().join(" / ")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_replace_section_replaces_existing() {
+        let content = "# Title\n\n## Projects\n- [[A/A]]\n- [[B/B]]\n\n## Other\nstuff\n";
+        let replacement = "## Projects\n- [[C/C]]\n";
+        let result = replace_section(content, "## Projects", replacement);
+        assert!(result.contains("- [[C/C]]"));
+        assert!(!result.contains("- [[A/A]]"));
+        assert!(result.contains("## Other"));
+    }
+
+    #[test]
+    fn test_replace_section_appends_when_missing() {
+        let content = "# Title\n\n## Other\nstuff\n";
+        let replacement = "## Projects\n- [[X/X]]\n";
+        let result = replace_section(content, "## Projects", replacement);
+        assert!(result.contains("## Projects"));
+        assert!(result.contains("- [[X/X]]"));
+        assert!(result.contains("## Other"));
+    }
+
+    #[test]
+    fn test_capitalize() {
+        assert_eq!(capitalize("hello"), "Hello");
+        assert_eq!(capitalize("rust"), "Rust");
+        assert_eq!(capitalize(""), "");
+        assert_eq!(capitalize("a"), "A");
+    }
+
+    #[test]
+    fn test_capitalize_path() {
+        assert_eq!(capitalize_path("foo/bar"), "Foo / Bar");
+        assert_eq!(capitalize_path("single"), "Single");
+    }
+
+    #[test]
+    fn test_extract_preserved_sections_empty() {
+        let content = "## Core Docs\n- [[note]]\n\n## Setup\nsome content\n";
+        let result = extract_preserved_sections(content);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_preserved_sections_with_related() {
+        let content =
+            "## Core Docs\n- [[note]]\n\n## Related Projects\n- [[X/X]]\n\n## Key Concepts\n- [[Y/Y]]\n";
+        let result = extract_preserved_sections(content);
+        assert!(result.contains("## Related Projects"));
+        assert!(result.contains("## Key Concepts"));
+        assert!(!result.contains("## Core Docs"));
+    }
+}

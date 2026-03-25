@@ -256,7 +256,10 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
             fs::create_dir_all(&log_dir)?;
 
             let plist = build_plist(&label, &exe, &log_dir);
-            fs::create_dir_all(plist_path.parent().unwrap())?;
+            let plist_parent = plist_path
+                .parent()
+                .ok_or_else(|| anyhow::anyhow!("invalid plist path: {}", plist_path.display()))?;
+            fs::create_dir_all(plist_parent)?;
             fs::write(&plist_path, plist)?;
             println!("✅ Plist written: {}", plist_path.display());
 

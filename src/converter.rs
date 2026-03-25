@@ -51,7 +51,9 @@ pub async fn convert_pdf_to_md(
 
             if generated_folder.exists() && generated_md.exists() {
                 let temp_folder = vault_root.join("temp_conversions").join(&stem);
-                fs::create_dir_all(temp_folder.parent().unwrap()).ok();
+                if let Some(parent) = temp_folder.parent() {
+                    fs::create_dir_all(parent).ok();
+                }
                 if temp_folder.exists() {
                     fs::remove_dir_all(&temp_folder)?;
                 }

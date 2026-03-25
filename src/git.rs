@@ -60,7 +60,7 @@ pub fn auto_commit_and_push(vault_root: &Path, do_push: bool) -> Result<bool> {
     Ok(true)
 }
 
-fn build_commit_message(changes: &[&str]) -> String {
+pub(crate) fn build_commit_message(changes: &[&str]) -> String {
     let mut has_moc = false;
     let mut has_zettel = false;
     let mut has_src = false;
@@ -100,4 +100,51 @@ fn build_commit_message(changes: &[&str]) -> String {
         parts.join(", "),
         changes.len()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_commit_message_vault_content() {
+        let changes = &["M  some-note.md", "A  another-note.md"];
+        let msg = build_commit_message(changes);
+        assert!(msg.contains("vault content"));
+        assert!(msg.contains("2 files"));
+        assert!(msg.starts_with("chore(vault):"));
+    }
+
+    #[test]
+    fn test_commit_message_moc() {
+        let changes = &["M  MyProject/MyProject.md"];
+        let msg = build_commit_message(changes);
+        assert!(msg.contains("MOC"));
+    }
+
+    #[test]
+    fn test_commit_message_zettelkasten() {
+        let changes = &["M  10-Zettelkasten/rust.md"];
+        let msg = build_commit_message(changes);
+        assert!(msg.contains("bridge notes"));
+    }
+
+    #[test]
+    fn test_commit_message_combined() {
+        let changes = &[
+            "M  MyProject/MyProject.md",
+            "M  10-Zettelkasten/rust.md",
+            "A  some-note.md",
+        ];
+        let msg = build_commit_message(changes);
+        assert!(msg.contains("3 files"));
+    }
+
+    #[test]
+    fn test_commit_message_empty() {
+        let changes: &[&str] = &[];
+        let msg = build_commit_message(changes);
+        assert!(msg.starts_with("chore(vault):"));
+        assert!(msg.contains("0 files"));
+    }
 }

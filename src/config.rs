@@ -86,7 +86,10 @@ impl GlobalConfig {
 
     pub fn save(&self) -> Result<()> {
         let p = Self::path();
-        fs::create_dir_all(p.parent().unwrap())?;
+        let parent = p
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("invalid config path: {}", p.display()))?;
+        fs::create_dir_all(parent)?;
         fs::write(&p, toml::to_string_pretty(self)?)?;
         debug!("Global config saved to {}", p.display());
         Ok(())
@@ -356,24 +359,31 @@ impl ForgeConfig {
         }
         let text = fs::read_to_string(&path)?;
         let mut config: ForgeConfig = toml::from_str(&text)?;
-        
+
         // Merge with global config (global as defaults, vault overrides)
         if let Ok(global) = GlobalConfig::load() {
             if let Some(ref global_sync) = global.sync {
                 config.sync = SyncConfig {
                     git_auto_commit: config.sync.git_auto_commit,
                     git_auto_push: config.sync.git_auto_push,
-                    interval_minutes: config.sync.interval_minutes.or(global_sync.interval_minutes),
+                    interval_minutes: config
+                        .sync
+                        .interval_minutes
+                        .or(global_sync.interval_minutes),
                 };
             }
             if let Some(ref global_ai) = global.ai {
                 config.ai = AiConfig {
-                    provider: if config.ai.provider == default_provider() && global_ai.provider != default_provider() {
+                    provider: if config.ai.provider == default_provider()
+                        && global_ai.provider != default_provider()
+                    {
                         global_ai.provider.clone()
                     } else {
                         config.ai.provider.clone()
                     },
-                    model: if config.ai.model == default_model() && global_ai.model != default_model() {
+                    model: if config.ai.model == default_model()
+                        && global_ai.model != default_model()
+                    {
                         global_ai.model.clone()
                     } else {
                         config.ai.model.clone()
@@ -385,21 +395,28 @@ impl ForgeConfig {
             }
             if let Some(ref global_daemon) = global.daemon {
                 config.daemon = DaemonConfig {
-                    label: if config.daemon.label == default_label() && global_daemon.label != default_label() {
+                    label: if config.daemon.label == default_label()
+                        && global_daemon.label != default_label()
+                    {
                         global_daemon.label.clone()
                     } else {
                         config.daemon.label.clone()
                     },
-                    log_dir: if config.daemon.log_dir == default_log_dir() && global_daemon.log_dir != default_log_dir() {
+                    log_dir: if config.daemon.log_dir == default_log_dir()
+                        && global_daemon.log_dir != default_log_dir()
+                    {
                         global_daemon.log_dir.clone()
                     } else {
                         config.daemon.log_dir.clone()
                     },
-                    interval_seconds: config.daemon.interval_seconds.or(global_daemon.interval_seconds),
+                    interval_seconds: config
+                        .daemon
+                        .interval_seconds
+                        .or(global_daemon.interval_seconds),
                 };
             }
         }
-        
+
         info!("Loaded config from {}", path.display());
         Ok(config)
     }
@@ -487,4 +504,94 @@ pub fn resolve_vault(input: Option<String>) -> Result<PathBuf> {
 
 fn canonicalize(p: PathBuf) -> Result<PathBuf> {
     Ok(fs::canonicalize(&p).unwrap_or(p))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_forge_config_default_for() {
+        let cfg = ForgeConfig::default_for("my-vault");
+        assert_eq!(cfg.vault.name, "my-vault");
+        assert_eq!(cfg.vault.inbox_dir, "00-Inbox");
+        assert_eq!(cfg.vault.zettelkasten_dir, "10-Zettelkasten");
+        assert_eq!(cfg.vault.archive_dir, "99-Archives");
+        assert_eq!(cfg.vault.attachments_dir, "Attachments");
+        assert_eq!(cfg.vault.templates_dir, "obsidian-templates");
+        assert_eq!(cfg.vault.layout, "para");
+    }
+
+    #[test]
+    fn test_graph_config_defaults() {
+        let cfg = GraphConfig::default();
+        assert!(cfg.backlinks);
+        assert!(cfg.bridge_notes);
+        assert!(cfg.auto_tags);
+        assert!(cfg.related_projects);
+        assert!(cfg.concepts.is_empty());
+    }
+
+    #[test]
+    fn test_ai_config_defaults() {
+        let cfg = AiConfig::default();
+        assert_eq!(cfg.provider, "ollama");
+        assert_eq!(cfg.model, "gemma3");
+        assert!(cfg.api_key.is_none());
+        assert!(cfg.base_url.is_none());
+        assert_eq!(cfg.max_concurrent, Some(5));
+    }
+
+    #[test]
+    fn test_sync_config_default_interval() {
+        // Rust's Default derive gives None for Option fields;
+        // the Some(60) default only applies during serde deserialization.
+        let cfg = SyncConfig::default();
+        assert!(!cfg.git_auto_commit);
+        assert!(!cfg.git_auto_push);
+        assert_eq!(cfg.interval_minutes, None);
+    }
+
+    #[test]
+    fn test_global_config_add_remove_vault() {
+        let mut global = GlobalConfig::default();
+        global.add_vault("test", "/tmp/test");
+        assert_eq!(global.vaults.len(), 1);
+        assert_eq!(global.vaults[0].name, "test");
+
+        // Add duplicate name should replace
+        global.add_vault("test", "/tmp/test2");
+        assert_eq!(global.vaults.len(), 1);
+        assert_eq!(global.vaults[0].path, "/tmp/test2");
+
+        let removed = global.remove_vault("test");
+        assert!(removed);
+        assert!(global.vaults.is_empty());
+
+        let not_found = global.remove_vault("nonexistent");
+        assert!(!not_found);
+    }
+
+    #[test]
+    fn test_global_config_watchable_vaults() {
+        let mut global = GlobalConfig::default();
+        global.add_vault("active", "/tmp/active");
+        global.add_vault("paused", "/tmp/paused");
+        if let Some(v) = global.find_vault_mut("paused") {
+            v.watch = false;
+        }
+        let watchable = global.watchable_vaults();
+        assert_eq!(watchable.len(), 1);
+        assert_eq!(watchable[0].name, "active");
+    }
+
+    #[test]
+    fn test_all_system_dirs_includes_defaults() {
+        let cfg = ForgeConfig::default_for("vault");
+        let dirs = cfg.all_system_dirs();
+        assert!(dirs.contains(&"00-Inbox".to_string()));
+        assert!(dirs.contains(&"10-Zettelkasten".to_string()));
+        assert!(dirs.contains(&".git".to_string()));
+        assert!(dirs.contains(&".obsidian".to_string()));
+    }
 }
