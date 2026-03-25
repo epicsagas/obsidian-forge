@@ -20,14 +20,13 @@ pub fn update_all_mocs(vault_root: &Path, config: &ForgeConfig) -> Result<()> {
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            if !path.is_dir() { return None; }
+            if !path.is_dir() {
+                return None;
+            }
 
             let name = path.file_name().and_then(|s| s.to_str())?.to_string();
 
-            if name.starts_with('.')
-                || system_dirs.contains(&name)
-                || exclude.contains(&name)
-            {
+            if name.starts_with('.') || system_dirs.contains(&name) || exclude.contains(&name) {
                 return None;
             }
 
@@ -55,14 +54,26 @@ fn update_moc_for_project(project_dir: &Path, project_name: &str, vault_root: &P
         .filter_map(|e| e.ok())
     {
         let p = entry.path();
-        if !p.is_file() { continue; }
-        if p.extension().and_then(|s| s.to_str()) != Some("md") { continue; }
+        if !p.is_file() {
+            continue;
+        }
+        if p.extension().and_then(|s| s.to_str()) != Some("md") {
+            continue;
+        }
 
-        let filename = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
-        if filename == project_name { continue; }
+        let filename = p
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+        if filename == project_name {
+            continue;
+        }
 
         // Skip source code
-        if p.components().any(|c| c.as_os_str() == "src" || c.as_os_str() == "target") {
+        if p.components()
+            .any(|c| c.as_os_str() == "src" || c.as_os_str() == "target")
+        {
             continue;
         }
 
@@ -78,7 +89,10 @@ fn update_moc_for_project(project_dir: &Path, project_name: &str, vault_root: &P
                 .unwrap_or_else(|| "Core Docs".to_string())
         };
 
-        groups.entry(group_key).or_default().push(format!("- [[{}]]", link));
+        groups
+            .entry(group_key)
+            .or_default()
+            .push(format!("- [[{}]]", link));
     }
 
     if groups.is_empty() {
@@ -88,19 +102,29 @@ fn update_moc_for_project(project_dir: &Path, project_name: &str, vault_root: &P
 
     let mut content = format!(
         "---\nproject: {}\ntype: moc\ntags: [{}]\n---\n\n# {} MOC\n\n",
-        project_name, project_name, capitalize(project_name),
+        project_name,
+        project_name,
+        capitalize(project_name),
     );
 
     if let Some(links) = groups.get("Core Docs") {
         content.push_str("## Core Docs\n");
-        for link in links { content.push_str(link); content.push('\n'); }
+        for link in links {
+            content.push_str(link);
+            content.push('\n');
+        }
         content.push('\n');
     }
 
     for (group, links) in &groups {
-        if group == "Core Docs" { continue; }
+        if group == "Core Docs" {
+            continue;
+        }
         content.push_str(&format!("## {}\n", capitalize_path(group)));
-        for link in links { content.push_str(link); content.push('\n'); }
+        for link in links {
+            content.push_str(link);
+            content.push('\n');
+        }
         content.push('\n');
     }
 
@@ -131,15 +155,14 @@ fn update_home_moc(vault_root: &Path, config: &ForgeConfig) -> Result<()> {
     for entry in fs::read_dir(vault_root)? {
         let entry = entry?;
         let path = entry.path();
-        if !path.is_dir() { continue; }
+        if !path.is_dir() {
+            continue;
+        }
         let name = match path.file_name().and_then(|s| s.to_str()) {
             Some(n) => n.to_string(),
             None => continue,
         };
-        if name.starts_with('.')
-            || system_dirs.contains(&name)
-            || exclude.contains(&name)
-        {
+        if name.starts_with('.') || system_dirs.contains(&name) || exclude.contains(&name) {
             continue;
         }
         let hub = path.join(format!("{}.md", name));
@@ -149,7 +172,9 @@ fn update_home_moc(vault_root: &Path, config: &ForgeConfig) -> Result<()> {
     }
     project_links.sort();
 
-    if project_links.is_empty() { return Ok(()); }
+    if project_links.is_empty() {
+        return Ok(());
+    }
 
     let projects_block = format!("## Projects\n{}\n", project_links.join("\n"));
     let new_content = if existing.contains("## Projects") {
@@ -180,7 +205,9 @@ pub fn replace_section(content: &str, header: &str, replacement: &str) -> String
             in_section = true;
             replaced = true;
             result.push_str(replacement);
-            if !replacement.ends_with('\n') { result.push('\n'); }
+            if !replacement.ends_with('\n') {
+                result.push('\n');
+            }
             continue;
         }
         if in_section && (line.starts_with("## ") || line.starts_with("# ")) {
@@ -189,12 +216,16 @@ pub fn replace_section(content: &str, header: &str, replacement: &str) -> String
             result.push('\n');
             continue;
         }
-        if in_section { continue; }
+        if in_section {
+            continue;
+        }
         result.push_str(line);
         result.push('\n');
     }
 
-    if !replaced { result.push_str(replacement); }
+    if !replaced {
+        result.push_str(replacement);
+    }
     result
 }
 
@@ -215,7 +246,11 @@ fn extract_preserved_sections(content: &str) -> String {
         }
     }
 
-    if !result.is_empty() { format!("\n{}", result) } else { String::new() }
+    if !result.is_empty() {
+        format!("\n{}", result)
+    } else {
+        String::new()
+    }
 }
 
 fn capitalize(s: &str) -> String {

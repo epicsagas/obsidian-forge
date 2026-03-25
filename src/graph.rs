@@ -97,19 +97,17 @@ fn scan_all_projects(vault_root: &Path, config: &ForgeConfig) -> Result<Vec<Proj
     // Scan projects in parallel using rayon
     let profiles: Vec<ProjectProfile> = project_dirs
         .par_iter()
-        .filter_map(|(path, name)| {
-            match scan_project(path, name, config) {
-                Ok(profile) => {
-                    if profile.docs.is_empty() {
-                        None
-                    } else {
-                        Some(profile)
-                    }
-                }
-                Err(e) => {
-                    debug!("Failed to scan project {}: {:?}", name, e);
+        .filter_map(|(path, name)| match scan_project(path, name, config) {
+            Ok(profile) => {
+                if profile.docs.is_empty() {
                     None
+                } else {
+                    Some(profile)
                 }
+            }
+            Err(e) => {
+                debug!("Failed to scan project {}: {:?}", name, e);
+                None
             }
         })
         .collect();

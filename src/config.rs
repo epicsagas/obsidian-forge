@@ -278,7 +278,7 @@ fn default_label() -> String {
     "com.obsidian-forge.watch".into()
 }
 fn default_log_dir() -> String {
-    "~/.config/obsidian-forge/logs".into()
+    "~/.obsidian-forge/logs".into()
 }
 fn yes() -> bool {
     true

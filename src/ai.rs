@@ -23,22 +23,20 @@ impl AiClient {
     pub fn from_config(cfg: &AiConfig) -> Self {
         let base_url = cfg.base_url.clone().unwrap_or_else(|| {
             match cfg.provider.as_str() {
-                "openai"            => "https://api.openai.com/v1".into(),
-                "openrouter"        => "https://openrouter.ai/api/v1".into(),
-                "lmstudio"          => "http://localhost:1234/v1".into(),
+                "openai" => "https://api.openai.com/v1".into(),
+                "openrouter" => "https://openrouter.ai/api/v1".into(),
+                "lmstudio" => "http://localhost:1234/v1".into(),
                 "openai-compatible" => "http://localhost:11434/v1".into(),
-                _                   => String::new(), // ollama: unused
+                _ => String::new(), // ollama: unused
             }
         });
 
         // api_key: vault.toml > environment variable
-        let api_key = cfg.api_key.clone().or_else(|| {
-            match cfg.provider.as_str() {
-                "openai"            => std::env::var("OPENAI_API_KEY").ok(),
-                "openrouter"        => std::env::var("OPENROUTER_API_KEY").ok(),
-                "openai-compatible" => std::env::var("OPENAI_API_KEY").ok(),
-                _                   => None,
-            }
+        let api_key = cfg.api_key.clone().or_else(|| match cfg.provider.as_str() {
+            "openai" => std::env::var("OPENAI_API_KEY").ok(),
+            "openrouter" => std::env::var("OPENROUTER_API_KEY").ok(),
+            "openai-compatible" => std::env::var("OPENAI_API_KEY").ok(),
+            _ => None,
         });
 
         Self {
@@ -62,8 +60,7 @@ impl AiClient {
         let raw = self.complete(prompt).await?;
         let json_str = extract_json(&raw);
         debug!("Parsing JSON: {}", json_str);
-        serde_json::from_str(json_str)
-            .with_context(|| format!("JSON parse failed. Raw: {}", raw))
+        serde_json::from_str(json_str).with_context(|| format!("JSON parse failed. Raw: {}", raw))
     }
 
     async fn complete(&self, prompt: &str) -> Result<String> {
@@ -93,7 +90,9 @@ impl AiClient {
         use tokio::io::AsyncWriteExt;
 
         let mut child = tokio::process::Command::new("ollama")
-            .arg("run").arg(&self.model).arg("--")
+            .arg("run")
+            .arg(&self.model)
+            .arg("--")
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -129,24 +128,37 @@ impl AiClient {
             temperature: f32,
         }
         #[derive(Serialize)]
-        struct Msg<'a> { role: &'a str, content: &'a str }
+        struct Msg<'a> {
+            role: &'a str,
+            content: &'a str,
+        }
 
         #[derive(Deserialize)]
-        struct Resp { choices: Vec<Choice> }
+        struct Resp {
+            choices: Vec<Choice>,
+        }
         #[derive(Deserialize)]
-        struct Choice { message: MsgOut }
+        struct Choice {
+            message: MsgOut,
+        }
         #[derive(Deserialize)]
-        struct MsgOut { content: String }
+        struct MsgOut {
+            content: String,
+        }
 
         let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
 
         let body = Req {
             model: &self.model,
-            messages: vec![Msg { role: "user", content: prompt }],
+            messages: vec![Msg {
+                role: "user",
+                content: prompt,
+            }],
             temperature: 0.3,
         };
 
-        let mut req = self.http
+        let mut req = self
+            .http
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&body);
@@ -157,11 +169,16 @@ impl AiClient {
 
         if self.provider == "openrouter" {
             req = req
-                .header("HTTP-Referer", "https://github.com/epicsagas/obsidian-forge")
+                .header(
+                    "HTTP-Referer",
+                    "https://github.com/epicsagas/obsidian-forge",
+                )
                 .header("X-Title", "obsidian-forge");
         }
 
-        let resp = req.send().await
+        let resp = req
+            .send()
+            .await
             .with_context(|| format!("request to {} failed", url))?;
 
         if !resp.status().is_success() {
@@ -170,10 +187,15 @@ impl AiClient {
             anyhow::bail!("AI API error {}: {}", status, body);
         }
 
-        let parsed: Resp = resp.json().await
+        let parsed: Resp = resp
+            .json()
+            .await
             .context("failed to parse AI API response")?;
 
-        parsed.choices.into_iter().next()
+        parsed
+            .choices
+            .into_iter()
+            .next()
             .map(|c| c.message.content.trim().to_string())
             .ok_or_else(|| anyhow::anyhow!("empty choices in AI API response"))
     }
@@ -186,7 +208,9 @@ impl AiClient {
 fn extract_json(raw: &str) -> &str {
     if let Some(start) = raw.find("```json") {
         let inner = &raw[start + 7..];
-        if let Some(end) = inner.find("```") { return inner[..end].trim(); }
+        if let Some(end) = inner.find("```") {
+            return inner[..end].trim();
+        }
     }
     if let Some(start) = raw.find("```") {
         let inner = &raw[start + 3..];
@@ -201,19 +225,23 @@ fn extract_json(raw: &str) -> &str {
     let arr = raw.find('[');
     match (obj, arr) {
         (Some(o), Some(a)) if a < o => extract_balanced(raw, a, '[', ']'),
-        (Some(o), _)                => extract_balanced(raw, o, '{', '}'),
-        (None, Some(a))             => extract_balanced(raw, a, '[', ']'),
-        _                           => raw.trim(),
+        (Some(o), _) => extract_balanced(raw, o, '{', '}'),
+        (None, Some(a)) => extract_balanced(raw, a, '[', ']'),
+        _ => raw.trim(),
     }
 }
 
 fn extract_balanced(s: &str, start: usize, open: char, close: char) -> &str {
     let mut depth = 0usize;
     for (i, &b) in s.as_bytes()[start..].iter().enumerate() {
-        if b == open as u8 { depth += 1; }
+        if b == open as u8 {
+            depth += 1;
+        }
         if b == close as u8 {
             depth = depth.saturating_sub(1);
-            if depth == 0 { return s[start..=start + i].trim(); }
+            if depth == 0 {
+                return s[start..=start + i].trim();
+            }
         }
     }
     s[start..].trim()

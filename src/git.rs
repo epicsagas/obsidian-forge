@@ -67,7 +67,9 @@ fn build_commit_message(changes: &[&str]) -> String {
 
     for line in changes {
         let file = line.get(3..).unwrap_or("").trim();
-        if file.contains("/src/") || file.ends_with(".rs") { has_src = true; }
+        if file.contains("/src/") || file.ends_with(".rs") {
+            has_src = true;
+        }
         if file.contains('/') {
             let parts: Vec<&str> = file.split('/').collect();
             if parts.len() >= 2 && file.ends_with(&format!("{}.md", parts[0])) {
@@ -80,10 +82,22 @@ fn build_commit_message(changes: &[&str]) -> String {
     }
 
     let mut parts = Vec::new();
-    if has_moc { parts.push("MOC"); }
-    if has_zettel { parts.push("bridge notes"); }
-    if has_src { parts.push("source"); }
-    if parts.is_empty() { parts.push("vault content"); }
+    if has_moc {
+        parts.push("MOC");
+    }
+    if has_zettel {
+        parts.push("bridge notes");
+    }
+    if has_src {
+        parts.push("source");
+    }
+    if parts.is_empty() {
+        parts.push("vault content");
+    }
 
-    format!("chore(vault): auto-update {} ({} files)", parts.join(", "), changes.len())
+    format!(
+        "chore(vault): auto-update {} ({} files)",
+        parts.join(", "),
+        changes.len()
+    )
 }

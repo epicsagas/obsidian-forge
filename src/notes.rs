@@ -2,7 +2,10 @@ use anyhow::{bail, Context, Result};
 use futures::stream::{self, StreamExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use tracing::{debug, info, warn};
 use walkdir::WalkDir;
 
@@ -12,15 +15,24 @@ use crate::prompts::load_prompts;
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct Frontmatter {
-    #[serde(skip_serializing_if = "Option::is_none")] pub status: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub summary: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub tags: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub keywords: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub processed_at: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub category: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub subcategory: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub detail: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")] pub questions: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keywords: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub processed_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subcategory: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub questions: Option<Vec<String>>,
 }
 
 pub fn is_markdown(path: &Path) -> bool {
@@ -77,7 +89,10 @@ pub async fn process_all(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
     // Scan temp_conversions
     let temp_folder = vault_root.join("temp_conversions");
     if temp_folder.exists() {
-        for entry in WalkDir::new(&temp_folder).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(&temp_folder)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             let path = entry.path().to_path_buf();
             if is_markdown(&path) {
                 md_files.push(path);
@@ -92,9 +107,7 @@ pub async fn process_all(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
     stream::iter(md_files)
         .map(|path| {
             let path = path.clone();
-            async move {
-                process_one(&path, config, vault_root).await
-            }
+            async move { process_one(&path, config, vault_root).await }
         })
         .buffer_unordered(concurrency_limit)
         .collect::<Vec<_>>()
@@ -106,7 +119,8 @@ pub async fn process_all(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
 pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -> Result<()> {
     info!("Processing: {}", path.display());
 
-    let content = tokio::fs::read_to_string(path).await
+    let content = tokio::fs::read_to_string(path)
+        .await
         .with_context(|| format!("read {}", path.display()))?;
     let (fm, body) = split_frontmatter(&content)?;
 
@@ -119,10 +133,12 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
     let prompts = load_prompts();
 
     // Prepare prompts
-    let q_prompt = prompts.questions_template
+    let q_prompt = prompts
+        .questions_template
         .replace("{count}", "3")
         .replace("{content}", &body);
-    let t_prompt = prompts.tags_template
+    let t_prompt = prompts
+        .tags_template
         .replace("{min_tags}", "3")
         .replace("{max_tags}", "5")
         .replace("{existing_tags}", "[]")
@@ -137,15 +153,28 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
 
     let summary = summary.unwrap_or_default();
     let questions = questions.unwrap_or_default();
-    let gen_tags = gen_tags.unwrap_or_else(|e| { warn!("Tag generation failed: {:?}", e); vec![] });
+    let gen_tags = gen_tags.unwrap_or_else(|e| {
+        warn!("Tag generation failed: {:?}", e);
+        vec![]
+    });
 
-    let title = body.lines()
+    let title = body
+        .lines()
         .find(|line| line.starts_with("# "))
         .map(|line| line.trim_start_matches("# ").to_string())
-        .unwrap_or_else(|| path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string());
+        .unwrap_or_else(|| {
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string()
+        });
 
-    let (category, subcategory, detail) = classify_by_title_or_ai(&title, &body, &ollama, &prompts).await;
-    info!("Classification: {} / {} / {}", category, subcategory, detail);
+    let (category, subcategory, detail) =
+        classify_by_title_or_ai(&title, &body, &ollama, &prompts).await;
+    info!(
+        "Classification: {} / {} / {}",
+        category, subcategory, detail
+    );
 
     let mut new_fm = fm.unwrap_or_default();
     new_fm.status = Some("processed".to_string());
@@ -158,7 +187,8 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
     new_fm.processed_at = Some(iso_now());
 
     let updated = join_frontmatter(&new_fm, &body);
-    tokio::fs::write(path, &updated).await
+    tokio::fs::write(path, &updated)
+        .await
         .with_context(|| format!("write {}", path.display()))?;
 
     move_to_para(path, &category, &subcategory, &detail, config, vault_root)?;
@@ -168,7 +198,9 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
 }
 
 async fn classify_by_title_or_ai(
-    title: &str, body: &str, ollama: &AiClient,
+    title: &str,
+    body: &str,
+    ollama: &AiClient,
     prompts: &crate::prompts::LoadedPrompts,
 ) -> (String, String, String) {
     let title_lower = title.to_lowercase();
@@ -176,14 +208,26 @@ async fn classify_by_title_or_ai(
     let research = ["paper", "research", "study", "survey", "analysis"];
 
     if how_to.iter().any(|kw| title_lower.contains(kw)) {
-        return ("Resources".into(), "Reference".into(), "Tutorials-Guides".into());
+        return (
+            "Resources".into(),
+            "Reference".into(),
+            "Tutorials-Guides".into(),
+        );
     }
     if research.iter().any(|kw| title_lower.contains(kw)) {
-        return ("Resources".into(), "Reference".into(), "Articles-Papers".into());
+        return (
+            "Resources".into(),
+            "Reference".into(),
+            "Articles-Papers".into(),
+        );
     }
 
     #[derive(serde::Deserialize, Default)]
-    struct Cat { category: Option<String>, subcategory: Option<String>, detail: Option<String> }
+    struct Cat {
+        category: Option<String>,
+        subcategory: Option<String>,
+        detail: Option<String>,
+    }
     let c_prompt = prompts.category_template.replace("{content}", body);
     let cat: Cat = ollama.generate_json(&c_prompt).await.unwrap_or_default();
     (
@@ -193,11 +237,19 @@ async fn classify_by_title_or_ai(
     )
 }
 
-fn move_to_para(path: &Path, category: &str, subcategory: &str, detail: &str, config: &ForgeConfig, vault_root: &Path) -> Result<()> {
+fn move_to_para(
+    path: &Path,
+    category: &str,
+    subcategory: &str,
+    detail: &str,
+    config: &ForgeConfig,
+    vault_root: &Path,
+) -> Result<()> {
     let dest_dir = resolve_dest_dir(&vault_root, category, subcategory, detail, config);
     fs::create_dir_all(&dest_dir)?;
 
-    let file_name = path.file_name()
+    let file_name = path
+        .file_name()
         .ok_or_else(|| anyhow::anyhow!("invalid file path: {}", path.display()))?;
     let dest = dest_dir.join(file_name);
     if path != dest {
@@ -207,27 +259,31 @@ fn move_to_para(path: &Path, category: &str, subcategory: &str, detail: &str, co
     Ok(())
 }
 
-fn resolve_dest_dir(vault_root: &Path, category: &str, subcategory: &str, detail: &str, _config: &ForgeConfig) -> PathBuf {
+fn resolve_dest_dir(
+    vault_root: &Path,
+    category: &str,
+    subcategory: &str,
+    detail: &str,
+    _config: &ForgeConfig,
+) -> PathBuf {
     match category {
         c if c.eq_ignore_ascii_case("Projects") => vault_root.join("01-Projects"),
-        c if c.eq_ignore_ascii_case("Areas")    => vault_root.join("02-Areas"),
-        c if c.eq_ignore_ascii_case("Archive")  => vault_root.join("99-Archives"),
-        c if c.eq_ignore_ascii_case("Resources") => {
-            match subcategory {
-                s if s.eq_ignore_ascii_case("Technical") => vault_root.join("03-Resources/Technical"),
-                s if s.eq_ignore_ascii_case("Ideas") => vault_root.join("10-Zettelkasten"),
-                s if s.eq_ignore_ascii_case("Reference") => {
-                    let d = match detail {
-                        d if d.eq_ignore_ascii_case("Books-Notes")      => "Books-Notes",
-                        d if d.eq_ignore_ascii_case("Tutorials-Guides") => "Tutorials-Guides",
-                        d if d.eq_ignore_ascii_case("Cheat-Sheets")     => "Cheat-Sheets",
-                        _ => "Articles-Papers",
-                    };
-                    vault_root.join("03-Resources/Reference").join(d)
-                }
-                _ => vault_root.join("03-Resources/Reference/Articles-Papers"),
+        c if c.eq_ignore_ascii_case("Areas") => vault_root.join("02-Areas"),
+        c if c.eq_ignore_ascii_case("Archive") => vault_root.join("99-Archives"),
+        c if c.eq_ignore_ascii_case("Resources") => match subcategory {
+            s if s.eq_ignore_ascii_case("Technical") => vault_root.join("03-Resources/Technical"),
+            s if s.eq_ignore_ascii_case("Ideas") => vault_root.join("10-Zettelkasten"),
+            s if s.eq_ignore_ascii_case("Reference") => {
+                let d = match detail {
+                    d if d.eq_ignore_ascii_case("Books-Notes") => "Books-Notes",
+                    d if d.eq_ignore_ascii_case("Tutorials-Guides") => "Tutorials-Guides",
+                    d if d.eq_ignore_ascii_case("Cheat-Sheets") => "Cheat-Sheets",
+                    _ => "Articles-Papers",
+                };
+                vault_root.join("03-Resources/Reference").join(d)
             }
-        }
+            _ => vault_root.join("03-Resources/Reference/Articles-Papers"),
+        },
         _ => vault_root.join("99-Archives"),
     }
 }
@@ -250,7 +306,11 @@ fn join_frontmatter(fm: &Frontmatter, body: &str) -> String {
 }
 
 fn merge_vec(mut a: Vec<String>, b: Vec<String>) -> Vec<String> {
-    for v in b { if !a.iter().any(|x| x == &v) { a.push(v); } }
+    for v in b {
+        if !a.iter().any(|x| x == &v) {
+            a.push(v);
+        }
+    }
     a
 }
 

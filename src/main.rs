@@ -12,7 +12,7 @@ mod watcher;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::{fs, path::PathBuf};
-use tracing_subscriber::{fmt, EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use config::{ForgeConfig, GlobalConfig};
 
@@ -176,7 +176,11 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Init { name, path, clone_settings_from } => {
+        Commands::Init {
+            name,
+            path,
+            clone_settings_from,
+        } => {
             let target = fs::canonicalize(&path).unwrap_or_else(|_| PathBuf::from(&path));
             init::init_vault(&name, &target)?;
 
@@ -210,7 +214,10 @@ async fn main() -> Result<()> {
 
     // Commands that target vault(s)
     match cli.command {
-        Commands::Watch { vault: filter, interval } => {
+        Commands::Watch {
+            vault: filter,
+            interval,
+        } => {
             run_watch(filter, interval).await?;
         }
         Commands::Sync { vault: filter } => {
@@ -244,8 +251,7 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
 
     match action {
         DaemonAction::Install => {
-            let exe = std::env::current_exe()
-                .unwrap_or_else(|_| PathBuf::from("obsidian-forge"));
+            let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("obsidian-forge"));
             let log_dir = dirs_home().join(".obsidian-forge/logs");
             fs::create_dir_all(&log_dir)?;
 
@@ -254,7 +260,11 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
             fs::write(&plist_path, plist)?;
             println!("✅ Plist written: {}", plist_path.display());
 
-            launchctl(&["bootstrap", &format!("gui/{}", uid()), &plist_path.to_string_lossy()])?;
+            launchctl(&[
+                "bootstrap",
+                &format!("gui/{}", uid()),
+                &plist_path.to_string_lossy(),
+            ])?;
             println!("✅ Daemon installed and started (label: {})", label);
             println!("   Logs: {}/forge.log", log_dir.display());
         }
@@ -270,7 +280,11 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
             if !plist_path.exists() {
                 anyhow::bail!("Daemon not installed. Run `obsidian-forge daemon install` first.");
             }
-            launchctl(&["bootstrap", &format!("gui/{}", uid()), &plist_path.to_string_lossy()])?;
+            launchctl(&[
+                "bootstrap",
+                &format!("gui/{}", uid()),
+                &plist_path.to_string_lossy(),
+            ])?;
             println!("▶️  Daemon started ({})", label);
         }
         DaemonAction::Stop => {
@@ -279,8 +293,15 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
         }
         DaemonAction::Status => {
             println!("Label:  {}", label);
-            println!("Plist:  {} ({})", plist_path.display(),
-                if plist_path.exists() { "installed" } else { "not installed" });
+            println!(
+                "Plist:  {} ({})",
+                plist_path.display(),
+                if plist_path.exists() {
+                    "installed"
+                } else {
+                    "not installed"
+                }
+            );
             match std::process::Command::new("launchctl")
                 .args(["list", &label])
                 .output()
@@ -536,7 +557,11 @@ fn handle_vault_action(action: &VaultAction) -> Result<()> {
 async fn run_watch(filter: Option<String>, interval_override: Option<u64>) -> Result<()> {
     let global = GlobalConfig::load()?;
     let vaults: Vec<_> = match &filter {
-        Some(name) => global.vaults.iter().filter(|v| v.name == *name && v.enabled && v.watch).collect(),
+        Some(name) => global
+            .vaults
+            .iter()
+            .filter(|v| v.name == *name && v.enabled && v.watch)
+            .collect(),
         None => global.watchable_vaults(),
     };
 
@@ -609,7 +634,12 @@ async fn run_watch(filter: Option<String>, interval_override: Option<u64>) -> Re
         });
         handles.push(handle);
 
-        tracing::info!("Started watch for: {} ({}) - interval: {}s", vault_name, vault_path.display(), interval_secs);
+        tracing::info!(
+            "Started watch for: {} ({}) - interval: {}s",
+            vault_name,
+            vault_path.display(),
+            interval_secs
+        );
     }
 
     // Wait for all watchers (they run forever)
@@ -640,7 +670,11 @@ fn resolve_interval(config: &ForgeConfig, cli_override: Option<u64>) -> u64 {
 fn run_sync_all(filter: Option<String>) -> Result<()> {
     let global = GlobalConfig::load()?;
     let vaults: Vec<_> = match &filter {
-        Some(name) => global.vaults.iter().filter(|v| v.name == *name && v.enabled).collect(),
+        Some(name) => global
+            .vaults
+            .iter()
+            .filter(|v| v.name == *name && v.enabled)
+            .collect(),
         None => global.enabled_vaults(),
     };
 
@@ -694,7 +728,10 @@ fn run_sync_cycle(vault: &PathBuf, config: &ForgeConfig) {
 }
 
 /// Resolve a single vault from --vault flag, --vault-path, or CWD.
-fn resolve_single_vault(vault_path: Option<String>, filter: Option<String>) -> Result<(PathBuf, ForgeConfig)> {
+fn resolve_single_vault(
+    vault_path: Option<String>,
+    filter: Option<String>,
+) -> Result<(PathBuf, ForgeConfig)> {
     if let Some(name) = filter {
         let global = GlobalConfig::load()?;
         if let Some(entry) = global.find_vault(&name) {
@@ -722,7 +759,10 @@ fn resolve_vault_path(name_or_path: &str) -> Result<PathBuf> {
     if p.exists() {
         Ok(fs::canonicalize(&p).unwrap_or(p))
     } else {
-        anyhow::bail!("'{}' is not a registered vault name or valid path", name_or_path)
+        anyhow::bail!(
+            "'{}' is not a registered vault name or valid path",
+            name_or_path
+        )
     }
 }
 
@@ -749,7 +789,10 @@ fn setup_logging() {
             Ok(f) => f,
             Err(_) => {
                 // Can't create log file — fall back to stderr logging.
-                eprintln!("Warning: cannot create log file at {}, falling back to stderr", log_file_path.display());
+                eprintln!(
+                    "Warning: cannot create log file at {}, falling back to stderr",
+                    log_file_path.display()
+                );
                 fmt()
                     .with_env_filter(EnvFilter::from_default_env())
                     .with_target(false)
