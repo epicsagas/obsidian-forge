@@ -218,6 +218,9 @@ pub struct AiConfig {
     /// API key (required for openai/openrouter, ignored for ollama/lmstudio)
     #[serde(default)]
     pub api_key: Option<String>,
+    /// Maximum concurrent AI requests (for parallel processing)
+    #[serde(default = "default_max_concurrent")]
+    pub max_concurrent: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -226,6 +229,9 @@ pub struct DaemonConfig {
     pub label: String,
     #[serde(default = "default_log_dir")]
     pub log_dir: String,
+    /// Watch/sync interval in seconds (default: 300 = 5 minutes)
+    #[serde(default = "default_interval_seconds")]
+    pub interval_seconds: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -256,11 +262,17 @@ fn default_detect() -> String {
 fn default_interval() -> u64 {
     5
 }
+fn default_interval_seconds() -> u64 {
+    300 // 5 minutes
+}
 fn default_provider() -> String {
     "ollama".into()
 }
 fn default_model() -> String {
     "gemma3".into()
+}
+fn default_max_concurrent() -> Option<usize> {
+    Some(5)
 }
 fn default_label() -> String {
     "com.obsidian-forge.watch".into()
@@ -310,6 +322,7 @@ impl Default for AiConfig {
             model: default_model(),
             base_url: None,
             api_key: None,
+            max_concurrent: default_max_concurrent(),
         }
     }
 }
@@ -319,6 +332,7 @@ impl Default for DaemonConfig {
         Self {
             label: default_label(),
             log_dir: default_log_dir(),
+            interval_seconds: default_interval_seconds(),
         }
     }
 }

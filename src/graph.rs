@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rayon::prelude::*;
 use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -73,29 +74,45 @@ struct ConceptBridge {
 
 fn scan_all_projects(vault_root: &Path, config: &ForgeConfig) -> Result<Vec<ProjectProfile>> {
     let system_dirs = config.all_system_dirs();
-    let exclude = &config.projects.exclude;
-    let mut profiles = Vec::new();
+    let exclude = config.projects.exclude.clone();
 
-    for entry in fs::read_dir(vault_root)? {
-        let entry = entry?;
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
-        }
+    // Collect project directories first (sequential I/O is cheap for directory listing)
+    let project_dirs: Vec<(PathBuf, String)> = fs::read_dir(vault_root)?
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if !path.is_dir() {
+                return None;
+            }
 
-        let name = match path.file_name().and_then(|s| s.to_str()) {
-            Some(n) => n.to_string(),
-            None => continue,
-        };
-        if name.starts_with('.') || system_dirs.contains(&name) || exclude.contains(&name) {
-            continue;
-        }
+            let name = path.file_name().and_then(|s| s.to_str())?.to_string();
+            if name.starts_with('.') || system_dirs.contains(&name) || exclude.contains(&name) {
+                return None;
+            }
 
-        let profile = scan_project(&path, &name, config)?;
-        if !profile.docs.is_empty() {
-            profiles.push(profile);
-        }
-    }
+            Some((path, name))
+        })
+        .collect();
+
+    // Scan projects in parallel using rayon
+    let profiles: Vec<ProjectProfile> = project_dirs
+        .par_iter()
+        .filter_map(|(path, name)| {
+            match scan_project(path, name, config) {
+                Ok(profile) => {
+                    if profile.docs.is_empty() {
+                        None
+                    } else {
+                        Some(profile)
+                    }
+                }
+                Err(e) => {
+                    debug!("Failed to scan project {}: {:?}", name, e);
+                    None
+                }
+            }
+        })
+        .collect();
 
     Ok(profiles)
 }
@@ -247,30 +264,44 @@ fn generate_bridge_notes(vault_root: &Path, bridges: &[ConceptBridge], zk_dir: &
 // ---------------------------------------------------------------------------
 
 fn inject_backlinks(vault_root: &Path, profiles: &[ProjectProfile], zk_dir: &str) -> Result<()> {
-    for profile in profiles {
+    let zk_path = vault_root.join(zk_dir);
+
+    // Cache all zettelkasten files once to avoid repeated directory reads
+    let zk_files: Vec<(String, String)> = match fs::read_dir(&zk_path) {
+        Ok(entries) => entries
+            .flatten()
+            .filter_map(|entry| {
+                let p = entry.path();
+                if p.extension().and_then(|s| s.to_str()) != Some("md") {
+                    return None;
+                }
+                let stem = p.file_stem().and_then(|s| s.to_str())?.to_string();
+                let name_lower = stem.replace('-', " ").to_lowercase();
+                Some((stem, name_lower))
+            })
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+
+    // Process each profile's documents in parallel
+    profiles.par_iter().for_each(|profile| {
         let hub_link = format!("[[{}/{}]]", profile.name, profile.name);
 
-        for doc_path in &profile.docs {
+        profile.docs.iter().for_each(|doc_path| {
             let content = match fs::read_to_string(doc_path) {
                 Ok(c) => c,
-                Err(_) => continue,
+                Err(_) => return,
             };
 
             if content.lines().count() < 3 {
-                continue;
+                return;
             }
 
             let content_lower = content.to_lowercase();
             let mut related: Vec<String> = Vec::new();
-            // Check which concept bridge notes exist and are relevant
-            let zk_path = vault_root.join(zk_dir);
-            for entry in fs::read_dir(&zk_path).into_iter().flatten().flatten() {
-                let p = entry.path();
-                if p.extension().and_then(|s| s.to_str()) != Some("md") {
-                    continue;
-                }
-                let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                let name_lower = stem.replace('-', " ").to_lowercase();
+
+            // Use cached zk_files instead of reading directory each time
+            for (stem, name_lower) in &zk_files {
                 let words: Vec<&str> = name_lower.split_whitespace().collect();
                 if words.len() >= 2 && words.iter().all(|w| content_lower.contains(w)) {
                     related.push(format!("- [[{}/{}]]", zk_dir, stem));
@@ -291,11 +322,11 @@ fn inject_backlinks(vault_root: &Path, profiles: &[ProjectProfile], zk_dir: &str
             };
 
             if content != new_content {
-                fs::write(doc_path, &new_content)?;
+                let _ = fs::write(doc_path, &new_content);
+                debug!("Backlink injected: {}", doc_path.display());
             }
-            debug!("Backlink injected: {}", doc_path.display());
-        }
-    }
+        });
+    });
 
     info!("Backlink injection complete");
     Ok(())
@@ -401,24 +432,31 @@ fn update_related_projects(
 fn auto_tag_documents(profiles: &[ProjectProfile], config: &ForgeConfig) -> Result<()> {
     let fm_re = Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").unwrap();
     let tags_re = Regex::new(r"(?m)^tags:\s*\[").unwrap();
-    let mut tagged_count = 0usize;
 
-    for profile in profiles {
-        for doc_path in &profile.docs {
+    // Use atomic counter for thread-safe counting
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let tagged_count = AtomicUsize::new(0);
+
+    // Process all documents in parallel
+    profiles.par_iter().for_each(|profile| {
+        let project_name = profile.name.clone();
+        let project_tags = config.graph.concepts.clone();
+
+        profile.docs.iter().for_each(|doc_path| {
             let content = match fs::read_to_string(doc_path) {
                 Ok(c) => c,
-                Err(_) => continue,
+                Err(_) => return,
             };
 
             if tags_re.is_match(&content) {
-                continue;
+                return;
             }
 
             let content_lower = content.to_lowercase();
             let mut tags: BTreeSet<String> = BTreeSet::new();
-            tags.insert(profile.name.clone());
+            tags.insert(project_name.clone());
 
-            for concept in &config.graph.concepts {
+            for concept in &project_tags {
                 if concept.keywords.iter().any(|kw| content_lower.contains(kw)) {
                     for tag in &concept.tags {
                         if tag != "evergreen" {
@@ -456,29 +494,31 @@ fn auto_tag_documents(profiles: &[ProjectProfile], config: &ForgeConfig) -> Resu
             }
 
             if tags.is_empty() {
-                continue;
+                return;
             }
+
             let tags_str = tags.into_iter().collect::<Vec<_>>().join(", ");
 
             let new_content = if let Some(caps) = fm_re.captures(&content) {
                 let yaml = caps.get(1).unwrap().as_str();
                 let body = caps.get(2).unwrap().as_str();
                 if yaml.contains("tags:") {
-                    continue;
+                    return;
                 }
                 format!("---\n{}\ntags: [{}]\n---\n{}", yaml, tags_str, body)
             } else {
                 format!("---\ntags: [{}]\n---\n\n{}", tags_str, content)
             };
 
-            fs::write(doc_path, &new_content)?;
-            tagged_count += 1;
+            let _ = fs::write(doc_path, &new_content);
+            tagged_count.fetch_add(1, Ordering::Relaxed);
             debug!("Auto-tagged: {}", doc_path.display());
-        }
-    }
+        });
+    });
 
-    if tagged_count > 0 {
-        info!("Auto-tagged {} documents", tagged_count);
+    let count = tagged_count.load(Ordering::Relaxed);
+    if count > 0 {
+        info!("Auto-tagged {} documents", count);
     }
     Ok(())
 }

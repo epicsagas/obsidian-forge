@@ -75,6 +75,9 @@ enum Commands {
         /// Watch only this vault
         #[arg(long)]
         vault: Option<String>,
+        /// Sync interval in seconds (overrides daemon.interval_seconds in config)
+        #[arg(long)]
+        interval: Option<u64>,
     },
 
     /// Rebuild all project hub files (MOCs)
@@ -207,8 +210,8 @@ async fn main() -> Result<()> {
 
     // Commands that target vault(s)
     match cli.command {
-        Commands::Watch { vault: filter } => {
-            run_watch(filter).await?;
+        Commands::Watch { vault: filter, interval } => {
+            run_watch(filter, interval).await?;
         }
         Commands::Sync { vault: filter } => {
             run_sync_all(filter)?;
@@ -530,7 +533,7 @@ fn handle_vault_action(action: &VaultAction) -> Result<()> {
 // Multi-vault watch
 // ---------------------------------------------------------------------------
 
-async fn run_watch(filter: Option<String>) -> Result<()> {
+async fn run_watch(filter: Option<String>, interval_override: Option<u64>) -> Result<()> {
     let global = GlobalConfig::load()?;
     let vaults: Vec<_> = match &filter {
         Some(name) => global.vaults.iter().filter(|v| v.name == *name && v.enabled && v.watch).collect(),
@@ -547,12 +550,12 @@ async fn run_watch(filter: Option<String>) -> Result<()> {
         let config = ForgeConfig::load(&vault)?;
         let vault_for_sync = vault.clone();
         let config_for_sync = config.clone();
+        let interval_secs = resolve_interval(&config, interval_override);
         tokio::spawn(async move {
             use tokio::time::{sleep, Duration};
-            let interval = config_for_sync.sync.interval_minutes.max(1);
             loop {
                 run_sync_cycle(&vault_for_sync, &config_for_sync);
-                sleep(Duration::from_secs(interval * 60)).await;
+                sleep(Duration::from_secs(interval_secs)).await;
             }
         });
         watcher::watch_inbox(&vault, &config).await?;
@@ -581,16 +584,18 @@ async fn run_watch(filter: Option<String>) -> Result<()> {
             }
         };
 
+        // Resolve interval: CLI override > daemon.interval_seconds > sync.interval_minutes (legacy)
+        let interval_secs = resolve_interval(&config, interval_override);
+
         // Sync loop for this vault
         let vp = vault_path.clone();
         let cfg = config.clone();
         tokio::spawn(async move {
             use tokio::time::{sleep, Duration};
-            let interval = cfg.sync.interval_minutes.max(1);
             loop {
                 tracing::debug!("Sync cycle: {}", vp.display());
                 run_sync_cycle(&vp, &cfg);
-                sleep(Duration::from_secs(interval * 60)).await;
+                sleep(Duration::from_secs(interval_secs)).await;
             }
         });
 
@@ -604,7 +609,7 @@ async fn run_watch(filter: Option<String>) -> Result<()> {
         });
         handles.push(handle);
 
-        tracing::info!("Started watch for: {} ({})", vault_name, vault_path.display());
+        tracing::info!("Started watch for: {} ({}) - interval: {}s", vault_name, vault_path.display(), interval_secs);
     }
 
     // Wait for all watchers (they run forever)
@@ -613,6 +618,19 @@ async fn run_watch(filter: Option<String>) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Resolve sync interval with priority: CLI override > daemon.interval_seconds > sync.interval_minutes
+fn resolve_interval(config: &ForgeConfig, cli_override: Option<u64>) -> u64 {
+    if let Some(secs) = cli_override {
+        return secs.max(1);
+    }
+    // Use daemon.interval_seconds if set (non-zero)
+    if config.daemon.interval_seconds > 0 {
+        return config.daemon.interval_seconds;
+    }
+    // Fallback to legacy sync.interval_minutes (convert to seconds)
+    config.sync.interval_minutes.max(1) * 60
 }
 
 // ---------------------------------------------------------------------------

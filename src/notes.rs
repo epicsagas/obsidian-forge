@@ -1,4 +1,5 @@
 use anyhow::{bail, Context, Result};
+use futures::stream::{self, StreamExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::{Path, PathBuf}};
@@ -38,40 +39,66 @@ pub async fn process_all(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
 
     info!("process_all started, inbox={}", inbox.display());
 
-    // Convert PDFs
-    for entry in (fs::read_dir(&inbox)?).flatten() {
-        let path = entry.path();
-        if is_pdf(&path) {
-            match crate::converter::convert_pdf_to_md(&path, vault_root, config) {
+    // Convert PDFs (async)
+    let pdf_results: Vec<_> = (fs::read_dir(&inbox)?)
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if is_pdf(&path) {
+                Some(path)
+            } else {
+                None
+            }
+        })
+        .map(|path| async move {
+            match crate::converter::convert_pdf_to_md(&path, vault_root, config).await {
                 Ok(md_path) => info!("PDF converted: {} -> {}", path.display(), md_path.display()),
                 Err(e) => warn!("PDF conversion failed: {}: {:?}", path.display(), e),
             }
-        }
-    }
+        })
+        .collect::<Vec<_>>();
 
-    // Process Markdown files
+    // Run all PDF conversions concurrently
+    futures::future::join_all(pdf_results).await;
+
+    // Collect all markdown files to process
+    let mut md_files: Vec<PathBuf> = Vec::new();
+
+    // Scan inbox
     for entry in fs::read_dir(&inbox)? {
-        match entry {
-            Ok(entry) => {
-                let path = entry.path();
-                if is_markdown(&path) {
-                    process_one(&path, config, vault_root).await?;
-                }
+        if let Ok(entry) = entry {
+            let path = entry.path();
+            if is_markdown(&path) {
+                md_files.push(path);
             }
-            Err(e) => warn!("read_dir error: {:?}", e),
         }
     }
 
-    // Process temp_conversions
+    // Scan temp_conversions
     let temp_folder = vault_root.join("temp_conversions");
     if temp_folder.exists() {
         for entry in WalkDir::new(&temp_folder).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path().to_path_buf();
             if is_markdown(&path) {
-                process_one(&path, config, vault_root).await?;
+                md_files.push(path);
             }
         }
     }
+
+    info!("Processing {} markdown files concurrently", md_files.len());
+
+    // Process files concurrently with buffer_unordered
+    let concurrency_limit = config.ai.max_concurrent.unwrap_or(5);
+    stream::iter(md_files)
+        .map(|path| {
+            let path = path.clone();
+            async move {
+                process_one(&path, config, vault_root).await
+            }
+        })
+        .buffer_unordered(concurrency_limit)
+        .collect::<Vec<_>>()
+        .await;
 
     Ok(())
 }
@@ -91,20 +118,26 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
     let ollama = AiClient::from_config(&config.ai);
     let prompts = load_prompts();
 
-    let summary = ollama.summarize(&body, 200).await.unwrap_or_default();
-
+    // Prepare prompts
     let q_prompt = prompts.questions_template
         .replace("{count}", "3")
         .replace("{content}", &body);
-    let questions: Vec<String> = ollama.generate_json(&q_prompt).await.unwrap_or_default();
-
     let t_prompt = prompts.tags_template
         .replace("{min_tags}", "3")
         .replace("{max_tags}", "5")
         .replace("{existing_tags}", "[]")
         .replace("{content}", &body);
-    let gen_tags: Vec<String> = ollama.generate_json(&t_prompt).await
-        .unwrap_or_else(|e| { warn!("Tag generation failed: {:?}", e); vec![] });
+
+    // Execute independent AI calls in parallel using tokio::join!
+    let (summary, questions, gen_tags) = tokio::join!(
+        ollama.summarize(&body, 200),
+        ollama.generate_json::<Vec<String>>(&q_prompt),
+        ollama.generate_json::<Vec<String>>(&t_prompt)
+    );
+
+    let summary = summary.unwrap_or_default();
+    let questions = questions.unwrap_or_default();
+    let gen_tags = gen_tags.unwrap_or_else(|e| { warn!("Tag generation failed: {:?}", e); vec![] });
 
     let title = body.lines()
         .find(|line| line.starts_with("# "))

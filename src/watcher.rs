@@ -39,8 +39,14 @@ pub async fn watch_inbox(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
         match event {
             Ok(Event { kind, paths, .. }) => {
                 if matches!(kind, EventKind::Create(_) | EventKind::Modify(_)) {
+                    // Process each file concurrently by spawning tokio tasks
                     for p in paths {
-                        handle_file_event(&p, vault_root, config).await;
+                        let p = p.clone();
+                        let vault_root = vault_root.to_path_buf();
+                        let config = config.clone();
+                        tokio::spawn(async move {
+                            handle_file_event(&p, &vault_root, &config).await;
+                        });
                     }
                 }
             }
@@ -53,7 +59,7 @@ pub async fn watch_inbox(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
 
 async fn handle_file_event(p: &Path, vault_root: &Path, config: &ForgeConfig) {
     if notes::is_pdf(p) {
-        match converter::convert_pdf_to_md(p, vault_root, config) {
+        match converter::convert_pdf_to_md(p, vault_root, config).await {
             Ok(md_path) => {
                 info!("PDF converted -> {}", md_path.display());
                 if let Err(e) = notes::process_one(&md_path, config, vault_root).await {

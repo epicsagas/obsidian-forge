@@ -1,8 +1,9 @@
 use anyhow::Result;
+use rayon::prelude::*;
 use std::{
     collections::BTreeMap,
     fs,
-    path::Path,
+    path::{Path, PathBuf},
 };
 use tracing::{debug, info};
 use walkdir::WalkDir;
@@ -12,27 +13,34 @@ use crate::config::ForgeConfig;
 /// Regenerate hub files for every project folder in the vault.
 pub fn update_all_mocs(vault_root: &Path, config: &ForgeConfig) -> Result<()> {
     let system_dirs = config.all_system_dirs();
-    let exclude = &config.projects.exclude;
+    let exclude = config.projects.exclude.clone();
 
-    for entry in fs::read_dir(vault_root)? {
-        let entry = entry?;
-        let path = entry.path();
-        if !path.is_dir() { continue; }
+    // Collect project directories first
+    let project_dirs: Vec<(PathBuf, String)> = fs::read_dir(vault_root)?
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if !path.is_dir() { return None; }
 
-        let name = match path.file_name().and_then(|s| s.to_str()) {
-            Some(n) => n.to_string(),
-            None => continue,
-        };
+            let name = path.file_name().and_then(|s| s.to_str())?.to_string();
 
-        if name.starts_with('.')
-            || system_dirs.contains(&name)
-            || exclude.contains(&name)
-        {
-            continue;
+            if name.starts_with('.')
+                || system_dirs.contains(&name)
+                || exclude.contains(&name)
+            {
+                return None;
+            }
+
+            Some((path, name))
+        })
+        .collect();
+
+    // Process MOCs in parallel
+    project_dirs.par_iter().for_each(|(path, name)| {
+        if let Err(e) = update_moc_for_project(path, name, vault_root) {
+            debug!("Failed to update MOC for {}: {:?}", name, e);
         }
-
-        update_moc_for_project(&path, &name, vault_root)?;
-    }
+    });
 
     update_home_moc(vault_root, config)?;
     Ok(())

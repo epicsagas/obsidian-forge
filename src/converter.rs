@@ -2,14 +2,15 @@ use anyhow::{bail, Context, Result};
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
 };
+use tokio::process::Command as TokioCommand;
 use tracing::{info, warn};
 
 use crate::config::ForgeConfig;
 
 /// Convert a PDF to Markdown. Tries marker_single, falls back to pdftotext.
-pub fn convert_pdf_to_md(
+/// This is an async function to avoid blocking the async runtime.
+pub async fn convert_pdf_to_md(
     pdf_path: &Path,
     vault_root: &Path,
     config: &ForgeConfig,
@@ -34,13 +35,14 @@ pub fn convert_pdf_to_md(
         .join("PDF-Archive");
 
     // Try marker_single
-    if is_command_available("marker_single") {
+    if is_command_available("marker_single").await {
         info!("Using marker_single for PDF -> MD: {}", pdf_path.display());
-        let status = Command::new("marker_single")
+        let status = TokioCommand::new("marker_single")
             .arg("--output_dir")
             .arg(&inbox)
             .arg(pdf_path)
             .status()
+            .await
             .context("spawn marker_single")?;
 
         if status.success() {
@@ -62,14 +64,15 @@ pub fn convert_pdf_to_md(
     }
 
     // Fallback to pdftotext
-    if is_command_available("pdftotext") {
+    if is_command_available("pdftotext").await {
         info!("Using pdftotext for PDF -> MD: {}", pdf_path.display());
         let output_path = inbox.join(format!("{}.md", &stem));
-        let status = Command::new("pdftotext")
+        let status = TokioCommand::new("pdftotext")
             .arg("-layout")
             .arg(pdf_path)
             .arg(&output_path)
             .status()
+            .await
             .context("spawn pdftotext")?;
 
         if status.success() {
@@ -98,10 +101,11 @@ fn archive_pdf(pdf_path: &Path, archive: &Path) {
     }
 }
 
-fn is_command_available(cmd: &str) -> bool {
-    Command::new("which")
+async fn is_command_available(cmd: &str) -> bool {
+    TokioCommand::new("which")
         .arg(cmd)
         .output()
+        .await
         .map(|o| o.status.success())
         .unwrap_or(false)
 }
