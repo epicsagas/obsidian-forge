@@ -655,12 +655,16 @@ fn resolve_interval(config: &ForgeConfig, cli_override: Option<u64>) -> u64 {
     if let Some(secs) = cli_override {
         return secs.max(1);
     }
-    // Use daemon.interval_seconds if set (non-zero)
-    if config.daemon.interval_seconds > 0 {
-        return config.daemon.interval_seconds;
+    // Use daemon.interval_seconds if set (Some)
+    if let Some(secs) = config.daemon.interval_seconds {
+        return secs.max(1);
     }
     // Fallback to legacy sync.interval_minutes (convert to seconds)
-    config.sync.interval_minutes.max(1) * 60
+    if let Some(mins) = config.sync.interval_minutes {
+        return mins.max(1) * 60;
+    }
+    // Default 5 minutes
+    300
 }
 
 // ---------------------------------------------------------------------------

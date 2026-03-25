@@ -29,6 +29,12 @@ pub const SETTINGS_FILES: &[&str] = &[
 pub struct GlobalConfig {
     #[serde(default)]
     pub vaults: Vec<VaultEntry>,
+    #[serde(default)]
+    pub sync: Option<SyncConfig>,
+    #[serde(default)]
+    pub ai: Option<AiConfig>,
+    #[serde(default)]
+    pub daemon: Option<DaemonConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,7 +73,12 @@ impl GlobalConfig {
     pub fn load() -> Result<Self> {
         let p = Self::path();
         if !p.exists() {
-            return Ok(Self::default());
+            return Ok(Self {
+                vaults: Vec::new(),
+                sync: None,
+                ai: None,
+                daemon: None,
+            });
         }
         let text = fs::read_to_string(&p)?;
         Ok(toml::from_str(&text)?)
@@ -201,8 +212,8 @@ pub struct SyncConfig {
     pub git_auto_commit: bool,
     #[serde(default)]
     pub git_auto_push: bool,
-    #[serde(default = "default_interval")]
-    pub interval_minutes: u64,
+    #[serde(default = "default_interval_option")]
+    pub interval_minutes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,8 +241,8 @@ pub struct DaemonConfig {
     #[serde(default = "default_log_dir")]
     pub log_dir: String,
     /// Watch/sync interval in seconds (default: 300 = 5 minutes)
-    #[serde(default = "default_interval_seconds")]
-    pub interval_seconds: u64,
+    #[serde(default = "default_interval_seconds_option")]
+    pub interval_seconds: Option<u64>,
 }
 
 // ---------------------------------------------------------------------------
@@ -262,8 +273,11 @@ fn default_detect() -> String {
 fn default_interval() -> u64 {
     5
 }
-fn default_interval_seconds() -> u64 {
-    300 // 5 minutes
+fn default_interval_option() -> Option<u64> {
+    Some(5)
+}
+fn default_interval_seconds_option() -> Option<u64> {
+    Some(300)
 }
 fn default_provider() -> String {
     "ollama".into()
@@ -310,7 +324,7 @@ impl Default for SyncConfig {
         Self {
             git_auto_commit: false,
             git_auto_push: false,
-            interval_minutes: default_interval(),
+            interval_minutes: None,
         }
     }
 }
@@ -332,7 +346,7 @@ impl Default for DaemonConfig {
         Self {
             label: default_label(),
             log_dir: default_log_dir(),
-            interval_seconds: default_interval_seconds(),
+            interval_seconds: None,
         }
     }
 }
@@ -343,6 +357,7 @@ impl Default for DaemonConfig {
 
 impl ForgeConfig {
     /// Load config from `vault.toml` in the given vault root.
+    /// Merges with global config: vault.toml values override global defaults.
     pub fn load(vault_root: &Path) -> Result<Self> {
         let path = vault_root.join(CONFIG_FILE);
         if !path.exists() {
@@ -353,7 +368,51 @@ impl ForgeConfig {
             );
         }
         let text = fs::read_to_string(&path)?;
-        let config: ForgeConfig = toml::from_str(&text)?;
+        let mut config: ForgeConfig = toml::from_str(&text)?;
+        
+        // Merge with global config (global as defaults, vault overrides)
+        if let Ok(global) = GlobalConfig::load() {
+            if let Some(ref global_sync) = global.sync {
+                config.sync = SyncConfig {
+                    git_auto_commit: config.sync.git_auto_commit,
+                    git_auto_push: config.sync.git_auto_push,
+                    interval_minutes: config.sync.interval_minutes.or(global_sync.interval_minutes),
+                };
+            }
+            if let Some(ref global_ai) = global.ai {
+                config.ai = AiConfig {
+                    provider: if config.ai.provider == default_provider() && global_ai.provider != default_provider() {
+                        global_ai.provider.clone()
+                    } else {
+                        config.ai.provider.clone()
+                    },
+                    model: if config.ai.model == default_model() && global_ai.model != default_model() {
+                        global_ai.model.clone()
+                    } else {
+                        config.ai.model.clone()
+                    },
+                    base_url: config.ai.base_url.clone().or(global_ai.base_url.clone()),
+                    api_key: config.ai.api_key.clone().or(global_ai.api_key.clone()),
+                    max_concurrent: config.ai.max_concurrent.or(global_ai.max_concurrent),
+                };
+            }
+            if let Some(ref global_daemon) = global.daemon {
+                config.daemon = DaemonConfig {
+                    label: if config.daemon.label == default_label() && global_daemon.label != default_label() {
+                        global_daemon.label.clone()
+                    } else {
+                        config.daemon.label.clone()
+                    },
+                    log_dir: if config.daemon.log_dir == default_log_dir() && global_daemon.log_dir != default_log_dir() {
+                        global_daemon.log_dir.clone()
+                    } else {
+                        config.daemon.log_dir.clone()
+                    },
+                    interval_seconds: config.daemon.interval_seconds.or(global_daemon.interval_seconds),
+                };
+            }
+        }
+        
         info!("Loaded config from {}", path.display());
         Ok(config)
     }
@@ -407,11 +466,8 @@ impl ForgeConfig {
             },
             projects: ProjectsConfig::default(),
             graph: GraphConfig::default(),
-            sync: SyncConfig {
-                git_auto_commit: true,
-                git_auto_push: true,
-                interval_minutes: 5,
-            },
+            // sync, ai, daemon omitted - use global config defaults
+            sync: SyncConfig::default(),
             ai: AiConfig::default(),
             daemon: DaemonConfig::default(),
         }
