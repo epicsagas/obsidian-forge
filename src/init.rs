@@ -133,8 +133,51 @@ fn adopt_directory_verbose(
 
     // ── vault.toml ───────────────────────────────────────────────────────
     if !vault_root.join(CONFIG_FILE).exists() {
-        let config = ForgeConfig::default_for(name);
-        config.save(vault_root)?;
+        let config_content = format!(r#"# Vault-specific configuration
+# Values here override ~/.obsidian-forge/config.toml defaults
+
+[vault]
+name = "{}"
+layout = "para"
+inbox_dir = "00-Inbox"
+zettelkasten_dir = "10-Zettelkasten"
+archive_dir = "99-Archives"
+attachments_dir = "Attachments"
+templates_dir = "obsidian-templates"
+system_dirs = []
+
+[projects]
+detect = "top-level-dirs"
+exclude = ["_template"]
+
+[graph]
+backlinks = true
+bridge_notes = true
+auto_tags = true
+related_projects = true
+concepts = []
+
+# Sync settings (overrides global config)
+# [sync]
+# git_auto_commit = false
+# git_auto_push = false
+# interval_minutes = 5
+
+# AI settings (overrides global config)
+# [ai]
+# provider = "ollama"
+# model = "gemma3"
+# base_url = null
+# api_key = null
+# max_concurrent = 5
+
+# Daemon settings (overrides global config)
+# [daemon]
+# label = "com.obsidian-forge.watch"
+# log_dir = "~/.obsidian-forge/logs"
+# interval_seconds = 300
+"#, name);
+        fs::write(vault_root.join(CONFIG_FILE), config_content)?;
         created.push(CONFIG_FILE.into());
     } else {
         skipped.push(format!("{} (keeping existing config)", CONFIG_FILE));
