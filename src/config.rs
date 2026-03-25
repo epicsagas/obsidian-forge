@@ -270,9 +270,6 @@ fn default_templates() -> String {
 fn default_detect() -> String {
     "top-level-dirs".into()
 }
-fn default_interval() -> u64 {
-    5
-}
 fn default_interval_option() -> Option<u64> {
     Some(5)
 }

@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::{fs, path::Path, process::Command};
 use tracing::{info, warn};
 
-use crate::config::{ForgeConfig, GlobalConfig, CONFIG_FILE, SETTINGS_DIRS, SETTINGS_FILES};
+use crate::config::{GlobalConfig, CONFIG_FILE, SETTINGS_DIRS, SETTINGS_FILES};
 use std::os::unix::fs::symlink;
 
 /// Initialize a vault. Works for both new and existing directories.
