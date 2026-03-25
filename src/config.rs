@@ -206,7 +206,7 @@ pub struct ConceptDef {
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SyncConfig {
     #[serde(default)]
     pub git_auto_commit: bool,
@@ -312,16 +312,6 @@ impl Default for GraphConfig {
             auto_tags: true,
             related_projects: true,
             concepts: Vec::new(),
-        }
-    }
-}
-
-impl Default for SyncConfig {
-    fn default() -> Self {
-        Self {
-            git_auto_commit: false,
-            git_auto_push: false,
-            interval_minutes: None,
         }
     }
 }

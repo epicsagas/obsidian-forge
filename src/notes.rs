@@ -77,12 +77,10 @@ pub async fn process_all(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
     let mut md_files: Vec<PathBuf> = Vec::new();
 
     // Scan inbox
-    for entry in fs::read_dir(&inbox)? {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if is_markdown(&path) {
-                md_files.push(path);
-            }
+    for entry in fs::read_dir(&inbox)?.flatten() {
+        let path = entry.path();
+        if is_markdown(&path) {
+            md_files.push(path);
         }
     }
 
@@ -245,7 +243,7 @@ fn move_to_para(
     config: &ForgeConfig,
     vault_root: &Path,
 ) -> Result<()> {
-    let dest_dir = resolve_dest_dir(&vault_root, category, subcategory, detail, config);
+    let dest_dir = resolve_dest_dir(vault_root, category, subcategory, detail, config);
     fs::create_dir_all(&dest_dir)?;
 
     let file_name = path

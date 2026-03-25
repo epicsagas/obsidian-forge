@@ -11,7 +11,7 @@ mod watcher;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::{fs, path::PathBuf};
+use std::{fs, path::{Path, PathBuf}};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use config::{ForgeConfig, GlobalConfig};
@@ -181,10 +181,10 @@ async fn main() -> Result<()> {
             path,
             clone_settings_from,
         } => {
-            let target = fs::canonicalize(&path).unwrap_or_else(|_| PathBuf::from(&path));
-            init::init_vault(&name, &target)?;
+            let target = fs::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path));
+            init::init_vault(name, &target)?;
 
-            let target_vault = target.join(&name);
+            let target_vault = target.join(name);
             if let Some(source) = clone_settings_from {
                 // Explicit flag: clone from a specific vault
                 let source_path = resolve_vault_path(source)?;
@@ -316,7 +316,7 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
     Ok(())
 }
 
-fn build_plist(label: &str, exe: &PathBuf, log_dir: &PathBuf) -> String {
+fn build_plist(label: &str, exe: &Path, log_dir: &Path) -> String {
     let home = dirs_home();
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -498,7 +498,7 @@ fn handle_vault_action(action: &VaultAction) -> Result<()> {
             if global.vaults.is_empty() {
                 println!("No vaults registered. Use `obsidian-forge init` or `vault add`.");
             } else {
-                println!("{:<20} {:<8} {:<8} {}", "NAME", "ENABLED", "WATCH", "PATH");
+                println!("{:<20} {:<8} {:<8} PATH", "NAME", "ENABLED", "WATCH");
                 println!("{}", "-".repeat(72));
                 for v in &global.vaults {
                     let enabled = if v.enabled { "✓" } else { "✗" };
@@ -717,7 +717,7 @@ fn run_sync_all(filter: Option<String>) -> Result<()> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn run_sync_cycle(vault: &PathBuf, config: &ForgeConfig) {
+fn run_sync_cycle(vault: &Path, config: &ForgeConfig) {
     if let Err(e) = moc::update_all_mocs(vault, config) {
         tracing::warn!("[{}] MOC update error: {:?}", config.vault.name, e);
     }

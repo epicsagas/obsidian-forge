@@ -401,7 +401,7 @@ fn update_related_projects(
         }
 
         if let Some(concepts) = concepts {
-            section.push_str(&format!("\n## Key Concepts\n"));
+            section.push_str("\n## Key Concepts\n");
             for c in concepts {
                 section.push_str(&format!("- [[{}/{}]]\n", zk_dir, c));
             }

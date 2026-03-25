@@ -26,7 +26,7 @@ pub async fn convert_pdf_to_md(
     let stem = if stem.is_empty() {
         "unknown".to_string()
     } else {
-        stem.replace("..", "").replace('/', "").replace('\\', "")
+        stem.replace("..", "").replace(['/', '\\'], "")
     };
 
     let inbox = vault_root.join(&config.vault.inbox_dir);

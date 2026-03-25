@@ -21,14 +21,11 @@ pub async fn watch_inbox(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
 
     // Bridge std::sync::mpsc → tokio::sync::mpsc so we don't block the async runtime.
     let (async_tx, mut async_rx) = tokio::sync::mpsc::unbounded_channel::<notify::Result<Event>>();
-    std::thread::spawn(move || loop {
-        match rx.recv() {
-            Ok(event) => {
-                if async_tx.send(event).is_err() {
-                    break;
-                }
+    std::thread::spawn(move || {
+        while let Ok(event) = rx.recv() {
+            if async_tx.send(event).is_err() {
+                break;
             }
-            Err(_) => break,
         }
     });
 
