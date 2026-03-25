@@ -9,7 +9,7 @@ use tracing::{debug, info};
 /// Per-vault config file.
 pub const CONFIG_FILE: &str = "vault.toml";
 /// Global config directory.
-pub const GLOBAL_DIR: &str = ".config/obsidian-forge";
+pub const GLOBAL_DIR: &str = ".obsidian-forge";
 /// Global config file name.
 pub const GLOBAL_FILE: &str = "config.toml";
 /// Subdirectories and files managed in the global settings store.
