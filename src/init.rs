@@ -3,7 +3,6 @@ use std::{fs, path::Path, process::Command};
 use tracing::{info, warn};
 
 use crate::config::{GlobalConfig, CONFIG_FILE, SETTINGS_DIRS, SETTINGS_FILES};
-use std::os::unix::fs::symlink;
 
 /// Initialize a vault. Works for both new and existing directories.
 /// - New directory: creates it, scaffolds everything, git init + first commit
@@ -335,7 +334,7 @@ fn link_global_templates(
         }
         // Dangling symlink — remove and recreate.
         fs::remove_file(&link_path)?;
-        symlink(&global_tpl, &link_path)?;
+        create_symlink(&global_tpl, &link_path)?;
         created.push(format!(
             "obsidian-templates → {} (dangling symlink replaced)",
             global_tpl.display()
@@ -349,7 +348,7 @@ fn link_global_templates(
         return Ok(());
     }
 
-    symlink(&global_tpl, &link_path)?;
+    create_symlink(&global_tpl, &link_path)?;
     created.push(format!(
         "obsidian-templates → {} (symlink)",
         global_tpl.display()
@@ -460,6 +459,18 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
             fs::copy(&src_path, &dst_path)?;
         }
     }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn create_symlink(src: &Path, dst: &Path) -> Result<()> {
+    std::os::unix::fs::symlink(src, dst)?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn create_symlink(src: &Path, dst: &Path) -> Result<()> {
+    copy_dir_recursive(src, dst)?;
     Ok(())
 }
 
