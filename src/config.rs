@@ -444,6 +444,7 @@ impl ForgeConfig {
     }
 
     /// Save config to `vault.toml`.
+    #[allow(dead_code)] // Public API; CLI uses `default_vault_toml_template` for new files
     pub fn save(&self, vault_root: &Path) -> Result<()> {
         let path = vault_root.join(CONFIG_FILE);
         let text = toml::to_string_pretty(self)?;
@@ -477,7 +478,8 @@ impl ForgeConfig {
         dirs
     }
 
-    /// Build the default config for `init`.
+    /// In-memory defaults matching an active-only `vault.toml` (see `default_vault_toml_template`).
+    #[allow(dead_code)] // Exercised by unit tests
     pub fn default_for(name: &str) -> Self {
         Self {
             vault: VaultConfig {
@@ -498,6 +500,56 @@ impl ForgeConfig {
             daemon: DaemonConfig::default(),
         }
     }
+}
+
+/// Initial `vault.toml` for `init` and `vault add`. Only `[vault]` is active; other sections are
+/// commented examples so runtime defaults (and `~/.config/obsidian-forge/config.toml`) apply until
+/// the user uncomments and overrides.
+pub fn default_vault_toml_template(vault_name: &str) -> String {
+    format!(
+        r#"# Vault-specific configuration
+# Values here override ~/.config/obsidian-forge/config.toml defaults
+
+[vault]
+name = "{vault_name}"
+layout = "para"
+inbox_dir = "00-Inbox"
+zettelkasten_dir = "10-Zettelkasten"
+archive_dir = "99-Archives"
+attachments_dir = "Attachments"
+templates_dir = "obsidian-templates"
+system_dirs = []
+
+# [projects]
+# detect = "top-level-dirs"
+# exclude = ["_template"]
+
+# [graph]
+# backlinks = true
+# bridge_notes = true
+# auto_tags = true
+# related_projects = true
+# concepts = []
+
+# [sync]
+# git_auto_commit = false
+# git_auto_push = false
+# interval_minutes = 60
+
+# [ai]
+# provider = "ollama"
+# model = "gemma3"
+# base_url = null
+# api_key = null
+# max_concurrent = 5
+
+# [daemon]
+# label = "com.obsidian-forge.watch"
+# log_dir = "~/.obsidian-forge/logs"
+# interval_seconds = 3600
+"#,
+        vault_name = vault_name,
+    )
 }
 
 /// Resolve the vault root from an optional path argument.
@@ -531,6 +583,15 @@ fn canonicalize(p: PathBuf) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_default_vault_toml_template_parses() {
+        let s = default_vault_toml_template("my-vault");
+        let cfg: ForgeConfig = toml::from_str(&s).expect("template TOML");
+        assert_eq!(cfg.vault.name, "my-vault");
+        assert_eq!(cfg.projects.detect, ProjectsConfig::default().detect);
+        assert!(cfg.graph.backlinks);
+    }
 
     #[test]
     fn test_forge_config_default_for() {

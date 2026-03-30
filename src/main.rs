@@ -14,7 +14,7 @@ use clap::{Parser, Subcommand};
 use std::{fs, path::{Path, PathBuf}};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use config::{ForgeConfig, GlobalConfig};
+use config::{default_vault_toml_template, ForgeConfig, GlobalConfig};
 
 #[derive(Parser)]
 #[command(name = "obsidian-forge")]
@@ -477,15 +477,20 @@ fn handle_vault_action(action: &VaultAction) -> Result<()> {
                     .to_string()
             });
 
-            // Create vault.toml if missing
+            // Create vault.toml if missing (commented examples; defaults from global + serde)
             let vault_toml = abs.join(config::CONFIG_FILE);
             if !vault_toml.exists() {
-                let cfg = ForgeConfig::default_for(&vault_name);
-                cfg.save(&abs)?;
+                fs::write(&vault_toml, default_vault_toml_template(&vault_name))?;
                 println!("  Created vault.toml in {}", abs.display());
             }
 
             global.add_vault(&vault_name, &abs.to_string_lossy());
+            if global.seed_missing_tooling_sections() {
+                println!(
+                    "  Seeded default [sync], [ai], [daemon] in {}",
+                    GlobalConfig::path().display()
+                );
+            }
             global.save()?;
             println!("✅ Registered: {} → {}", vault_name, abs.display());
         }
