@@ -429,7 +429,7 @@ fn register_and_print(vault_root: &Path, name: &str) {
     global.add_vault(name, &vault_root.to_string_lossy());
     if global.seed_missing_tooling_sections() {
         println!(
-            "  Seeded default [sync], [ai], [daemon] in {}",
+            "  Seeded default [projects], [graph], [sync], [ai], [daemon] in {}",
             GlobalConfig::path().display()
         );
     }

@@ -487,7 +487,7 @@ fn handle_vault_action(action: &VaultAction) -> Result<()> {
             global.add_vault(&vault_name, &abs.to_string_lossy());
             if global.seed_missing_tooling_sections() {
                 println!(
-                    "  Seeded default [sync], [ai], [daemon] in {}",
+                    "  Seeded default [projects], [graph], [sync], [ai], [daemon] in {}",
                     GlobalConfig::path().display()
                 );
             }

@@ -21,6 +21,34 @@ pub const SETTINGS_FILES: &[&str] = &[
     "app.json",
 ];
 
+/// Prepended to `config.toml` on every save so users can read purpose of each table without docs.
+const GLOBAL_CONFIG_PREAMBLE: &str = r#"# obsidian-forge — global configuration
+# Path: ~/.config/obsidian-forge/config.toml
+#
+# ── Global-only settings (do NOT override in vault.toml) ─────────────────
+#   [ai]        Shared AI backend: provider, model, base_url, api_key, max_concurrent.
+#               Individual vaults may override `model` and `max_concurrent` only.
+#   [daemon]    Single watch/sync process for all vaults: label, log_dir, interval_seconds.
+#               Not meaningful per-vault — always managed here.
+#
+# ── Shared defaults (vault.toml can override per-vault) ───────────────────
+#   [projects]  Default exclude list for MOC/graph scanning.
+#   [graph]     Default graph strengthening toggles (backlinks, bridge notes, tags, concepts).
+#   [sync]      Default git auto commit/push and sync interval.
+#
+# ── Vault registry ────────────────────────────────────────────────────────
+#   [[vaults]]  Registered vaults with name, path, enabled, watch flags.
+#               Managed automatically by `obsidian-forge init` and `vault add/remove`.
+#
+# ── [ai] optional keys (omitted from generated TOML when unset) ───────────
+# base_url = "https://api.openai.com/v1"       # openai
+# base_url = "https://openrouter.ai/api/v1"    # openrouter
+# base_url = "http://localhost:1234/v1"        # lmstudio
+# base_url = "http://localhost:11434/v1"       # openai-compatible
+# (ollama: base_url unused, uses local CLI)
+#
+"#;
+
 // ---------------------------------------------------------------------------
 // Global config (multi-vault)
 // ---------------------------------------------------------------------------
@@ -29,6 +57,12 @@ pub const SETTINGS_FILES: &[&str] = &[
 pub struct GlobalConfig {
     #[serde(default)]
     pub vaults: Vec<VaultEntry>,
+    /// Shared project detection defaults (vault.toml `[projects]` overrides when present).
+    #[serde(default)]
+    pub projects: Option<ProjectsConfig>,
+    /// Shared graph defaults (vault.toml `[graph]` overrides when present).
+    #[serde(default)]
+    pub graph: Option<GraphConfig>,
     #[serde(default)]
     pub sync: Option<SyncConfig>,
     #[serde(default)]
@@ -75,6 +109,8 @@ impl GlobalConfig {
         if !p.exists() {
             return Ok(Self {
                 vaults: Vec::new(),
+                projects: None,
+                graph: None,
                 sync: None,
                 ai: None,
                 daemon: None,
@@ -90,7 +126,12 @@ impl GlobalConfig {
             .parent()
             .ok_or_else(|| anyhow::anyhow!("invalid config path: {}", p.display()))?;
         fs::create_dir_all(parent)?;
-        fs::write(&p, toml::to_string_pretty(self)?)?;
+        let body = toml::to_string_pretty(self)?;
+        let mut out = String::with_capacity(GLOBAL_CONFIG_PREAMBLE.len() + body.len() + 4);
+        out.push_str(GLOBAL_CONFIG_PREAMBLE);
+        out.push('\n');
+        out.push_str(&body);
+        fs::write(&p, out)?;
         debug!("Global config saved to {}", p.display());
         Ok(())
     }
@@ -134,13 +175,20 @@ impl GlobalConfig {
         self.vaults.iter().filter(|v| v.enabled).collect()
     }
 
-    /// Fills `sync`, `ai`, and `daemon` with the same defaults as a new `vault.toml` would use,
-    /// but only when each section is absent (`None`). Makes `~/.config/obsidian-forge/config.toml`
-    /// self-documenting and easy to edit after the first `init`.
+    /// Fills shared sections (`projects`, `graph`, `sync`, `ai`, `daemon`) when absent (`None`).
+    /// Called after `init` / `vault add` so the global file lists every knob with defaults.
     ///
     /// Returns `true` if any section was added (global file will gain new keys on save).
     pub fn seed_missing_tooling_sections(&mut self) -> bool {
         let mut added = false;
+        if self.projects.is_none() {
+            self.projects = Some(ProjectsConfig::default());
+            added = true;
+        }
+        if self.graph.is_none() {
+            self.graph = Some(GraphConfig::default());
+            added = true;
+        }
         if self.sync.is_none() {
             self.sync = Some(SyncConfig::default());
             added = true;
@@ -201,15 +249,17 @@ pub struct VaultConfig {
     pub system_dirs: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProjectsConfig {
+    /// Reserved for future detection modes; **currently ignored**. MOC/graph scan only uses
+    /// top-level directories under the vault root (same as `top-level-dirs`).
     #[serde(default = "default_detect")]
     pub detect: String,
     #[serde(default)]
     pub exclude: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GraphConfig {
     #[serde(default = "yes")]
     pub backlinks: bool,
@@ -223,7 +273,7 @@ pub struct GraphConfig {
     pub concepts: Vec<ConceptDef>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConceptDef {
     pub name: String,
     pub keywords: Vec<String>,
@@ -367,6 +417,71 @@ impl Default for DaemonConfig {
 // Loading
 // ---------------------------------------------------------------------------
 
+/// Apply `~/.config/obsidian-forge/config.toml` onto a vault-loaded config.
+fn merge_global_into_forge(config: &mut ForgeConfig, global: &GlobalConfig) {
+    if let Some(ref gp) = global.projects {
+        if config.projects == ProjectsConfig::default() {
+            config.projects = gp.clone();
+        }
+    }
+    if let Some(ref gg) = global.graph {
+        if config.graph == GraphConfig::default() {
+            config.graph = gg.clone();
+        }
+    }
+    if let Some(ref global_sync) = global.sync {
+        config.sync = SyncConfig {
+            git_auto_commit: config.sync.git_auto_commit,
+            git_auto_push: config.sync.git_auto_push,
+            interval_minutes: config
+                .sync
+                .interval_minutes
+                .or(global_sync.interval_minutes),
+        };
+    }
+    if let Some(ref global_ai) = global.ai {
+        config.ai = AiConfig {
+            provider: if config.ai.provider == default_provider()
+                && global_ai.provider != default_provider()
+            {
+                global_ai.provider.clone()
+            } else {
+                config.ai.provider.clone()
+            },
+            model: if config.ai.model == default_model() && global_ai.model != default_model() {
+                global_ai.model.clone()
+            } else {
+                config.ai.model.clone()
+            },
+            base_url: config.ai.base_url.clone().or(global_ai.base_url.clone()),
+            api_key: config.ai.api_key.clone().or(global_ai.api_key.clone()),
+            max_concurrent: config.ai.max_concurrent.or(global_ai.max_concurrent),
+        };
+    }
+    if let Some(ref global_daemon) = global.daemon {
+        config.daemon = DaemonConfig {
+            label: if config.daemon.label == default_label()
+                && global_daemon.label != default_label()
+            {
+                global_daemon.label.clone()
+            } else {
+                config.daemon.label.clone()
+            },
+            log_dir: if config.daemon.log_dir == default_log_dir()
+                && global_daemon.log_dir != default_log_dir()
+            {
+                global_daemon.log_dir.clone()
+            } else {
+                config.daemon.log_dir.clone()
+            },
+            interval_seconds: config
+                .daemon
+                .interval_seconds
+                .or(global_daemon.interval_seconds),
+        };
+    }
+}
+
 impl ForgeConfig {
     /// Load config from `vault.toml` in the given vault root.
     /// Merges with global config: vault.toml values override global defaults.
@@ -382,61 +497,8 @@ impl ForgeConfig {
         let text = fs::read_to_string(&path)?;
         let mut config: ForgeConfig = toml::from_str(&text)?;
 
-        // Merge with global config (global as defaults, vault overrides)
         if let Ok(global) = GlobalConfig::load() {
-            if let Some(ref global_sync) = global.sync {
-                config.sync = SyncConfig {
-                    git_auto_commit: config.sync.git_auto_commit,
-                    git_auto_push: config.sync.git_auto_push,
-                    interval_minutes: config
-                        .sync
-                        .interval_minutes
-                        .or(global_sync.interval_minutes),
-                };
-            }
-            if let Some(ref global_ai) = global.ai {
-                config.ai = AiConfig {
-                    provider: if config.ai.provider == default_provider()
-                        && global_ai.provider != default_provider()
-                    {
-                        global_ai.provider.clone()
-                    } else {
-                        config.ai.provider.clone()
-                    },
-                    model: if config.ai.model == default_model()
-                        && global_ai.model != default_model()
-                    {
-                        global_ai.model.clone()
-                    } else {
-                        config.ai.model.clone()
-                    },
-                    base_url: config.ai.base_url.clone().or(global_ai.base_url.clone()),
-                    api_key: config.ai.api_key.clone().or(global_ai.api_key.clone()),
-                    max_concurrent: config.ai.max_concurrent.or(global_ai.max_concurrent),
-                };
-            }
-            if let Some(ref global_daemon) = global.daemon {
-                config.daemon = DaemonConfig {
-                    label: if config.daemon.label == default_label()
-                        && global_daemon.label != default_label()
-                    {
-                        global_daemon.label.clone()
-                    } else {
-                        config.daemon.label.clone()
-                    },
-                    log_dir: if config.daemon.log_dir == default_log_dir()
-                        && global_daemon.log_dir != default_log_dir()
-                    {
-                        global_daemon.log_dir.clone()
-                    } else {
-                        config.daemon.log_dir.clone()
-                    },
-                    interval_seconds: config
-                        .daemon
-                        .interval_seconds
-                        .or(global_daemon.interval_seconds),
-                };
-            }
+            merge_global_into_forge(&mut config, &global);
         }
 
         info!("Loaded config from {}", path.display());
@@ -502,13 +564,28 @@ impl ForgeConfig {
     }
 }
 
-/// Initial `vault.toml` for `init` and `vault add`. Only `[vault]` is active; other sections are
-/// commented examples so runtime defaults (and `~/.config/obsidian-forge/config.toml`) apply until
-/// the user uncomments and overrides.
+/// Initial `vault.toml` for `init` and `vault add`. Only `[vault]` is active.
+///
+/// Shared defaults (`projects`, `graph`, `sync`) and global-only settings (`ai`, `daemon`) live in
+/// `~/.config/obsidian-forge/config.toml`. Uncomment a section below only to override for this vault.
 pub fn default_vault_toml_template(vault_name: &str) -> String {
     format!(
-        r#"# Vault-specific configuration
-# Values here override ~/.config/obsidian-forge/config.toml defaults
+        r#"# vault.toml — settings for THIS vault only
+#
+# ── Always vault-specific (edit freely) ──────────────────────────────────
+#   [vault]     Display name and folder layout (inbox, PARA paths, templates, …).
+#
+# ── Per-vault overrides (uncomment to differ from global config.toml) ─────
+#   [projects]  Exclude specific top-level dirs from MOC/graph scanning.
+#   [graph]     Graph strengthening toggles and custom concepts for this vault.
+#   [sync]      Git auto commit/push and sync interval for this vault.
+#   [ai]        Override model or concurrency for AI operations in this vault.
+#               (provider / base_url / api_key are global infrastructure — set in config.toml)
+#
+# ── Global-only (manage in ~/.config/obsidian-forge/config.toml) ──────────
+#   [daemon]    Single watch/sync process for all vaults; not meaningful per-vault.
+#   [ai]        provider, base_url, api_key — shared AI backend.
+#
 
 [vault]
 name = "{vault_name}"
@@ -520,8 +597,10 @@ attachments_dir = "Attachments"
 templates_dir = "obsidian-templates"
 system_dirs = []
 
+# ── Per-vault overrides ───────────────────────────────────────────────────
+
 # [projects]
-# detect = "top-level-dirs"
+# detect = "top-level-dirs"   # reserved for future use
 # exclude = ["_template"]
 
 # [graph]
@@ -530,6 +609,11 @@ system_dirs = []
 # auto_tags = true
 # related_projects = true
 # concepts = []
+# # Example concept definition:
+# # [[graph.concepts]]
+# # name = "rust"
+# # keywords = ["cargo", "crate", "borrow"]
+# # tags = ["lang/rust"]
 
 # [sync]
 # git_auto_commit = false
@@ -537,16 +621,8 @@ system_dirs = []
 # interval_minutes = 60
 
 # [ai]
-# provider = "ollama"
-# model = "gemma3"
-# base_url = null
-# api_key = null
-# max_concurrent = 5
-
-# [daemon]
-# label = "com.obsidian-forge.watch"
-# log_dir = "~/.obsidian-forge/logs"
-# interval_seconds = 3600
+# model = "gemma3"        # override AI model for this vault only
+# max_concurrent = 5      # override concurrency limit for this vault only
 "#,
         vault_name = vault_name,
     )
@@ -676,5 +752,63 @@ mod tests {
         assert!(dirs.contains(&"10-Zettelkasten".to_string()));
         assert!(dirs.contains(&".git".to_string()));
         assert!(dirs.contains(&".obsidian".to_string()));
+    }
+
+    #[test]
+    fn test_global_toml_parses_with_preamble() {
+        let body = r#"[[vaults]]
+name = "v"
+path = "/tmp/v"
+
+[sync]
+git_auto_commit = false
+git_auto_push = false
+"#;
+        let full = format!("{GLOBAL_CONFIG_PREAMBLE}\n{body}");
+        let g: GlobalConfig = toml::from_str(&full).expect("parse with preamble");
+        assert_eq!(g.vaults.len(), 1);
+        assert_eq!(g.vaults[0].name, "v");
+    }
+
+    #[test]
+    fn test_merge_global_replaces_default_projects_and_graph() {
+        let mut config: ForgeConfig =
+            toml::from_str(&default_vault_toml_template("v")).expect("vault template");
+        let mut global = GlobalConfig::default();
+        global.projects = Some(ProjectsConfig {
+            detect: "from-global".into(),
+            exclude: vec!["only-global".into()],
+        });
+        global.graph = Some(GraphConfig {
+            backlinks: false,
+            ..GraphConfig::default()
+        });
+        merge_global_into_forge(&mut config, &global);
+        assert_eq!(config.projects.detect, "from-global");
+        assert_eq!(config.projects.exclude, vec!["only-global".to_string()]);
+        assert!(!config.graph.backlinks);
+    }
+
+    #[test]
+    fn test_merge_global_skips_graph_when_vault_customized() {
+        let toml_v = r#"
+[vault]
+name = "v"
+layout = "para"
+inbox_dir = "00-Inbox"
+zettelkasten_dir = "10-Zettelkasten"
+archive_dir = "99-Archives"
+attachments_dir = "Attachments"
+templates_dir = "obsidian-templates"
+system_dirs = []
+
+[graph]
+backlinks = false
+"#;
+        let mut config: ForgeConfig = toml::from_str(toml_v).expect("parse");
+        let mut global = GlobalConfig::default();
+        global.graph = Some(GraphConfig::default());
+        merge_global_into_forge(&mut config, &global);
+        assert!(!config.graph.backlinks);
     }
 }
