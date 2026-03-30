@@ -133,6 +133,28 @@ impl GlobalConfig {
     pub fn enabled_vaults(&self) -> Vec<&VaultEntry> {
         self.vaults.iter().filter(|v| v.enabled).collect()
     }
+
+    /// Fills `sync`, `ai`, and `daemon` with the same defaults as a new `vault.toml` would use,
+    /// but only when each section is absent (`None`). Makes `~/.config/obsidian-forge/config.toml`
+    /// self-documenting and easy to edit after the first `init`.
+    ///
+    /// Returns `true` if any section was added (global file will gain new keys on save).
+    pub fn seed_missing_tooling_sections(&mut self) -> bool {
+        let mut added = false;
+        if self.sync.is_none() {
+            self.sync = Some(SyncConfig::default());
+            added = true;
+        }
+        if self.ai.is_none() {
+            self.ai = Some(AiConfig::default());
+            added = true;
+        }
+        if self.daemon.is_none() {
+            self.daemon = Some(DaemonConfig::default());
+            added = true;
+        }
+        added
+    }
 }
 
 fn dirs_home() -> PathBuf {

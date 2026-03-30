@@ -133,7 +133,8 @@ fn adopt_directory_verbose(
 
     // ── vault.toml ���──────────────────────────────────────────────────────
     if !vault_root.join(CONFIG_FILE).exists() {
-        let config_content = format!(r#"# Vault-specific configuration
+        let config_content = format!(
+            r#"# Vault-specific configuration
 # Values here override ~/.obsidian-forge/config.toml defaults
 
 [vault]
@@ -176,7 +177,9 @@ concepts = []
 # label = "com.obsidian-forge.watch"
 # log_dir = "~/.obsidian-forge/logs"
 # interval_seconds = 3600
-"#, name);
+"#,
+            name
+        );
         fs::write(vault_root.join(CONFIG_FILE), config_content)?;
         created.push(CONFIG_FILE.into());
     } else {
@@ -466,6 +469,12 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
 fn register_and_print(vault_root: &Path, name: &str) {
     let mut global = GlobalConfig::load().unwrap_or_default();
     global.add_vault(name, &vault_root.to_string_lossy());
+    if global.seed_missing_tooling_sections() {
+        println!(
+            "  Seeded default [sync], [ai], [daemon] in {}",
+            GlobalConfig::path().display()
+        );
+    }
     if let Err(e) = global.save() {
         warn!("Failed to update global config: {:?}", e);
     }
