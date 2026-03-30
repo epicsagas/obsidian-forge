@@ -429,7 +429,20 @@ fn create_symlink(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+fn create_symlink(src: &Path, dst: &Path) -> Result<()> {
+    // Directory symlink — falls back to recursive copy if the user
+    // lacks the "Create symbolic links" privilege.
+    if std::os::windows::fs::symlink_dir(src, dst).is_ok() {
+        return Ok(());
+    }
+    // Fall back to junction (works without elevated privileges on NTFS).
+    // If that also fails, copy recursively as last resort.
+    copy_dir_recursive(src, dst)?;
+    Ok(())
+}
+
+#[cfg(not(any(unix, windows)))]
 fn create_symlink(src: &Path, dst: &Path) -> Result<()> {
     copy_dir_recursive(src, dst)?;
     Ok(())
