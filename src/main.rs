@@ -99,6 +99,16 @@ enum Commands {
         vault: Option<String>,
     },
 
+    /// Show vault and AI configuration status
+    Status {
+        /// Specific vault name (from global config)
+        #[arg(long)]
+        vault: Option<String>,
+        /// Skip AI connectivity test
+        #[arg(long)]
+        no_ping: bool,
+    },
+
     /// Manage the background daemon (macOS LaunchAgent)
     Daemon {
         #[command(subcommand)]
@@ -234,6 +244,13 @@ async fn main() -> Result<()> {
         Commands::StrengthenGraph { vault: filter } => {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
             graph::strengthen_graph(&vault, &config)?;
+        }
+        Commands::Status {
+            vault: filter,
+            no_ping,
+        } => {
+            let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
+            run_status(&vault, &config, no_ping).await?;
         }
         _ => unreachable!(),
     }
@@ -740,10 +757,17 @@ fn run_sync_cycle(vault: &Path, config: &ForgeConfig) {
 }
 
 /// Resolve a single vault from --vault flag, --vault-path, or CWD.
+///
+/// Priority:
+/// 1. `--vault <name>` — look up by name in global config
+/// 2. `--vault-path` / `VAULT_PATH` env — direct path
+/// 3. CWD walk-up — look for `vault.toml` or `00-Inbox`
+/// 4. Global config fallback — single registered vault → auto-select; multiple → list
 fn resolve_single_vault(
     vault_path: Option<String>,
     filter: Option<String>,
 ) -> Result<(PathBuf, ForgeConfig)> {
+    // 1. Explicit --vault <name>
     if let Some(name) = filter {
         let global = GlobalConfig::load()?;
         if let Some(entry) = global.find_vault(&name) {
@@ -753,9 +777,114 @@ fn resolve_single_vault(
         }
         anyhow::bail!("Vault '{}' not found in global config", name);
     }
-    let vault = config::resolve_vault(vault_path)?;
-    let config = ForgeConfig::load(&vault)?;
-    Ok((vault, config))
+
+    // 2 & 3. --vault-path / VAULT_PATH / CWD walk-up
+    if let Ok(vault) = config::resolve_vault(vault_path.clone()) {
+        let config = ForgeConfig::load(&vault)?;
+        return Ok((vault, config));
+    }
+
+    // 4. Global config fallback
+    let global = GlobalConfig::load()?;
+    let enabled: Vec<_> = global.enabled_vaults();
+    match enabled.len() {
+        0 => {
+            anyhow::bail!(
+                "No vaults registered. Run `of init <name>` to create one, \
+                 or `of vault add <path>` to register an existing vault."
+            );
+        }
+        1 => {
+            let entry = enabled[0];
+            let p = PathBuf::from(&entry.path);
+            let c = ForgeConfig::load(&p)?;
+            Ok((p, c))
+        }
+        _ => {
+            let names: Vec<String> = enabled.iter().map(|v| v.name.clone()).collect();
+            anyhow::bail!(
+                "Multiple vaults registered. Specify one with --vault <name>.\n\
+                 Available: {}",
+                names.join(", ")
+            );
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Status
+// ---------------------------------------------------------------------------
+
+async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result<()> {
+    // ── Vault ──
+    println!("Vault");
+    println!("  Name:       {}", config.vault.name);
+    println!("  Path:       {}", vault.display());
+    let inbox = vault.join(&config.vault.inbox_dir);
+    println!(
+        "  Inbox:      {} ({})",
+        config.vault.inbox_dir,
+        if inbox.exists() { "exists" } else { "missing" }
+    );
+
+    // ── AI ──
+    let client = ai::AiClient::from_config(&config.ai);
+    let summary = client.config_summary();
+
+    println!();
+    println!("AI");
+    println!("  Provider:   {}", summary.provider);
+    println!("  Model:      {}", summary.model);
+    println!("  Base URL:   {}", summary.base_url);
+    println!(
+        "  API Key:    {}",
+        if summary.api_key == "missing" {
+            "⚠️  missing".to_string()
+        } else if summary.api_key == "not required" {
+            "not required".to_string()
+        } else {
+            summary.api_key.clone()
+        }
+    );
+
+    if no_ping {
+        println!("  Ping:       skipped (--no-ping)");
+    } else {
+        print!("  Ping:       ");
+        match client.ping().await {
+            Ok(resp) => {
+                let display = if resp.len() > 80 {
+                    format!("{}…", &resp[..80])
+                } else {
+                    resp
+                };
+                println!("✅ connected ({})", display);
+            }
+            Err(e) => println!("❌ {}", e),
+        }
+    }
+
+    // ── Sync ──
+    println!();
+    println!("Sync");
+    println!(
+        "  Git commit: {}",
+        if config.sync.git_auto_commit {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
+    println!(
+        "  Git push:   {}",
+        if config.sync.git_auto_push {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
+
+    Ok(())
 }
 
 /// Resolve a vault name (from global config) or path to an absolute path.

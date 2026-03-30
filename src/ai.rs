@@ -4,6 +4,14 @@ use tracing::{debug, warn};
 
 use crate::config::AiConfig;
 
+/// Summary of AI configuration (for display purposes).
+pub struct AiConfigSummary {
+    pub provider: String,
+    pub model: String,
+    pub base_url: String,
+    pub api_key: String,
+}
+
 /// Unified AI client. Supports:
 /// - `ollama`            — local Ollama CLI subprocess
 /// - `openai`            — OpenAI API (requires api_key)
@@ -45,6 +53,144 @@ impl AiClient {
             base_url,
             api_key,
             http: reqwest::Client::new(),
+        }
+    }
+
+    /// Send a minimal prompt to verify AI connectivity.
+    /// Returns a short confirmation message from the model on success.
+    /// 429 (rate-limited) is treated as reachable — the config is correct,
+    /// only the request budget is exhausted.
+    pub async fn ping(&self) -> Result<String> {
+        match self.provider.as_str() {
+            "ollama" => {
+                // For ollama, just check that the CLI is available
+                let output = tokio::process::Command::new("ollama")
+                    .arg("list")
+                    .output()
+                    .await
+                    .context("failed to spawn ollama — is it installed?")?;
+                if output.status.success() {
+                    Ok("ollama running".to_string())
+                } else {
+                    anyhow::bail!(
+                        "ollama not responding: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    )
+                }
+            }
+            _ => self.ping_http().await,
+        }
+    }
+
+    /// HTTP-based ping: send a minimal completion request and interpret the
+    /// response status.  429 means "connected but rate-limited" (success).
+    async fn ping_http(&self) -> Result<String> {
+        #[derive(Serialize)]
+        struct Req<'a> {
+            model: &'a str,
+            messages: Vec<Msg<'a>>,
+            max_tokens: u32,
+        }
+        #[derive(Serialize)]
+        struct Msg<'a> {
+            role: &'a str,
+            content: &'a str,
+        }
+
+        if self.base_url.is_empty() {
+            anyhow::bail!(
+                "provider '{}' requires a base_url — set it in config.toml [ai]",
+                self.provider
+            );
+        }
+
+        let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
+        let body = Req {
+            model: &self.model,
+            messages: vec![Msg {
+                role: "user",
+                content: "Hi",
+            }],
+            max_tokens: 1,
+        };
+
+        let mut req = self
+            .http
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&body);
+
+        if let Some(key) = &self.api_key {
+            req = req.bearer_auth(key);
+        }
+        if self.provider == "openrouter" {
+            req = req
+                .header("HTTP-Referer", "https://github.com/epicsagas/obsidian-forge")
+                .header("X-Title", "obsidian-forge");
+        }
+
+        let resp = req
+            .send()
+            .await
+            .with_context(|| format!("connection to {} failed", url))?;
+
+        let status = resp.status();
+        match status.as_u16() {
+            200..=299 => {
+                // Try to parse response body for a short confirmation
+                let text = resp.text().await.unwrap_or_default();
+                // Extract content from JSON response
+                if let Some(content) = text
+                    .split("\"content\":")
+                    .nth(1)
+                    .and_then(|s| s.trim().strip_prefix('"'))
+                    .and_then(|s| s.split('"').next())
+                {
+                    Ok(content.to_string())
+                } else {
+                    Ok("connected".to_string())
+                }
+            }
+            429 => Ok("connected (rate-limited)".to_string()),
+            401 | 403 => anyhow::bail!("connected but unauthorized — check API key"),
+            404 => anyhow::bail!(
+                "connected but model '{}' not found at {} — check model name",
+                self.model,
+                self.base_url
+            ),
+            _ => {
+                let body = resp.text().await.unwrap_or_default();
+                anyhow::bail!("API error {}: {}", status, body)
+            }
+        }
+    }
+
+    /// Return a summary of the current configuration (for status display).
+    /// The API key is masked for safety.
+    pub fn config_summary(&self) -> AiConfigSummary {
+        let key_status = match &self.api_key {
+            Some(k) if !k.is_empty() => {
+                if k.len() > 8 {
+                    format!("{}...{}", &k[..4], &k[k.len() - 4..])
+                } else {
+                    "****".to_string()
+                }
+            }
+            _ if self.provider == "ollama" || self.provider == "lmstudio" => {
+                "not required".to_string()
+            }
+            _ => "missing".to_string(),
+        };
+
+        AiConfigSummary {
+            provider: self.provider.clone(),
+            model: self.model.clone(),
+            base_url: if self.base_url.is_empty() {
+                "N/A (ollama)".to_string()
+            } else {
+                self.base_url.clone()
+            },
+            api_key: key_status,
         }
     }
 
