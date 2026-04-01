@@ -217,14 +217,34 @@ label   = "com.obsidian-forge.watch"
 log_dir = "~/.obsidian-forge/logs"
 ```
 
-**API キーの優先順位：** 環境変数 → `vault.toml api_key`（シークレットのコミット防止のため環境変数を推奨）
+**APIキー**の解決順序：
 
-| プロバイダー | 環境変数 |
-|---|---|
-| `openai` | `OPENAI_API_KEY` |
-| `openrouter` | `OPENROUTER_API_KEY` |
-| `openai-compatible` | `OPENAI_API_KEY` |
-| `ollama` / `lmstudio` | — （キー不要） |
+1. `[ai]`セクションの`api_key`（config.tomlまたはvault.toml）— *シークレットのコミットを避けること*
+2. 環境変数（下記の表を参照）
+3. `~/.config/obsidian-forge/.env`ファイル — **推奨**（自動ロード、コミットされない）
+
+| Provider | 環境変数 | 備考 |
+|---|---|---|
+| `openai` | `OPENAI_API_KEY` | [キー取得 →](https://platform.openai.com/api-keys) |
+| `openrouter` | `OPENROUTER_API_KEY` | [キー取得 →](https://openrouter.ai/keys) |
+| `openai-compatible` | `OPENAI_COMPATIBLE_API_KEY` | `OPENAI_API_KEY`にフォールバック |
+| `ollama` / `lmstudio` | — | キー不要 |
+
+**`.env`ファイルでAPIキーを設定（推奨）：**
+
+```bash
+# .envファイルを作成（gitにコミットされません）
+cat > ~/.config/obsidian-forge/.env << 'EOF'
+# 使用するプロバイダーの行のコメントを外してください：
+# OPENAI_API_KEY=sk-...
+# OPENROUTER_API_KEY=sk-or-...
+# OPENAI_COMPATIBLE_API_KEY=...
+EOF
+```
+
+> `OPENAI_COMPATIBLE_API_KEY`と`OPENAI_API_KEY`の両方が設定されている場合、
+> プロバイダー固有の変数が優先されます。これにより`openai`と
+> `openai-compatible`を異なるキーで同時に使用できます。
 
 **設定の解決順序：**
 

@@ -217,14 +217,34 @@ label   = "com.obsidian-forge.watch"
 log_dir = "~/.obsidian-forge/logs"
 ```
 
-**API 密钥优先级：** 环境变量 → `vault.toml api_key`（优先使用环境变量以避免提交密钥）
+**API 密钥**按以下顺序解析：
 
-| 提供商 | 环境变量 |
-|---|---|
-| `openai` | `OPENAI_API_KEY` |
-| `openrouter` | `OPENROUTER_API_KEY` |
-| `openai-compatible` | `OPENAI_API_KEY` |
-| `ollama` / `lmstudio` | — （无需密钥） |
+1. `[ai]` 部分的 `api_key`（config.toml 或 vault.toml）— *避免提交密钥*
+2. 环境变量（见下表）
+3. `~/.config/obsidian-forge/.env` 文件 — **推荐**（自动加载，不会被提交）
+
+| 提供商 | 环境变量 | 说明 |
+|---|---|---|
+| `openai` | `OPENAI_API_KEY` | [获取密钥 →](https://platform.openai.com/api-keys) |
+| `openrouter` | `OPENROUTER_API_KEY` | [获取密钥 →](https://openrouter.ai/keys) |
+| `openai-compatible` | `OPENAI_COMPATIBLE_API_KEY` | 回退到 `OPENAI_API_KEY` |
+| `ollama` / `lmstudio` | — | 无需密钥 |
+
+**使用 `.env` 文件设置 API 密钥（推荐）：**
+
+```bash
+# 创建 .env 文件（不会被提交到 git）
+cat > ~/.config/obsidian-forge/.env << 'EOF'
+# 取消注释你使用的 provider 对应的行：
+# OPENAI_API_KEY=sk-...
+# OPENROUTER_API_KEY=sk-or-...
+# OPENAI_COMPATIBLE_API_KEY=...
+EOF
+```
+
+> 如果同时设置了 `OPENAI_COMPATIBLE_API_KEY` 和 `OPENAI_API_KEY`，
+> 特定于 provider 的变量优先。这样可以使用不同的密钥同时使用
+> `openai` 和 `openai-compatible`。
 
 **配置解析顺序：**
 
