@@ -47,6 +47,14 @@ const GLOBAL_CONFIG_PREAMBLE: &str = r#"# obsidian-forge — global configuratio
 # base_url = "http://localhost:11434/v1"       # openai-compatible
 # (ollama: base_url unused, uses local CLI)
 #
+# ── API key resolution (priority: config < env var < .env file) ───────────
+#   Prefer ~/.config/obsidian-forge/.env over setting api_key here:
+#
+#     provider="openai"            → OPENAI_API_KEY
+#     provider="openrouter"        → OPENROUTER_API_KEY
+#     provider="openai-compatible" → OPENAI_COMPATIBLE_API_KEY  (fallback: OPENAI_API_KEY)
+#     provider="ollama"/"lmstudio" → (no key needed)
+#
 "#;
 
 // ---------------------------------------------------------------------------

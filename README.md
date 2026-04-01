@@ -217,14 +217,34 @@ label   = "com.obsidian-forge.watch"
 log_dir = "~/.obsidian-forge/logs"
 ```
 
-**API key priority:** env var → `vault.toml api_key` (env var preferred to avoid committing secrets)
+**API keys** are resolved in this order:
 
-| Provider | Environment variable |
-|---|---|
-| `openai` | `OPENAI_API_KEY` |
-| `openrouter` | `OPENROUTER_API_KEY` |
-| `openai-compatible` | `OPENAI_API_KEY` |
-| `ollama` / `lmstudio` | — (no key needed) |
+1. `api_key` in `[ai]` section (config.toml or vault.toml) — *avoid committing secrets*
+2. Environment variable (see table below)
+3. `~/.config/obsidian-forge/.env` file — **recommended** (auto-loaded, never committed)
+
+| Provider | Environment variable | Notes |
+|---|---|---|
+| `openai` | `OPENAI_API_KEY` | [Get key →](https://platform.openai.com/api-keys) |
+| `openrouter` | `OPENROUTER_API_KEY` | [Get key →](https://openrouter.ai/keys) |
+| `openai-compatible` | `OPENAI_COMPATIBLE_API_KEY` | falls back to `OPENAI_API_KEY` |
+| `ollama` / `lmstudio` | — | no key needed |
+
+**Setting up API keys with `.env` (recommended):**
+
+```bash
+# Create the .env file (never committed to git)
+cat > ~/.config/obsidian-forge/.env << 'EOF'
+# Uncomment the line(s) for your provider(s):
+# OPENAI_API_KEY=sk-...
+# OPENROUTER_API_KEY=sk-or-...
+# OPENAI_COMPATIBLE_API_KEY=...
+EOF
+```
+
+> If both `OPENAI_COMPATIBLE_API_KEY` and `OPENAI_API_KEY` are set, the
+> provider-specific one takes precedence. This lets you use `openai` and
+> `openai-compatible` with different keys simultaneously.
 
 **Config resolution:**
 

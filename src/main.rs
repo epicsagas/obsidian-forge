@@ -312,24 +312,124 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
             println!("⏹️  Daemon stopped ({})", label);
         }
         DaemonAction::Status => {
-            println!("Label:  {}", label);
+            // ── Plist installation ──
+            let installed = plist_path.exists();
+            println!("Daemon");
+            println!("  Label:       {}", label);
             println!(
-                "Plist:  {} ({})",
+                "  Plist:       {} ({})",
                 plist_path.display(),
-                if plist_path.exists() {
-                    "installed"
-                } else {
-                    "not installed"
-                }
+                if installed { "installed" } else { "not installed" }
             );
+
+            // ── Running state from launchctl ──
+            let mut pid: Option<u32> = None;
+            let mut last_exit: Option<u32> = None;
+
             match std::process::Command::new("launchctl")
                 .args(["list", &label])
                 .output()
             {
                 Ok(out) if out.status.success() => {
-                    print!("{}", String::from_utf8_lossy(&out.stdout));
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    // Parse structured output: "PID" = <number>; , "LastExitStatus" = <number>;
+                    for line in stdout.lines() {
+                        let trimmed = line.trim();
+                        if let Some(rest) = trimmed.strip_prefix("\"PID\"") {
+                            // Extract number after '='
+                            if let Some(n) = extract_plist_int(rest) {
+                                pid = Some(n);
+                            }
+                        } else if let Some(rest) = trimmed.strip_prefix("\"LastExitStatus\"") {
+                            if let Some(n) = extract_plist_int(rest) {
+                                last_exit = Some(n);
+                            }
+                        }
+                    }
+
+                    if let Some(p) = pid {
+                        println!("  Status:      🟢 running (PID {})", p);
+                    } else if installed {
+                        println!("  Status:      🔴 stopped");
+                    }
+                    if let Some(code) = last_exit {
+                        if pid.is_none() {
+                            println!("  Last Exit:   {}", code);
+                        }
+                    }
                 }
-                _ => println!("Status: not running"),
+                _ => {
+                    println!("  Status:      ⚫ not loaded");
+                }
+            }
+
+            // ── Scheduling interval ──
+            let interval_secs = GlobalConfig::load()
+                .ok()
+                .and_then(|g| g.daemon)
+                .and_then(|d| d.interval_seconds)
+                .unwrap_or_else(|| {
+                    // Fallback: legacy sync.interval_minutes → seconds
+                    GlobalConfig::load()
+                        .ok()
+                        .and_then(|g| g.sync)
+                        .and_then(|s| s.interval_minutes)
+                        .map(|m| m * 60)
+                        .unwrap_or(300)
+                });
+            println!(
+                "  Interval:    {}s ({})",
+                interval_secs,
+                format_duration(interval_secs)
+            );
+
+            // ── Log files ──
+            let log_dir = dirs_home().join(".obsidian-forge/logs");
+            let stdout_log = log_dir.join("forge.log");
+            let stderr_log = log_dir.join("forge.err");
+            print!(
+                "  Stdout log:  {} ",
+                stdout_log.display()
+            );
+            if stdout_log.exists() {
+                match fs::metadata(&stdout_log) {
+                    Ok(meta) => println!("({})", format_bytes(meta.len())),
+                    Err(_) => println!(),
+                }
+            } else {
+                println!("(not created)");
+            }
+            print!(
+                "  Stderr log:  {} ",
+                stderr_log.display()
+            );
+            if stderr_log.exists() {
+                match fs::metadata(&stderr_log) {
+                    Ok(meta) => println!("({})", format_bytes(meta.len())),
+                    Err(_) => println!(),
+                }
+            } else {
+                println!("(not created)");
+            }
+
+            // ── Registered vaults ──
+            if let Ok(global) = GlobalConfig::load() {
+                let watchable = global.watchable_vaults();
+                let total = global.vaults.len();
+                let enabled_count = global.enabled_vaults().len();
+                println!(
+                    "  Vaults:      {} registered, {} enabled, {} watchable",
+                    total,
+                    enabled_count,
+                    watchable.len()
+                );
+                if !watchable.is_empty() {
+                    for v in &watchable {
+                        let path = PathBuf::from(&v.path);
+                        let exists = if path.exists() { "✓" } else { "✗ missing" };
+                        println!("               · {} ({}) {}", v.name, v.path, exists);
+                    }
+                }
             }
         }
     }
@@ -821,10 +921,18 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
     println!("  Name:       {}", config.vault.name);
     println!("  Path:       {}", vault.display());
     let inbox = vault.join(&config.vault.inbox_dir);
+    let inbox_count = if inbox.exists() {
+        fs::read_dir(&inbox)
+            .map(|r| r.count())
+            .unwrap_or(0)
+    } else {
+        0
+    };
     println!(
-        "  Inbox:      {} ({})",
+        "  Inbox:      {} ({}, {} items)",
         config.vault.inbox_dir,
-        if inbox.exists() { "exists" } else { "missing" }
+        if inbox.exists() { "exists" } else { "missing" },
+        inbox_count
     );
 
     // ── AI ──
@@ -864,6 +972,17 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
         }
     }
 
+    // ── Graph ──
+    println!();
+    println!("Graph");
+    println!("  Backlinks:      {}", if config.graph.backlinks { "✓ on" } else { "✗ off" });
+    println!("  Bridge notes:   {}", if config.graph.bridge_notes { "✓ on" } else { "✗ off" });
+    println!("  Auto tags:      {}", if config.graph.auto_tags { "✓ on" } else { "✗ off" });
+    println!("  Related:        {}", if config.graph.related_projects { "✓ on" } else { "✗ off" });
+    if !config.graph.concepts.is_empty() {
+        println!("  Concepts:       {} defined", config.graph.concepts.len());
+    }
+
     // ── Sync ──
     println!();
     println!("Sync");
@@ -883,6 +1002,68 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
             "disabled"
         }
     );
+
+    // Git branch & working tree status
+    let git_branch = std::process::Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(vault)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+
+    if let Some(branch) = git_branch {
+        println!("  Branch:     {}", branch);
+        let dirty = std::process::Command::new("git")
+            .args(["status", "--porcelain"])
+            .current_dir(vault)
+            .output()
+            .ok()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .filter(|s| !s.is_empty());
+        if let Some(changes) = dirty {
+            let count = changes.lines().count();
+            println!("  Working:    {} uncommitted change{}", count, if count == 1 { "" } else { "s" });
+        } else {
+            println!("  Working:    clean");
+        }
+    } else {
+        println!("  Branch:     (not a git repo)");
+    }
+
+    // ── Daemon / Scheduling ──
+    println!();
+    println!("Scheduling");
+    let interval_secs = resolve_interval(config, None);
+    println!(
+        "  Sync interval:  {} ({})",
+        format_duration(interval_secs),
+        interval_secs
+    );
+
+    // Show daemon install status for this vault
+    let label = daemon_label();
+    let plist_path = launch_agents_dir().join(format!("{}.plist", label));
+    if plist_path.exists() {
+        let running = std::process::Command::new("launchctl")
+            .args(["list", &label])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .and_then(|o| {
+                let s = String::from_utf8_lossy(&o.stdout);
+                s.lines()
+                    .find(|l| l.trim().starts_with("\"PID\""))
+                    .and_then(|l| extract_plist_int(l.trim().strip_prefix("\"PID\"").unwrap_or("")))
+            });
+        if running.is_some() {
+            println!("  Daemon:         🟢 running (PID {})", running.unwrap());
+        } else {
+            println!("  Daemon:         🔴 installed but stopped");
+        }
+    } else {
+        println!("  Daemon:         ⚫ not installed");
+    }
 
     Ok(())
 }
@@ -909,6 +1090,61 @@ fn resolve_vault_path(name_or_path: &str) -> Result<PathBuf> {
 
 fn no_vaults_hint() {
     eprintln!("No vaults registered. Run `of init <name>` to create your first vault.");
+}
+
+// ---------------------------------------------------------------------------
+// Display helpers
+// ---------------------------------------------------------------------------
+
+/// Extract an integer value from a launchctl plist line fragment like `= 12345;`.
+fn extract_plist_int(s: &str) -> Option<u32> {
+    s.split('=')
+        .nth(1)?
+        .trim()
+        .trim_end_matches(';')
+        .trim()
+        .parse()
+        .ok()
+}
+
+/// Format seconds into a human-readable duration string (e.g., "5m", "2h 30m", "1h").
+fn format_duration(secs: u64) -> String {
+    if secs < 60 {
+        format!("{}s", secs)
+    } else if secs < 3600 {
+        let m = secs / 60;
+        let s = secs % 60;
+        if s == 0 {
+            format!("{}m", m)
+        } else {
+            format!("{}m {}s", m, s)
+        }
+    } else {
+        let h = secs / 3600;
+        let rem = secs % 3600;
+        let m = rem / 60;
+        if m == 0 {
+            format!("{}h", h)
+        } else {
+            format!("{}h {}m", h, m)
+        }
+    }
+}
+
+/// Format byte count into human-readable size (e.g., "1.2 KB", "3.4 MB").
+fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * 1024;
+    const GB: u64 = 1024 * 1024 * 1024;
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
 }
 
 fn setup_logging() {
