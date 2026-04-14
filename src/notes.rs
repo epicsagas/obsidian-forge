@@ -204,6 +204,7 @@ async fn classify_by_title_or_ai(
     let title_lower = title.to_lowercase();
     let how_to = ["how to", "how-to", "guide", "setup", "install", "configure"];
     let research = ["paper", "research", "study", "survey", "analysis"];
+    let book = ["book", "reading", "chapter", "isbn"];
 
     if how_to.iter().any(|kw| title_lower.contains(kw)) {
         return (
@@ -217,6 +218,13 @@ async fn classify_by_title_or_ai(
             "Resources".into(),
             "Reference".into(),
             "Articles-Papers".into(),
+        );
+    }
+    if book.iter().any(|kw| title_lower.contains(kw)) {
+        return (
+            "Resources".into(),
+            "Reference".into(),
+            "Books-Notes".into(),
         );
     }
 
@@ -262,15 +270,24 @@ fn resolve_dest_dir(
     category: &str,
     subcategory: &str,
     detail: &str,
-    _config: &ForgeConfig,
+    config: &ForgeConfig,
 ) -> PathBuf {
+    let zk = &config.vault.zettelkasten_dir;
     match category {
         c if c.eq_ignore_ascii_case("Projects") => vault_root.join("01-Projects"),
         c if c.eq_ignore_ascii_case("Areas") => vault_root.join("02-Areas"),
         c if c.eq_ignore_ascii_case("Archive") => vault_root.join("99-Archives"),
+        c if c.eq_ignore_ascii_case("Zettelkasten") => {
+            let sub = match subcategory {
+                s if s.eq_ignore_ascii_case("literature") => "literature",
+                s if s.eq_ignore_ascii_case("permanent") => "permanent",
+                _ => "fleeting",
+            };
+            vault_root.join(zk).join(sub)
+        }
         c if c.eq_ignore_ascii_case("Resources") => match subcategory {
             s if s.eq_ignore_ascii_case("Technical") => vault_root.join("03-Resources/Technical"),
-            s if s.eq_ignore_ascii_case("Ideas") => vault_root.join("10-Zettelkasten"),
+            s if s.eq_ignore_ascii_case("Ideas") => vault_root.join(zk).join("fleeting"),
             s if s.eq_ignore_ascii_case("Reference") => {
                 let d = match detail {
                     d if d.eq_ignore_ascii_case("Books-Notes") => "Books-Notes",
@@ -389,6 +406,46 @@ mod tests {
         assert!(!is_markdown(&txt));
         let _ = std::fs::remove_file(&md);
         let _ = std::fs::remove_file(&txt);
+    }
+
+    #[test]
+    fn test_resolve_dest_dir_zettelkasten_fleeting() {
+        let vault = PathBuf::from("/vault");
+        let cfg = ForgeConfig::default_for("v");
+        let dest = resolve_dest_dir(&vault, "Zettelkasten", "fleeting", "", &cfg);
+        assert_eq!(dest, vault.join("10-Zettelkasten/fleeting"));
+    }
+
+    #[test]
+    fn test_resolve_dest_dir_zettelkasten_literature() {
+        let vault = PathBuf::from("/vault");
+        let cfg = ForgeConfig::default_for("v");
+        let dest = resolve_dest_dir(&vault, "Zettelkasten", "literature", "", &cfg);
+        assert_eq!(dest, vault.join("10-Zettelkasten/literature"));
+    }
+
+    #[test]
+    fn test_resolve_dest_dir_zettelkasten_permanent() {
+        let vault = PathBuf::from("/vault");
+        let cfg = ForgeConfig::default_for("v");
+        let dest = resolve_dest_dir(&vault, "Zettelkasten", "permanent", "", &cfg);
+        assert_eq!(dest, vault.join("10-Zettelkasten/permanent"));
+    }
+
+    #[test]
+    fn test_resolve_dest_dir_resources_ideas_routes_to_fleeting() {
+        let vault = PathBuf::from("/vault");
+        let cfg = ForgeConfig::default_for("v");
+        let dest = resolve_dest_dir(&vault, "Resources", "Ideas", "", &cfg);
+        assert_eq!(dest, vault.join("10-Zettelkasten/fleeting"));
+    }
+
+    #[test]
+    fn test_resolve_dest_dir_books_notes() {
+        let vault = PathBuf::from("/vault");
+        let cfg = ForgeConfig::default_for("v");
+        let dest = resolve_dest_dir(&vault, "Resources", "Reference", "Books-Notes", &cfg);
+        assert_eq!(dest, vault.join("03-Resources/Reference/Books-Notes"));
     }
 
     #[test]

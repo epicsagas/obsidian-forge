@@ -98,15 +98,22 @@ fn default_questions() -> String {
 }
 
 fn default_category() -> String {
-    r#"Classify the following text into a PARA category.
+    r#"Classify the following text into a PARA + Zettelkasten category.
 
-PARA categories:
+Categories:
 - Projects: tasks with a deadline or specific goal
 - Areas: ongoing responsibilities
 - Resources: reference material for future use
+- Zettelkasten: atomic ideas and knowledge notes
 - Archive: inactive material
 
-For Resources, also provide subcategory (Technical, Reference, Ideas) and detail.
+For Resources, also provide subcategory (Technical, Reference) and detail.
+  Reference detail: Articles-Papers, Books-Notes, Tutorials-Guides, Cheat-Sheets
+
+For Zettelkasten, provide subcategory:
+  - fleeting: quick captures, raw thoughts, unprocessed ideas
+  - literature: extracted ideas from books, articles, talks (with source attribution)
+  - permanent: fully developed, self-contained ideas in your own words
 
 Output JSON only: {"category": "...", "subcategory": "...", "detail": "..."}
 
