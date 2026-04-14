@@ -121,6 +121,9 @@ of daemon install
 obsidian-forge init <name>
 obsidian-forge init <name> --path ~/vaults
 obsidian-forge init <name> --clone-settings-from ~/other-vault
+
+# Re-run on an existing vault to repair/upgrade (idempotent — never overwrites)
+obsidian-forge init my-brain --path ~/
 ```
 
 ### Multi-Vault Management
