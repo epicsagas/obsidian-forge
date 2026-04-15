@@ -31,7 +31,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize an Obsidian vault (new or existing directory)
+    /// Initialize an Obsidian vault (new or existing directory).
+    /// Safe to re-run on existing vaults — only adds missing structure, never overwrites.
+    /// Use this to repair or upgrade a vault after updating obsidian-forge.
     Init {
         /// Vault name (directory name to create or adopt)
         name: String,
