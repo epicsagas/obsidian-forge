@@ -204,7 +204,7 @@ async fn classify_by_title_or_ai(
     let title_lower = title.to_lowercase();
     let how_to = ["how to", "how-to", "guide", "setup", "install", "configure"];
     let research = ["paper", "research", "study", "survey", "analysis"];
-    let book = ["book", "reading", "chapter", "isbn"];
+    let book = ["book review", "book note", "book summary", "isbn"];
 
     if how_to.iter().any(|kw| title_lower.contains(kw)) {
         return (
@@ -287,6 +287,7 @@ fn resolve_dest_dir(
         }
         c if c.eq_ignore_ascii_case("Resources") => match subcategory {
             s if s.eq_ignore_ascii_case("Technical") => vault_root.join("03-Resources/Technical"),
+            // "Ideas" is no longer in the default AI prompt but kept for custom prompt compatibility
             s if s.eq_ignore_ascii_case("Ideas") => vault_root.join(zk).join("fleeting"),
             s if s.eq_ignore_ascii_case("Reference") => {
                 let d = match detail {
@@ -446,6 +447,29 @@ mod tests {
         let cfg = ForgeConfig::default_for("v");
         let dest = resolve_dest_dir(&vault, "Resources", "Reference", "Books-Notes", &cfg);
         assert_eq!(dest, vault.join("03-Resources/Reference/Books-Notes"));
+    }
+
+    #[test]
+    fn test_resolve_dest_dir_zettelkasten_unknown_falls_back_to_fleeting() {
+        let vault = PathBuf::from("/vault");
+        let cfg = ForgeConfig::default_for("v");
+        let dest = resolve_dest_dir(&vault, "Zettelkasten", "unknown-garbage", "", &cfg);
+        assert_eq!(dest, vault.join("10-Zettelkasten/fleeting"));
+    }
+
+    #[test]
+    fn test_classify_book_keywords() {
+        let title_hits = ["Book review: Rust in Action", "ISBN 978-3-16", "book summary of DDIA"];
+        let title_misses = ["Chapter 3: Kubernetes", "Reading sensor data"];
+        let book = ["book review", "book note", "book summary", "isbn"];
+        for title in &title_hits {
+            let t = title.to_lowercase();
+            assert!(book.iter().any(|kw| t.contains(kw)), "should match: {}", title);
+        }
+        for title in &title_misses {
+            let t = title.to_lowercase();
+            assert!(!book.iter().any(|kw| t.contains(kw)), "should NOT match: {}", title);
+        }
     }
 
     #[test]
