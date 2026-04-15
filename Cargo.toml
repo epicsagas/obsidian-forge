@@ -1,6 +1,6 @@
 [package]
 name = "obsidian-forge"
-version = "0.1.4-dev"
+version = "0.1.4"
 edition = "2024"
 description = "Obsidian vault generator, automation daemon, and graph strengthener"
 license = "Apache-2.0"
