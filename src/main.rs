@@ -92,6 +92,15 @@ enum Commands {
         vault: Option<String>,
     },
 
+    /// Graph operations: health, orphans, extract, tags, strengthen
+    Graph {
+        #[command(subcommand)]
+        action: GraphAction,
+        /// Specific vault name (from global config)
+        #[arg(long)]
+        vault: Option<String>,
+    },
+
     /// Run full sync cycle: MOC → Graph → Git
     Sync {
         /// Sync only this vault (omit for all enabled vaults)
@@ -152,6 +161,32 @@ enum DaemonAction {
     Stop,
     /// Show daemon status
     Status,
+}
+
+#[derive(Subcommand)]
+enum GraphAction {
+    /// Show graph statistics and health metrics
+    Health,
+    /// List orphan notes (no incoming or outgoing links)
+    Orphans {
+        /// Attempt to auto-link orphans to relevant MOCs using AI
+        #[arg(long)]
+        auto_link: bool,
+    },
+    /// Extract wikilinks and (optionally) AI relationships
+    Extract {
+        /// Skip AI relationship extraction, only parse wikilinks
+        #[arg(long)]
+        no_ai: bool,
+    },
+    /// Normalize and cluster tags into hierarchical structure
+    Tags {
+        /// Show suggestions without applying changes
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Run the full graph strengthening pipeline
+    Strengthen,
 }
 
 #[derive(Subcommand)]
@@ -245,6 +280,10 @@ async fn main() -> Result<()> {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
             graph::strengthen_graph(&vault, &config)?;
         }
+        Commands::Graph { ref action, vault: filter } => {
+            let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
+            handle_graph_action(action, &vault, &config).await?;
+        }
         Commands::Status {
             vault: filter,
             no_ping,
@@ -255,6 +294,79 @@ async fn main() -> Result<()> {
         _ => unreachable!(),
     }
 
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Graph subcommands
+// ---------------------------------------------------------------------------
+
+async fn handle_graph_action(action: &GraphAction, vault: &Path, config: &ForgeConfig) -> Result<()> {
+    match action {
+        GraphAction::Health => {
+            let health = graph::graph_health(vault, config)?;
+            println!("{}", health);
+        }
+        GraphAction::Orphans { auto_link } => {
+            if *auto_link {
+                let g = graph::build_vault_graph(vault, config)?;
+                let linked = graph::auto_link_orphans(vault, config, &g).await?;
+                if linked.is_empty() {
+                    println!("No orphans auto-linked.");
+                } else {
+                    println!("Auto-linked {} orphans:", linked.len());
+                    for f in &linked {
+                        println!("  - {}", f);
+                    }
+                }
+            } else {
+                let orphans = graph::detect_orphans(vault, config)?;
+                if orphans.is_empty() {
+                    println!("No orphan notes found.");
+                } else {
+                    println!("Found {} orphan notes:", orphans.len());
+                    for f in &orphans {
+                        println!("  - {}", f);
+                    }
+                }
+            }
+        }
+        GraphAction::Extract { no_ai } => {
+            let g = graph::build_vault_graph(vault, config)?;
+            println!(
+                "Extracted graph: {} files, {} links, {} orphans",
+                g.all_files.len(),
+                g.total_links(),
+                g.orphan_count()
+            );
+
+            if !no_ai {
+                let relationships = graph::extract_relationships(vault, config, &g).await?;
+                if relationships.is_empty() {
+                    println!("No relationships extracted.");
+                } else {
+                    println!("Extracted {} relationships:", relationships.len());
+                    for r in &relationships {
+                        println!("  {} --{}-> {} ({:.0}%)", r.source, r.relation, r.target, r.confidence * 100.0);
+                    }
+                    graph::save_relationships_manifest(vault, &relationships)?;
+                }
+            }
+        }
+        GraphAction::Tags { dry_run } => {
+            let result = graph::normalize_tags(vault, config, *dry_run).await?;
+            if *dry_run {
+                println!("{}", result);
+                println!("\n(dry run — no changes applied)");
+            } else {
+                println!("{}", result);
+            }
+        }
+        GraphAction::Strengthen => {
+            graph::strengthen_graph(vault, config)?;
+            println!("Graph strengthening complete.");
+        }
+    }
     Ok(())
 }
 

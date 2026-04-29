@@ -271,6 +271,15 @@ pub struct GraphConfig {
     pub related_projects: bool,
     #[serde(default)]
     pub concepts: Vec<ConceptDef>,
+    /// Extract typed relationships between notes using AI
+    #[serde(default)]
+    pub ai_relationships: bool,
+    /// Normalize flat tags into hierarchical structure
+    #[serde(default)]
+    pub tag_hierarchy: bool,
+    /// Detect and report orphan notes
+    #[serde(default)]
+    pub orphan_detection: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -387,6 +396,9 @@ impl Default for GraphConfig {
             auto_tags: true,
             related_projects: true,
             concepts: Vec::new(),
+            ai_relationships: false,
+            tag_hierarchy: false,
+            orphan_detection: false,
         }
     }
 }
@@ -609,6 +621,9 @@ system_dirs = []
 # auto_tags = true
 # related_projects = true
 # concepts = []
+# ai_relationships = false     # AI-powered typed relationship extraction
+# tag_hierarchy = false        # Normalize flat tags into hierarchical structure
+# orphan_detection = false     # Detect notes with no incoming/outgoing links
 # # Example concept definition:
 # # [[graph.concepts]]
 # # name = "rust"
