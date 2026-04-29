@@ -789,15 +789,17 @@ git_auto_push = false
     fn test_merge_global_replaces_default_projects_and_graph() {
         let mut config: ForgeConfig =
             toml::from_str(&default_vault_toml_template("v")).expect("vault template");
-        let mut global = GlobalConfig::default();
-        global.projects = Some(ProjectsConfig {
-            detect: "from-global".into(),
-            exclude: vec!["only-global".into()],
-        });
-        global.graph = Some(GraphConfig {
-            backlinks: false,
-            ..GraphConfig::default()
-        });
+        let global = GlobalConfig {
+            projects: Some(ProjectsConfig {
+                detect: "from-global".into(),
+                exclude: vec!["only-global".into()],
+            }),
+            graph: Some(GraphConfig {
+                backlinks: false,
+                ..GraphConfig::default()
+            }),
+            ..GlobalConfig::default()
+        };
         merge_global_into_forge(&mut config, &global);
         assert_eq!(config.projects.detect, "from-global");
         assert_eq!(config.projects.exclude, vec!["only-global".to_string()]);
@@ -821,8 +823,10 @@ system_dirs = []
 backlinks = false
 "#;
         let mut config: ForgeConfig = toml::from_str(toml_v).expect("parse");
-        let mut global = GlobalConfig::default();
-        global.graph = Some(GraphConfig::default());
+        let global = GlobalConfig {
+            graph: Some(GraphConfig::default()),
+            ..GlobalConfig::default()
+        };
         merge_global_into_forge(&mut config, &global);
         assert!(!config.graph.backlinks);
     }
