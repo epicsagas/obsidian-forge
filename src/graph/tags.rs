@@ -264,6 +264,7 @@ struct AiTagCluster {
     canonical: String,
     #[serde(default)]
     aliases: Vec<String>,
+    #[allow(dead_code)]
     suggested_parent: Option<String>,
 }
 

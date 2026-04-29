@@ -431,15 +431,15 @@ impl Default for DaemonConfig {
 
 /// Apply `~/.config/obsidian-forge/config.toml` onto a vault-loaded config.
 fn merge_global_into_forge(config: &mut ForgeConfig, global: &GlobalConfig) {
-    if let Some(ref gp) = global.projects {
-        if config.projects == ProjectsConfig::default() {
-            config.projects = gp.clone();
-        }
+    if let Some(ref gp) = global.projects
+        && config.projects == ProjectsConfig::default()
+    {
+        config.projects = gp.clone();
     }
-    if let Some(ref gg) = global.graph {
-        if config.graph == GraphConfig::default() {
-            config.graph = gg.clone();
-        }
+    if let Some(ref gg) = global.graph
+        && config.graph == GraphConfig::default()
+    {
+        config.graph = gg.clone();
     }
     if let Some(ref global_sync) = global.sync {
         config.sync = SyncConfig {

@@ -14,14 +14,11 @@ use tracing::info;
 
 use crate::config::ForgeConfig;
 
-pub use health::{graph_health, GraphHealth};
+pub use health::graph_health;
 pub use orphans::{auto_link_orphans, detect_orphans};
-pub use relationships::{
-    extract_relationships, save_relationships_manifest, Relationship, RelationshipManifest,
-    RelationType,
-};
-pub use tags::{normalize_tags, TagNormalizationResult};
-pub use wikilinks::{build_vault_graph, VaultGraph, Wikilink};
+pub use relationships::{extract_relationships, save_relationships_manifest};
+pub use tags::normalize_tags;
+pub use wikilinks::build_vault_graph;
 
 /// Run the full graph strengthening pipeline (existing behavior).
 pub fn strengthen_graph(vault_root: &Path, config: &ForgeConfig) -> Result<()> {

@@ -59,20 +59,19 @@ async fn handle_file_event(p: &Path, vault_root: &Path, config: &ForgeConfig) {
         match converter::convert_pdf_to_md(p, vault_root, config).await {
             Ok(md_path) => {
                 info!("PDF converted -> {}", md_path.display());
-                if let Err(e) = notes::process_one(&md_path, config, vault_root).await {
-                    if !e.to_string().contains("No such file or directory") {
-                        error!("Processing failed: {:?}", e);
-                    }
+                if let Err(e) = notes::process_one(&md_path, config, vault_root).await
+                    && !e.to_string().contains("No such file or directory")
+                {
+                    error!("Processing failed: {:?}", e);
                 }
             }
             Err(e) => error!("PDF conversion failed: {:?}", e),
         }
-    } else if notes::is_markdown(p) {
-        if let Err(e) = notes::process_one(p, config, vault_root).await {
-            if !e.to_string().contains("No such file or directory") {
-                error!("Processing failed: {:?}", e);
-            }
-        }
+    } else if notes::is_markdown(p)
+        && let Err(e) = notes::process_one(p, config, vault_root).await
+        && !e.to_string().contains("No such file or directory")
+    {
+        error!("Processing failed: {:?}", e);
     }
 }
 

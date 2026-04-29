@@ -15,6 +15,7 @@ use crate::config::ForgeConfig;
 #[derive(Debug, Clone)]
 pub struct Wikilink {
     pub raw_target: String,
+    #[allow(dead_code)]
     pub alias: Option<String>,
     pub resolved_path: Option<String>,
 }
@@ -32,8 +33,8 @@ impl VaultGraph {
         self.all_files
             .iter()
             .filter(|f| {
-                self.outgoing.get(*f).map_or(true, |s| s.is_empty())
-                    && self.incoming.get(*f).map_or(true, |s| s.is_empty())
+                self.outgoing.get(*f).is_none_or(|s| s.is_empty())
+                    && self.incoming.get(*f).is_none_or(|s| s.is_empty())
             })
             .count()
     }
@@ -42,8 +43,8 @@ impl VaultGraph {
         self.all_files
             .iter()
             .filter(|f| {
-                self.outgoing.get(*f).map_or(true, |s| s.is_empty())
-                    && self.incoming.get(*f).map_or(true, |s| s.is_empty())
+                self.outgoing.get(*f).is_none_or(|s| s.is_empty())
+                    && self.incoming.get(*f).is_none_or(|s| s.is_empty())
             })
             .map(|s| s.as_str())
             .collect()
@@ -118,7 +119,7 @@ fn wikilink_re() -> &'static Regex {
     RE.get_or_init(|| Regex::new(r"\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]").expect("valid wikilink regex"))
 }
 
-pub fn build_vault_graph(vault_root: &Path, config: &ForgeConfig) -> Result<VaultGraph> {
+pub fn build_vault_graph(vault_root: &Path, _config: &ForgeConfig) -> Result<VaultGraph> {
     let md_files: Vec<(String, String)> = WalkDir::new(vault_root)
         .into_iter()
         .filter_map(|e| e.ok())
