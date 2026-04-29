@@ -217,14 +217,34 @@ label   = "com.obsidian-forge.watch"
 log_dir = "~/.obsidian-forge/logs"
 ```
 
-**API 키 우선순위:** 환경 변수 → `vault.toml api_key` (시크릿 커밋 방지를 위해 환경 변수 권장)
+**API 키** 조회 순서:
 
-| 프로바이더 | 환경 변수 |
-|---|---|
-| `openai` | `OPENAI_API_KEY` |
-| `openrouter` | `OPENROUTER_API_KEY` |
-| `openai-compatible` | `OPENAI_API_KEY` |
-| `ollama` / `lmstudio` | — (키 불필요) |
+1. `[ai]` 섹션의 `api_key` (config.toml 또는 vault.toml) — *시크릿 커밋 방지*
+2. 환경 변수 (아래 표 참조)
+3. `~/.config/obsidian-forge/.env` 파일 — **권장** (자동 로드, 커밋되지 않음)
+
+| 프로바이더 | 환경 변수 | 참고 |
+|---|---|---|
+| `openai` | `OPENAI_API_KEY` | [키 발급 →](https://platform.openai.com/api-keys) |
+| `openrouter` | `OPENROUTER_API_KEY` | [키 발급 →](https://openrouter.ai/keys) |
+| `openai-compatible` | `OPENAI_COMPATIBLE_API_KEY` | `OPENAI_API_KEY`로 폴백 |
+| `ollama` / `lmstudio` | — | 키 불필요 |
+
+**`.env` 파일로 API 키 설정 (권장):**
+
+```bash
+# .env 파일 생성 (git에 커밋되지 않음)
+cat > ~/.config/obsidian-forge/.env << 'EOF'
+# 사용 중인 provider의 줄의 주석을 해제하세요:
+# OPENAI_API_KEY=sk-...
+# OPENROUTER_API_KEY=sk-or-...
+# OPENAI_COMPATIBLE_API_KEY=...
+EOF
+```
+
+> `OPENAI_COMPATIBLE_API_KEY`와 `OPENAI_API_KEY`가 모두 설정된 경우
+> provider 전용 변수가 우선합니다. 이렇게 하면 `openai`와
+> `openai-compatible`을 동시에 다른 키로 사용할 수 있습니다.
 
 **설정 해석 순서:**
 

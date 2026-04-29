@@ -217,14 +217,34 @@ label   = "com.obsidian-forge.watch"
 log_dir = "~/.obsidian-forge/logs"
 ```
 
-**Prioridad de clave API:** variable de entorno → `vault.toml api_key` (se prefiere variable de entorno para evitar confirmar secretos)
+**Las claves API** se resuelven en este orden:
 
-| Proveedor | Variable de entorno |
-|---|---|
-| `openai` | `OPENAI_API_KEY` |
-| `openrouter` | `OPENROUTER_API_KEY` |
-| `openai-compatible` | `OPENAI_API_KEY` |
-| `ollama` / `lmstudio` | — (no se necesita clave) |
+1. `api_key` en la sección `[ai]` (config.toml o vault.toml) — *evita confirmar secretos*
+2. Variable de entorno (ver tabla abajo)
+3. Archivo `~/.config/obsidian-forge/.env` — **recomendado** (carga automática, nunca se confirma)
+
+| Proveedor | Variable de entorno | Notas |
+|---|---|---|
+| `openai` | `OPENAI_API_KEY` | [Obtener clave →](https://platform.openai.com/api-keys) |
+| `openrouter` | `OPENROUTER_API_KEY` | [Obtener clave →](https://openrouter.ai/keys) |
+| `openai-compatible` | `OPENAI_COMPATIBLE_API_KEY` | retrocede a `OPENAI_API_KEY` |
+| `ollama` / `lmstudio` | — | no se necesita clave |
+
+**Configuración de claves API con `.env` (recomendado):**
+
+```bash
+# Crea el archivo .env (nunca se confirma a git)
+cat > ~/.config/obsidian-forge/.env << 'EOF'
+# Descomenta la(s) línea(s) de tu(s) proveedor(es):
+# OPENAI_API_KEY=sk-...
+# OPENROUTER_API_KEY=sk-or-...
+# OPENAI_COMPATIBLE_API_KEY=...
+EOF
+```
+
+> Si tanto `OPENAI_COMPATIBLE_API_KEY` como `OPENAI_API_KEY` están configuradas,
+> la específica del proveedor tiene prioridad. Esto permite usar `openai` y
+> `openai-compatible` con claves diferentes simultáneamente.
 
 **Resolución de configuración:**
 

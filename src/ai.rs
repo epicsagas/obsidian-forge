@@ -43,7 +43,9 @@ impl AiClient {
         let api_key = cfg.api_key.clone().or_else(|| match cfg.provider.as_str() {
             "openai" => std::env::var("OPENAI_API_KEY").ok(),
             "openrouter" => std::env::var("OPENROUTER_API_KEY").ok(),
-            "openai-compatible" => std::env::var("OPENAI_API_KEY").ok(),
+            "openai-compatible" => std::env::var("OPENAI_COMPATIBLE_API_KEY")
+                .ok()
+                .or_else(|| std::env::var("OPENAI_API_KEY").ok()),
             _ => None,
         });
 

@@ -217,14 +217,34 @@ label   = "com.obsidian-forge.watch"
 log_dir = "~/.obsidian-forge/logs"
 ```
 
-**Приоритет API-ключа:** переменная среды → `vault.toml api_key` (переменная среды предпочтительна во избежание коммита секретов)
+**API-ключи** определяются в следующем порядке:
 
-| Провайдер | Переменная среды |
-|---|---|
-| `openai` | `OPENAI_API_KEY` |
-| `openrouter` | `OPENROUTER_API_KEY` |
-| `openai-compatible` | `OPENAI_API_KEY` |
-| `ollama` / `lmstudio` | — (ключ не нужен) |
+1. `api_key` в секции `[ai]` (config.toml или vault.toml) — *избегайте коммита секретов*
+2. Переменная среды (см. таблицу ниже)
+3. Файл `~/.config/obsidian-forge/.env` — **рекомендуется** (автозагрузка, не коммитится)
+
+| Провайдер | Переменная среды | Примечания |
+|---|---|---|
+| `openai` | `OPENAI_API_KEY` | [Получить ключ →](https://platform.openai.com/api-keys) |
+| `openrouter` | `OPENROUTER_API_KEY` | [Получить ключ →](https://openrouter.ai/keys) |
+| `openai-compatible` | `OPENAI_COMPATIBLE_API_KEY` | откат к `OPENAI_API_KEY` |
+| `ollama` / `lmstudio` | — | ключ не нужен |
+
+**Настройка API-ключей через `.env` (рекомендуется):**
+
+```bash
+# Создайте файл .env (никогда не попадёт в git)
+cat > ~/.config/obsidian-forge/.env << 'EOF'
+# Раскомментируйте строку(и) нужного провайдера:
+# OPENAI_API_KEY=sk-...
+# OPENROUTER_API_KEY=sk-or-...
+# OPENAI_COMPATIBLE_API_KEY=...
+EOF
+```
+
+> Если установлены обе переменные `OPENAI_COMPATIBLE_API_KEY` и `OPENAI_API_KEY`,
+> приоритет имеет специфичная для провайдера. Это позволяет использовать `openai` и
+> `openai-compatible` с разными ключами одновременно.
 
 **Порядок разрешения конфигурации:**
 

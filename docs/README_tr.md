@@ -217,14 +217,34 @@ label   = "com.obsidian-forge.watch"
 log_dir = "~/.obsidian-forge/logs"
 ```
 
-**API anahtarı önceliği:** ortam değişkeni → `vault.toml api_key` (sırları commit etmemek için ortam değişkeni tercih edilir)
+**API anahtarları** şu sırayla çözümlenir:
 
-| Sağlayıcı | Ortam değişkeni |
-|---|---|
-| `openai` | `OPENAI_API_KEY` |
-| `openrouter` | `OPENROUTER_API_KEY` |
-| `openai-compatible` | `OPENAI_API_KEY` |
-| `ollama` / `lmstudio` | — (anahtar gerekmez) |
+1. `[ai]` bölümündeki `api_key` (config.toml veya vault.toml) — *sırları commit etmekten kaçının*
+2. Ortam değişkeni (aşağıdaki tabloya bakın)
+3. `~/.config/obsidian-forge/.env` dosyası — **önerilen** (otomatik yüklenir, asla commit edilmez)
+
+| Provider | Ortam değişkeni | Notlar |
+|---|---|---|
+| `openai` | `OPENAI_API_KEY` | [Anahtar al →](https://platform.openai.com/api-keys) |
+| `openrouter` | `OPENROUTER_API_KEY` | [Anahtar al →](https://openrouter.ai/keys) |
+| `openai-compatible` | `OPENAI_COMPATIBLE_API_KEY` | `OPENAI_API_KEY`'ye geri düşer |
+| `ollama` / `lmstudio` | — | anahtar gerekli değil |
+
+**`.env` ile API anahtarlarını ayarlama (önerilen):**
+
+```bash
+# .env dosyasını oluşturun (asla git'e commit edilmez)
+cat > ~/.config/obsidian-forge/.env << 'EOF'
+# Sağlayıcınız için satır(ların yorumunu kaldırın:
+# OPENAI_API_KEY=sk-...
+# OPENROUTER_API_KEY=sk-or-...
+# OPENAI_COMPATIBLE_API_KEY=...
+EOF
+```
+
+> Hem `OPENAI_COMPATIBLE_API_KEY` hem de `OPENAI_API_KEY` ayarlanmışsa,
+> sağlayıcıya özel olan öncelik alır. Bu, `openai` ve
+> `openai-compatible`'ı aynı anda farklı anahtarlarla kullanmanıza olanak tanır.
 
 **Yapılandırma çözümleme:**
 

@@ -3,7 +3,8 @@ use std::{fs, path::Path, process::Command};
 use tracing::{info, warn};
 
 use crate::config::{
-    default_vault_toml_template, GlobalConfig, CONFIG_FILE, SETTINGS_DIRS, SETTINGS_FILES,
+    default_vault_toml_template, ForgeConfig, GlobalConfig, CONFIG_FILE, SETTINGS_DIRS,
+    SETTINGS_FILES,
 };
 
 /// Initialize a vault. Works for both new and existing directories.
@@ -26,7 +27,12 @@ pub fn init_vault(name: &str, target: &Path) -> Result<()> {
     let mut created = Vec::new();
     let mut skipped = Vec::new();
 
-    adopt_directory_verbose(&vault_root, name, &mut created, &mut skipped)?;
+    // Read zettelkasten_dir from existing vault.toml if present, otherwise use default
+    let zk_dir = ForgeConfig::load(&vault_root)
+        .map(|c| c.vault.zettelkasten_dir)
+        .unwrap_or_else(|_| "10-Zettelkasten".into());
+
+    adopt_directory_verbose(&vault_root, name, &zk_dir, &mut created, &mut skipped)?;
 
     // git init only if not already a repo
     if !vault_root.join(".git").exists() {
@@ -77,11 +83,15 @@ pub fn init_vault(name: &str, target: &Path) -> Result<()> {
 fn adopt_directory_verbose(
     vault_root: &Path,
     name: &str,
+    zk_dir: &str,
     created: &mut Vec<String>,
     skipped: &mut Vec<String>,
 ) -> Result<()> {
     // ── PARA folders (create only if missing) ────────────────────────────
-    let dirs = [
+    let zk_fleeting = format!("{}/fleeting", zk_dir);
+    let zk_literature = format!("{}/literature", zk_dir);
+    let zk_permanent = format!("{}/permanent", zk_dir);
+    let dirs: Vec<&str> = vec![
         "00-Inbox",
         "01-Projects",
         "02-Areas",
@@ -90,7 +100,9 @@ fn adopt_directory_verbose(
         "03-Resources/Reference/Tutorials-Guides",
         "03-Resources/Reference/Cheat-Sheets",
         "03-Resources/Technical",
-        "10-Zettelkasten",
+        &zk_fleeting,
+        &zk_literature,
+        &zk_permanent,
         "99-Archives/PDF-Archive",
         "Attachments",
         "Chats",

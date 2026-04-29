@@ -217,14 +217,34 @@ label   = "com.obsidian-forge.watch"
 log_dir = "~/.obsidian-forge/logs"
 ```
 
-**API-Schlüssel-Priorität:** Umgebungsvariable → `vault.toml api_key` (Umgebungsvariable bevorzugt, um das Committen von Geheimnissen zu vermeiden)
+**API-Schlüssel** werden in dieser Reihenfolge aufgelöst:
 
-| Anbieter | Umgebungsvariable |
-|---|---|
-| `openai` | `OPENAI_API_KEY` |
-| `openrouter` | `OPENROUTER_API_KEY` |
-| `openai-compatible` | `OPENAI_API_KEY` |
-| `ollama` / `lmstudio` | — (kein Schlüssel benötigt) |
+1. `api_key` im Abschnitt `[ai]` (config.toml oder vault.toml) — *vermeiden Sie das Committen von Geheimnissen*
+2. Umgebungsvariable (siehe Tabelle unten)
+3. Datei `~/.config/obsidian-forge/.env` — **empfohlen** (automatisch geladen, nie committet)
+
+| Anbieter | Umgebungsvariable | Hinweise |
+|---|---|---|
+| `openai` | `OPENAI_API_KEY` | [Schlüssel holen →](https://platform.openai.com/api-keys) |
+| `openrouter` | `OPENROUTER_API_KEY` | [Schlüssel holen →](https://openrouter.ai/keys) |
+| `openai-compatible` | `OPENAI_COMPATIBLE_API_KEY` | Fallback auf `OPENAI_API_KEY` |
+| `ollama` / `lmstudio` | — | kein Schlüssel erforderlich |
+
+**API-Schlüssel mit `.env` einrichten (empfohlen):**
+
+```bash
+# Erstellen Sie die .env-Datei (wird nie in git committet)
+cat > ~/.config/obsidian-forge/.env << 'EOF'
+# Kommentieren Sie die Zeile(n) Ihres/Ihrer Anbieter aus:
+# OPENAI_API_KEY=sk-...
+# OPENROUTER_API_KEY=sk-or-...
+# OPENAI_COMPATIBLE_API_KEY=...
+EOF
+```
+
+> Wenn sowohl `OPENAI_COMPATIBLE_API_KEY` als auch `OPENAI_API_KEY` gesetzt sind,
+> hat die anbieterspezifische Vorrang. So können Sie `openai` und
+> `openai-compatible` gleichzeitig mit verschiedenen Schlüsseln verwenden.
 
 **Konfigurationsauflösung:**
 
