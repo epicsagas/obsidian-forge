@@ -290,8 +290,7 @@ async fn main() -> Result<()> {
             vault: filter,
             no_ping,
         } => {
-            let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
-            run_status(&vault, &config, no_ping).await?;
+            run_status_command(cli.vault_path, filter, no_ping).await?;
         }
         _ => unreachable!(),
     }
@@ -1028,6 +1027,60 @@ fn resolve_single_vault(
 // ---------------------------------------------------------------------------
 // Status
 // ---------------------------------------------------------------------------
+
+async fn run_status_command(
+    vault_path: Option<String>,
+    filter: Option<String>,
+    no_ping: bool,
+) -> Result<()> {
+    // --vault <name> 또는 --vault-path 지정 → 단일 vault
+    if filter.is_some() || vault_path.is_some() {
+        let (vault, config) = resolve_single_vault(vault_path, filter)?;
+        return run_status(&vault, &config, no_ping).await;
+    }
+
+    // CWD walk-up으로 단일 vault 감지 시 그것만 사용
+    if let Ok(vault) = config::resolve_vault(None) {
+        let config = ForgeConfig::load(&vault)?;
+        return run_status(&vault, &config, no_ping).await;
+    }
+
+    // 글로벌 설정 fallback: 등록된 모든 vault 출력
+    let global = GlobalConfig::load()?;
+    let enabled: Vec<_> = global.enabled_vaults();
+    match enabled.len() {
+        0 => anyhow::bail!(
+            "No vaults registered. Run `of init <name>` to create one, \
+             or `of vault add <path>` to register an existing vault."
+        ),
+        1 => {
+            let p = PathBuf::from(&enabled[0].path);
+            let c = ForgeConfig::load(&p)?;
+            run_status(&p, &c, no_ping).await
+        }
+        _ => {
+            let mut first = true;
+            for entry in &enabled {
+                let p = PathBuf::from(&entry.path);
+                match ForgeConfig::load(&p) {
+                    Ok(c) => {
+                        if !first {
+                            println!("{}", "─".repeat(60));
+                        }
+                        first = false;
+                        if let Err(e) = run_status(&p, &c, no_ping).await {
+                            println!("  ⚠️  Error reading vault '{}': {}", entry.name, e);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("warning: skipping '{}' — {}", entry.name, e);
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
+}
 
 async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result<()> {
     // ── Vault ──

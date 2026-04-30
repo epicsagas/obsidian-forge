@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo test:*)",
+      "Skill(git-cc)",
+      "Bash(git add:*)",
+      "Bash(git commit -m 'feat\\(notes\\): implement Zettelkasten fleeting/literature/permanent sublayout' -m '- Init: scaffold 10-Zettelkasten/{fleeting,literature,permanent} dirs:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(gh pr:*)",
+      "Bash(git pull:*)",
+      "Bash(cargo search:*)",
+      "Bash(cargo check:*)",
+      "Bash(git tag:*)",
+      "Bash(gh run:*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(wc -l /Users/hackme/.harness/projects/obsidian-forge-bcddca/obs/*.jsonl)"
+    ]
+  }
+}
