@@ -446,18 +446,16 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
                 Ok(out) if out.status.success() => {
                     let stdout = String::from_utf8_lossy(&out.stdout);
                     // Parse structured output: "PID" = <number>; , "LastExitStatus" = <number>;
-                    // allow(collapsible_if): let-chain requires Rust 1.88+; CI runs 1.85
-                    #[allow(clippy::collapsible_if)]
                     for line in stdout.lines() {
                         let trimmed = line.trim();
-                        if let Some(rest) = trimmed.strip_prefix("\"PID\"") {
-                            if let Some(n) = extract_plist_int(rest) {
-                                pid = Some(n);
-                            }
-                        } else if let Some(rest) = trimmed.strip_prefix("\"LastExitStatus\"") {
-                            if let Some(n) = extract_plist_int(rest) {
-                                last_exit = Some(n);
-                            }
+                        if let Some(rest) = trimmed.strip_prefix("\"PID\"")
+                            && let Some(n) = extract_plist_int(rest)
+                        {
+                            pid = Some(n);
+                        } else if let Some(rest) = trimmed.strip_prefix("\"LastExitStatus\"")
+                            && let Some(n) = extract_plist_int(rest)
+                        {
+                            last_exit = Some(n);
                         }
                     }
 
@@ -466,11 +464,10 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
                     } else if installed {
                         println!("  Status:      🔴 stopped");
                     }
-                    #[allow(clippy::collapsible_if)]
-                    if let Some(code) = last_exit {
-                        if pid.is_none() {
-                            println!("  Last Exit:   {}", code);
-                        }
+                    if let Some(code) = last_exit
+                        && pid.is_none()
+                    {
+                        println!("  Last Exit:   {}", code);
                     }
                 }
                 _ => {
@@ -964,12 +961,10 @@ fn run_sync_cycle(vault: &Path, config: &ForgeConfig) {
     if let Err(e) = graph::strengthen_graph(vault, config) {
         tracing::warn!("[{}] Graph error: {:?}", config.vault.name, e);
     }
-    // allow(collapsible_if): let-chain requires Rust 1.88+; CI runs 1.85
-    #[allow(clippy::collapsible_if)]
-    if config.sync.git_auto_commit {
-        if let Err(e) = git::auto_commit_and_push(vault, config.sync.git_auto_push) {
-            tracing::warn!("[{}] Git error: {:?}", config.vault.name, e);
-        }
+    if config.sync.git_auto_commit
+        && let Err(e) = git::auto_commit_and_push(vault, config.sync.git_auto_push)
+    {
+        tracing::warn!("[{}] Git error: {:?}", config.vault.name, e);
     }
 }
 
@@ -1242,12 +1237,10 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
 /// Resolve a vault name (from global config) or path to an absolute path.
 fn resolve_vault_path(name_or_path: &str) -> Result<PathBuf> {
     // Try global config first
-    // allow(collapsible_if): let-chain requires Rust 1.88+; CI runs 1.85
-    #[allow(clippy::collapsible_if)]
-    if let Ok(global) = GlobalConfig::load() {
-        if let Some(entry) = global.find_vault(name_or_path) {
-            return Ok(PathBuf::from(&entry.path));
-        }
+    if let Ok(global) = GlobalConfig::load()
+        && let Some(entry) = global.find_vault(name_or_path)
+    {
+        return Ok(PathBuf::from(&entry.path));
     }
     // Treat as path
     let p = PathBuf::from(name_or_path);
