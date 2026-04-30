@@ -446,16 +446,18 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
                 Ok(out) if out.status.success() => {
                     let stdout = String::from_utf8_lossy(&out.stdout);
                     // Parse structured output: "PID" = <number>; , "LastExitStatus" = <number>;
+                    // allow(collapsible_if): let-chain requires Rust 1.88+; CI runs 1.85
+                    #[allow(clippy::collapsible_if)]
                     for line in stdout.lines() {
                         let trimmed = line.trim();
                         if let Some(rest) = trimmed.strip_prefix("\"PID\"") {
-                            // Extract number after '='
                             if let Some(n) = extract_plist_int(rest) {
                                 pid = Some(n);
                             }
-                        } else if let Some(rest) = trimmed.strip_prefix("\"LastExitStatus\"")
-                            && let Some(n) = extract_plist_int(rest) {
+                        } else if let Some(rest) = trimmed.strip_prefix("\"LastExitStatus\"") {
+                            if let Some(n) = extract_plist_int(rest) {
                                 last_exit = Some(n);
+                            }
                         }
                     }
 
@@ -464,9 +466,11 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
                     } else if installed {
                         println!("  Status:      🔴 stopped");
                     }
-                    if let Some(code) = last_exit
-                        && pid.is_none() {
+                    #[allow(clippy::collapsible_if)]
+                    if let Some(code) = last_exit {
+                        if pid.is_none() {
                             println!("  Last Exit:   {}", code);
+                        }
                     }
                 }
                 _ => {
