@@ -83,6 +83,14 @@ pub async fn auto_link_orphans(
         let suggestions: Suggestions = ai.generate_json(&prompt).await.unwrap_or_default();
 
         if !suggestions.suggested_links.is_empty() {
+            let links_section = suggestions
+                .suggested_links
+                .iter()
+                .map(|moc| format!("- [[{}]]", moc))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let new_content = format!("{}\n\n## See Also\n{}\n", content.trim_end(), links_section);
+            std::fs::write(&orphan_path, &new_content)?;
             linked.push(orphan_rel.to_string());
         }
     }

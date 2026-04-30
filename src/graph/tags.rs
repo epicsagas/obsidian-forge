@@ -63,7 +63,7 @@ fn fm_re() -> &'static Regex {
 
 fn tags_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?m)^tags:\s*\[").expect("valid tags regex"))
+    RE.get_or_init(|| Regex::new(r"(?m)^tags:\s*\[.*?\]").expect("valid tags regex"))
 }
 
 pub fn extract_all_tags(

@@ -453,10 +453,9 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
                             if let Some(n) = extract_plist_int(rest) {
                                 pid = Some(n);
                             }
-                        } else if let Some(rest) = trimmed.strip_prefix("\"LastExitStatus\"") {
-                            if let Some(n) = extract_plist_int(rest) {
+                        } else if let Some(rest) = trimmed.strip_prefix("\"LastExitStatus\"")
+                            && let Some(n) = extract_plist_int(rest) {
                                 last_exit = Some(n);
-                            }
                         }
                     }
 
@@ -465,10 +464,9 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
                     } else if installed {
                         println!("  Status:      🔴 stopped");
                     }
-                    if let Some(code) = last_exit {
-                        if pid.is_none() {
+                    if let Some(code) = last_exit
+                        && pid.is_none() {
                             println!("  Last Exit:   {}", code);
-                        }
                     }
                 }
                 _ => {
@@ -1223,8 +1221,8 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
                     .find(|l| l.trim().starts_with("\"PID\""))
                     .and_then(|l| extract_plist_int(l.trim().strip_prefix("\"PID\"").unwrap_or("")))
             });
-        if running.is_some() {
-            println!("  Daemon:         🟢 running (PID {})", running.unwrap());
+        if let Some(pid) = running {
+            println!("  Daemon:         🟢 running (PID {})", pid);
         } else {
             println!("  Daemon:         🔴 installed but stopped");
         }
