@@ -964,10 +964,12 @@ fn run_sync_cycle(vault: &Path, config: &ForgeConfig) {
     if let Err(e) = graph::strengthen_graph(vault, config) {
         tracing::warn!("[{}] Graph error: {:?}", config.vault.name, e);
     }
-    if config.sync.git_auto_commit
-        && let Err(e) = git::auto_commit_and_push(vault, config.sync.git_auto_push)
-    {
-        tracing::warn!("[{}] Git error: {:?}", config.vault.name, e);
+    // allow(collapsible_if): let-chain requires Rust 1.88+; CI runs 1.85
+    #[allow(clippy::collapsible_if)]
+    if config.sync.git_auto_commit {
+        if let Err(e) = git::auto_commit_and_push(vault, config.sync.git_auto_push) {
+            tracing::warn!("[{}] Git error: {:?}", config.vault.name, e);
+        }
     }
 }
 
@@ -1240,10 +1242,12 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
 /// Resolve a vault name (from global config) or path to an absolute path.
 fn resolve_vault_path(name_or_path: &str) -> Result<PathBuf> {
     // Try global config first
-    if let Ok(global) = GlobalConfig::load()
-        && let Some(entry) = global.find_vault(name_or_path)
-    {
-        return Ok(PathBuf::from(&entry.path));
+    // allow(collapsible_if): let-chain requires Rust 1.88+; CI runs 1.85
+    #[allow(clippy::collapsible_if)]
+    if let Ok(global) = GlobalConfig::load() {
+        if let Some(entry) = global.find_vault(name_or_path) {
+            return Ok(PathBuf::from(&entry.path));
+        }
     }
     // Treat as path
     let p = PathBuf::from(name_or_path);

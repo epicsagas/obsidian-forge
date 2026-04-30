@@ -67,11 +67,14 @@ async fn handle_file_event(p: &Path, vault_root: &Path, config: &ForgeConfig) {
             }
             Err(e) => error!("PDF conversion failed: {:?}", e),
         }
-    } else if notes::is_markdown(p)
-        && let Err(e) = notes::process_one(p, config, vault_root).await
-        && !e.to_string().contains("No such file or directory")
-    {
-        error!("Processing failed: {:?}", e);
+    } else if notes::is_markdown(p) {
+        // allow(collapsible_if): let-chain requires Rust 1.88+; CI runs 1.85
+        #[allow(clippy::collapsible_if)]
+        if let Err(e) = notes::process_one(p, config, vault_root).await {
+            if !e.to_string().contains("No such file or directory") {
+                error!("Processing failed: {:?}", e);
+            }
+        }
     }
 }
 
