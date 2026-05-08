@@ -271,14 +271,37 @@ obsidian-forge/
 │   ├── config.rs      vault.toml + global config structs
 │   ├── init.rs        vault scaffolding, settings import/push
 │   ├── moc.rs         MOC hub file generation
-│   ├── graph.rs       backlinks, bridge notes, auto-tags
+│   ├── graph/         Graph strengthening pipeline
+│   │   ├── mod.rs       pipeline coordinator
+│   │   ├── scan.rs      vault-wide graph scanning
+│   │   ├── tags.rs      concept-based auto-tagging
+│   │   ├── wikilinks.rs wikilink extraction & injection
+│   │   ├── backlinks.rs backlink section generation
+│   │   ├── bridges.rs   bridge note creation
+│   │   ├── relationships.rs  related-project linking
+│   │   ├── orphans.rs   orphan detection
+│   │   ├── autotag.rs   auto-tag orchestration
+│   │   └── health.rs    graph health reporting
 │   ├── git.rs         auto commit + push (conventional commits)
 │   ├── notes.rs       inbox processing + PARA routing
 │   ├── converter.rs   PDF → Markdown
-│   ├── ai.rs          AI client (Ollama, OpenAI-compatible providers)
+│   ├── ai.rs          AI client (Ollama, OpenAI, OpenRouter, LM Studio, OpenAI-compatible)
 │   ├── prompts.rs     LLM prompt templates
 │   └── watcher.rs     filesystem watcher (notify crate)
 └── vault.toml         per-vault config (created by init)
+```
+
+### Ecosystem
+
+obsidian-forge is the **companion project to [alcove](https://github.com/epicsagas/alcove)** — an MCP server that serves project docs to AI agents. They share a Cargo workspace:
+
+- **alcove** = read/pull (MCP server, on-demand search via BM25 + vector)
+- **obsidian-forge** = write/push (daemon, vault automation + graph strengthening)
+
+```
+obsidian-forge (vault automation)   →   alcove (MCP server)
+  graph strengthening, MOC, sync         BM25 search, project docs
+  daemon (24/7 background)               request-based (stdio JSON-RPC)
 ```
 
 ---
