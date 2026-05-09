@@ -1,6 +1,6 @@
 ## What This Is
 
-`obsidian-forge` is a standalone Rust CLI tool that creates, automates, and manages Obsidian vaults. It supports multiple vaults from a single binary/daemon.
+`obsidian-forge` (`of`) is a Rust CLI daemon for Obsidian vault lifecycle management. It is the **companion project to alcove** in the AI agent documentation ecosystem — alcove provides read-access (MCP server), obsidian-forge provides write-automation (daemon).
 
 ## Build & Run
 
@@ -13,19 +13,19 @@ No external services required for core features. Ollama needed only for AI metad
 
 ## Architecture
 
-Single binary, 11 modules:
+Single binary, 11 top-level modules + graph/ subdirectory:
 
 | Module | Purpose |
 |--------|---------|
 | `main.rs` | CLI (clap), multi-vault dispatch, sync loop |
-| `config.rs` | `vault.toml` (per-vault) + `~/.config/obsidian-forge/config.toml` (global) |
+| `config.rs` | `vault.toml` (per-vault) + `~/.obsidian-forge/config.toml` (global) |
 | `init.rs` | Vault scaffolding (PARA dirs, templates, .obsidian, git) |
 | `moc.rs` | Auto-generate `{project}/{project}.md` hub files |
-| `graph.rs` | Graph strengthening: backlinks, bridge notes, related projects, auto-tags |
+| `graph/` | Graph strengthening pipeline (9 submodules: tags, wikilinks, relationships, bridges, orphans, autotag, scan, health, backlinks) |
 | `git.rs` | Auto commit + push with conventional commit messages |
 | `notes.rs` | Inbox processing: frontmatter, classification, PARA move |
 | `converter.rs` | PDF → Markdown (marker_single / pdftotext fallback) |
-| `ollama.rs` | Ollama client with robust JSON extraction |
+| `ai.rs` | Unified AI client (Ollama, OpenAI, OpenRouter, LM Studio, OpenAI-compatible) |
 | `prompts.rs` | LLM prompt templates (bundled defaults + YAML override) |
 | `watcher.rs` | Filesystem watcher for Inbox (notify crate) |
 
