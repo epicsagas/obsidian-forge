@@ -124,12 +124,25 @@ fn adopt_directory_verbose(
         vault_root,
         "Home.md",
         &format!(
-            "---\ntype: home\ntags: [home]\n---\n\n# {}\n\n## Projects\n\n\
-             ## Key Concepts\n\n\
-             ## Quick Links\n- [[Inbox-Dashboard]]\n\n\
-             ```dataview\nLIST\nFROM \"\"\nWHERE type = \"moc\"\nSORT file.name ASC\n```\n",
+            "---\nproject: root\ntags: [dashboard, layer/raw, type/moc]\n---\n\n# {}\n\n## Raw Layer — Projects & Capture\n\n### Active Projects\n\n### Ongoing Interests\n\n### Inbox\n```dataview\nLIST FROM \"00-Inbox\"\nSORT file.mtime DESC\n```\n\n## Wiki Layer — Compiled Knowledge\n\n### Zettelkasten\n```dataview\nLIST FROM \"10-Zettelkasten\"\nWHERE contains(tags, \"layer/wiki\")\nSORT file.name ASC\n```\n\n## Graph Layer — Connections\n\n### Vault Governance\n- [[README]]\n- [[TAGGING]]\n- [[AGENTS]]\n- [[Inbox-Dashboard]]\n\n--- \n\n## All Maps of Content\n```dataview\nLIST\nFROM \"\"\nWHERE contains(tags, \"type/moc\")\nSORT file.name ASC\n```\n",
             name,
         ),
+        created,
+        skipped,
+    )?;
+
+    // ── Vault Governance ──────────────────────────────────────────────────
+    write_if_missing(
+        vault_root,
+        "AGENTS.md",
+        include_str!("templates/AGENTS.md"),
+        created,
+        skipped,
+    )?;
+    write_if_missing(
+        vault_root,
+        "TAGGING.md",
+        include_str!("templates/TAGGING.md"),
         created,
         skipped,
     )?;
@@ -286,6 +299,13 @@ fn link_global_templates(
             "Monthly-Retrospective.md",
             include_str!("templates/Monthly-Retrospective.md"),
         ),
+        ("PRD.md", include_str!("templates/PRD.md")),
+        ("ARCHITECTURE.md", include_str!("templates/ARCHITECTURE.md")),
+        ("DECISIONS.md", include_str!("templates/DECISIONS.md")),
+        ("CONVENTIONS.md", include_str!("templates/CONVENTIONS.md")),
+        ("PROGRESS.md", include_str!("templates/PROGRESS.md")),
+        ("DEBT.md", include_str!("templates/DEBT.md")),
+        ("SECRETS_MAP.md", include_str!("templates/SECRETS_MAP.md")),
     ];
     for (name, content) in templates {
         let p = global_tpl.join(name);

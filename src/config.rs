@@ -628,15 +628,19 @@ system_dirs = []
 # bridge_notes = true
 # auto_tags = true
 # related_projects = true
-# concepts = []
-# ai_relationships = false     # AI-powered typed relationship extraction
-# tag_hierarchy = false        # Normalize flat tags into hierarchical structure
-# orphan_detection = false     # Detect notes with no incoming/outgoing links
-# # Example concept definition:
-# # [[graph.concepts]]
-# # name = "rust"
-# # keywords = ["cargo", "crate", "borrow"]
-# # tags = ["lang/rust"]
+# ai_relationships = true     # AI-powered typed relationship extraction
+# tag_hierarchy = true        # Normalize flat tags into hierarchical structure
+# orphan_detection = true     # Detect notes with no incoming/outgoing links
+# concepts = [
+#   {{ name = "Search", keywords = ["bm25", "full-text search", "tantivy", "search quality", "retrieval"], tags = ["topics/search"] }},
+#   {{ name = "Rust", keywords = ["rust", "cargo", "agent runtime", "systems programming"], tags = ["topics/rust"] }},
+#   {{ name = "LLM", keywords = ["llm", "large language model", "ollama"], tags = ["topics/ai/llm"] }},
+#   {{ name = "Zettelkasten", keywords = ["zettelkasten", "permanent note", "atomic note"], tags = ["topics/zettelkasten"] }},
+#   {{ name = "AI Agent", keywords = ["agent", "ai agent", "mcp server"], tags = ["topics/ai-agent"] }},
+#   {{ name = "TUI", keywords = ["tui", "terminal", "ratatui"], tags = ["topics/tui"] }},
+#   {{ name = "Knowledge Graph", keywords = ["knowledge graph", "wikilink", "backlink"], tags = ["topics/knowledge-graph"] }},
+#   {{ name = "Ontology", keywords = ["ontology", "knowledge management", "pkm", "taxonomy"], tags = ["topics/ontology"] }},
+# ]
 
 # [sync]
 # git_auto_commit = false

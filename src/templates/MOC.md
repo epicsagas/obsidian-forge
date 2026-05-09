@@ -1,8 +1,10 @@
 ---
-type: moc
-tags: [moc]
-created: <% tp.date.now("YYYY-MM-DD") %>
+project: {{project}}
+tags: [{{project}}, layer/raw, type/moc]
 ---
+
+
+
 # <% tp.file.title %>
 
 ## Overview

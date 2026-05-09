@@ -1,8 +1,10 @@
 ---
-status: active
-tags: [project]
-deadline:
+project: {{project}}
+tags: [{{project}}, layer/raw, type/project]
 ---
+
+
+
 # <% tp.file.title %>
 
 ## Goal

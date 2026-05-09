@@ -1,3 +1,13 @@
+
+## [Unreleased] - 2026-05-10
+### Added
+- Automated seeding of `AGENTS.md` and `TAGGING.md` during vault initialization.
+- New standard project templates: `PRD.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `CONVENTIONS.md`, `PROGRESS.md`, `DEBT.md`, `SECRETS_MAP.md`.
+- Comprehensive ontology concepts in default `vault.toml` template (Ontology, Search Quality, AI Agent, etc.).
+
+### Changed
+- Updated base templates (`MOC.md`, `ZK-Note.md`, `Project-Note.md`) with mandatory Karpathy 3-Layer metadata and hierarchical tags.
+- Enabled `ai_relationships`, `tag_hierarchy`, and `orphan_detection` by default in new vaults.
 # Changelog
 
 All notable changes to this project will be documented in this file.

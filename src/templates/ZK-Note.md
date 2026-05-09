@@ -1,8 +1,9 @@
 ---
-id: <% tp.date.now("YYYYMMDD-HHmm") %>
-tags: [evergreen]
-aliases: []
+tags: [layer/wiki, status/evergreen]
 ---
+
+
+
 # <% tp.file.title %>
 
 ## Core Idea
