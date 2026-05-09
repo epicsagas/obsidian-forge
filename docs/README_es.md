@@ -23,7 +23,7 @@
 
 ```
 of init my-brain                      # construye una nueva bóveda en segundos
-of daemon install                     # registra como elemento de inicio de macOS
+of daemon enable                     # registra como elemento de inicio de macOS
 # "of" es un alias corto integrado para "obsidian-forge"
 # → tu bóveda ahora se procesa, enlaza y confirma automáticamente
 ```
@@ -106,7 +106,7 @@ of init my-brain
 of vault add ~/my-brain
 
 # 4. Instalar el demonio en segundo plano
-of daemon install
+of daemon enable
 
 # Listo — coloca notas en 00-Inbox/ y obsidian-forge se encarga del resto
 ```
@@ -158,8 +158,8 @@ obsidian-forge process-all        [--vault <name>]   # procesamiento IA de bande
 ### Demonio en segundo plano (macOS LaunchAgent)
 
 ```bash
-obsidian-forge daemon install     # escribir plist + bootstrap (elemento de inicio)
-obsidian-forge daemon uninstall   # bootout + eliminar plist
+obsidian-forge daemon enable     # escribir plist + bootstrap (elemento de inicio)
+obsidian-forge daemon disable   # bootout + eliminar plist
 obsidian-forge daemon start
 obsidian-forge daemon stop
 obsidian-forge daemon status      # muestra PID y último código de salida

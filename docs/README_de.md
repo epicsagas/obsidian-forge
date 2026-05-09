@@ -23,7 +23,7 @@
 
 ```
 of init my-brain                      # neuen Tresor in Sekunden aufbauen
-of daemon install                     # als macOS-Anmeldeobjekt registrieren
+of daemon enable                     # als macOS-Anmeldeobjekt registrieren
 # "of" ist ein eingebauter Kurzalias für "obsidian-forge"
 # → Ihr Tresor verarbeitet, verknüpft und committet jetzt automatisch
 ```
@@ -106,7 +106,7 @@ of init my-brain
 of vault add ~/my-brain
 
 # 4. Hintergrund-Daemon installieren
-of daemon install
+of daemon enable
 
 # Fertig — Notizen in 00-Inbox/ ablegen und obsidian-forge erledigt den Rest
 ```
@@ -158,8 +158,8 @@ obsidian-forge process-all        [--vault <name>]   # KI-Posteingangsverarbeitu
 ### Hintergrund-Daemon (macOS LaunchAgent)
 
 ```bash
-obsidian-forge daemon install     # plist schreiben + Bootstrap (Anmeldeobjekt)
-obsidian-forge daemon uninstall   # Bootout + plist entfernen
+obsidian-forge daemon enable     # plist schreiben + Bootstrap (Anmeldeobjekt)
+obsidian-forge daemon disable   # Bootout + plist entfernen
 obsidian-forge daemon start
 obsidian-forge daemon stop
 obsidian-forge daemon status      # zeigt PID und letzten Exit-Code

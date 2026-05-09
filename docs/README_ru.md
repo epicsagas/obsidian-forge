@@ -23,7 +23,7 @@
 
 ```
 of init my-brain                      # создать новое хранилище за секунды
-of daemon install                     # зарегистрировать как элемент входа macOS
+of daemon enable                     # зарегистрировать как элемент входа macOS
 # "of" — встроенный короткий псевдоним для "obsidian-forge"
 # → ваше хранилище теперь обрабатывается, связывается и фиксируется автоматически
 ```
@@ -106,7 +106,7 @@ of init my-brain
 of vault add ~/my-brain
 
 # 4. Установить фоновый демон
-of daemon install
+of daemon enable
 
 # Готово — помещайте заметки в 00-Inbox/, obsidian-forge позаботится об остальном
 ```
@@ -158,8 +158,8 @@ obsidian-forge process-all        [--vault <name>]   # обработка вхо
 ### Фоновый демон (macOS LaunchAgent)
 
 ```bash
-obsidian-forge daemon install     # записать plist + bootstrap (элемент входа)
-obsidian-forge daemon uninstall   # bootout + удалить plist
+obsidian-forge daemon enable     # записать plist + bootstrap (элемент входа)
+obsidian-forge daemon disable   # bootout + удалить plist
 obsidian-forge daemon start
 obsidian-forge daemon stop
 obsidian-forge daemon status      # показывает PID и последний код выхода

@@ -23,7 +23,7 @@
 
 ```
 of init my-brain                      # saniyeler içinde yeni kasa kur
-of daemon install                     # macOS giriş öğesi olarak kaydet
+of daemon enable                     # macOS giriş öğesi olarak kaydet
 # "of", "obsidian-forge" için yerleşik kısa takma addır
 # → kasanız artık otomatik işliyor, bağlantı kuruyor ve commit yapıyor
 ```
@@ -106,7 +106,7 @@ of init my-brain
 of vault add ~/my-brain
 
 # 4. Arka plan daemonunu kur
-of daemon install
+of daemon enable
 
 # Bitti — 00-Inbox/ dizinine notlar bırakın, obsidian-forge gerisini halleder
 ```
@@ -158,8 +158,8 @@ obsidian-forge process-all        [--vault <name>]   # AI gelen kutusu işleme
 ### Arka Plan Daemonu (macOS LaunchAgent)
 
 ```bash
-obsidian-forge daemon install     # plist yaz + bootstrap (giriş öğesi)
-obsidian-forge daemon uninstall   # bootout + plist kaldır
+obsidian-forge daemon enable     # plist yaz + bootstrap (giriş öğesi)
+obsidian-forge daemon disable   # bootout + plist kaldır
 obsidian-forge daemon start
 obsidian-forge daemon stop
 obsidian-forge daemon status      # PID ve son çıkış kodunu gösterir

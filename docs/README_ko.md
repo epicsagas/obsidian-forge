@@ -23,7 +23,7 @@
 
 ```
 of init my-brain                      # 몇 초 만에 새 볼트 스캐폴딩
-of daemon install                     # macOS 로그인 항목으로 등록
+of daemon enable                     # macOS 로그인 항목으로 등록
 # "of"는 "obsidian-forge"의 내장 단축 별칭입니다
 # → 이제 볼트가 자동 처리, 자동 링크, 자동 커밋됩니다
 ```
@@ -106,7 +106,7 @@ of init my-brain
 of vault add ~/my-brain
 
 # 4. 백그라운드 데몬 설치
-of daemon install
+of daemon enable
 
 # 완료 — 00-Inbox/에 노트를 넣으면 obsidian-forge가 나머지를 처리합니다
 ```
@@ -158,8 +158,8 @@ obsidian-forge process-all        [--vault <name>]   # AI 인박스 처리
 ### 백그라운드 데몬 (macOS LaunchAgent)
 
 ```bash
-obsidian-forge daemon install     # plist 작성 + 부트스트랩 (로그인 항목)
-obsidian-forge daemon uninstall   # 부트아웃 + plist 제거
+obsidian-forge daemon enable     # plist 작성 + 부트스트랩 (로그인 항목)
+obsidian-forge daemon disable   # 부트아웃 + plist 제거
 obsidian-forge daemon start
 obsidian-forge daemon stop
 obsidian-forge daemon status      # PID 및 마지막 종료 코드 표시

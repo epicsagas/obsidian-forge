@@ -23,7 +23,7 @@
 
 ```
 of init my-brain          # scaffold a new vault in seconds
-of daemon install         # register as a macOS login item
+of daemon enable         # register as a macOS login item
 # → your vault now auto-processes, auto-links, and auto-commits
 # "of" is a built-in short alias for "obsidian-forge"
 ```
@@ -106,7 +106,7 @@ of init my-brain
 of vault add ~/my-brain
 
 # 4. Install the background daemon
-of daemon install
+of daemon enable
 
 # Done — drop notes into 00-Inbox/ and obsidian-forge handles the rest
 ```
@@ -161,8 +161,8 @@ obsidian-forge process-all        [--vault <name>]   # AI inbox processing
 ### Background Daemon (macOS LaunchAgent)
 
 ```bash
-obsidian-forge daemon install     # write plist + bootstrap (login item)
-obsidian-forge daemon uninstall   # bootout + remove plist
+obsidian-forge daemon enable     # write plist + bootstrap (login item)
+obsidian-forge daemon disable   # bootout + remove plist
 obsidian-forge daemon start
 obsidian-forge daemon stop
 obsidian-forge daemon status      # shows PID and last exit code

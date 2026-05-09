@@ -23,7 +23,7 @@
 
 ```
 of init my-brain                      # 几秒内搭建新知识库
-of daemon install                     # 注册为 macOS 登录项
+of daemon enable                     # 注册为 macOS 登录项
 # "of" 是 "obsidian-forge" 的内置短别名
 # → 您的知识库现在自动处理、自动链接、自动提交
 ```
@@ -106,7 +106,7 @@ of init my-brain
 of vault add ~/my-brain
 
 # 4. 安装后台守护进程
-of daemon install
+of daemon enable
 
 # 完成 —— 将笔记放入 00-Inbox/，obsidian-forge 会处理剩余的一切
 ```
@@ -158,8 +158,8 @@ obsidian-forge process-all        [--vault <name>]   # AI 收件箱处理
 ### 后台守护进程（macOS LaunchAgent）
 
 ```bash
-obsidian-forge daemon install     # 写入 plist + 引导启动（登录项）
-obsidian-forge daemon uninstall   # 卸载引导 + 删除 plist
+obsidian-forge daemon enable     # 写入 plist + 引导启动（登录项）
+obsidian-forge daemon disable   # 卸载引导 + 删除 plist
 obsidian-forge daemon start
 obsidian-forge daemon stop
 obsidian-forge daemon status      # 显示 PID 和最后退出代码

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- CLI: `daemon install` renamed to `daemon enable` (old name works as deprecated alias)
+- CLI: `daemon uninstall` renamed to `daemon disable` (old name works as deprecated alias)
+
 ## [0.1.0] - 2026-03-25
 
 ### Added

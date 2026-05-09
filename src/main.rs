@@ -166,10 +166,20 @@ enum VaultAction {
 
 #[derive(Subcommand)]
 enum DaemonAction {
-    /// Install LaunchAgent plist and start the daemon
-    Install,
-    /// Stop the daemon and uninstall LaunchAgent plist
-    Uninstall,
+    /// Enable the LaunchAgent daemon (register plist and start)
+    #[command(name = "enable", alias = "install")]
+    Enable {
+        /// Start immediately (default behavior, accepted for consistency)
+        #[arg(long)]
+        now: bool,
+    },
+    /// Disable the LaunchAgent daemon (stop and remove plist)
+    #[command(name = "disable", alias = "uninstall")]
+    Disable {
+        /// Stop immediately (default behavior, accepted for consistency)
+        #[arg(long)]
+        now: bool,
+    },
     /// Start the installed LaunchAgent
     Start,
     /// Stop the running LaunchAgent
@@ -269,6 +279,7 @@ async fn main() -> Result<()> {
             return handle_vault_action(action);
         }
         Commands::Daemon { action } => {
+            check_daemon_deprecated_args();
             return handle_daemon_action(action);
         }
         _ => {}
@@ -409,12 +420,34 @@ async fn handle_graph_action(
 // Daemon management (macOS LaunchAgent)
 // ---------------------------------------------------------------------------
 
+fn warn_deprecated(old: &str, new: &str) {
+    eprintln!(
+        "[deprecated] '{}' is deprecated, use '{}' instead.",
+        old, new
+    );
+}
+
+/// Check raw CLI args for deprecated alias usage after the `daemon` subcommand.
+fn check_daemon_deprecated_args() {
+    let args: Vec<String> = std::env::args().collect();
+    // Find the position of "daemon" and check the next token
+    if let Some(idx) = args.iter().position(|a| a == "daemon")
+        && let Some(sub) = args.get(idx + 1)
+    {
+        match sub.as_str() {
+            "install" => warn_deprecated("daemon install", "daemon enable"),
+            "uninstall" => warn_deprecated("daemon uninstall", "daemon disable"),
+            _ => {}
+        }
+    }
+}
+
 fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
     let label = daemon_label();
     let plist_path = launch_agents_dir().join(format!("{}.plist", label));
 
     match action {
-        DaemonAction::Install => {
+        DaemonAction::Enable { .. } => {
             let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("obsidian-forge"));
             let log_dir = dirs_home().join(".obsidian-forge/logs");
             fs::create_dir_all(&log_dir)?;
@@ -432,20 +465,20 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
                 &format!("gui/{}", uid()),
                 &plist_path.to_string_lossy(),
             ])?;
-            println!("✅ Daemon installed and started (label: {})", label);
+            println!("✅ Daemon enabled and started (label: {})", label);
             println!("   Logs: {}/forge.log", log_dir.display());
         }
-        DaemonAction::Uninstall => {
+        DaemonAction::Disable { .. } => {
             let _ = launchctl(&["bootout", &format!("gui/{}/{}", uid(), label)]);
             if plist_path.exists() {
                 fs::remove_file(&plist_path)?;
                 println!("✅ Plist removed: {}", plist_path.display());
             }
-            println!("✅ Daemon uninstalled");
+            println!("✅ Daemon disabled");
         }
         DaemonAction::Start => {
             if !plist_path.exists() {
-                anyhow::bail!("Daemon not installed. Run `obsidian-forge daemon install` first.");
+                anyhow::bail!("Daemon not installed. Run `obsidian-forge daemon enable` first.");
             }
             launchctl(&[
                 "bootstrap",
@@ -460,7 +493,7 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
         }
         DaemonAction::Restart => {
             if !plist_path.exists() {
-                anyhow::bail!("Daemon not installed. Run `obsidian-forge daemon install` first.");
+                anyhow::bail!("Daemon not installed. Run `obsidian-forge daemon enable` first.");
             }
             let _ = launchctl(&["bootout", &format!("gui/{}/{}", uid(), label)]);
             launchctl(&[

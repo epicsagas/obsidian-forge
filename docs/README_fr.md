@@ -23,7 +23,7 @@
 
 ```
 of init my-brain                      # structure un nouveau coffre en quelques secondes
-of daemon install                     # enregistre comme élément de connexion macOS
+of daemon enable                     # enregistre comme élément de connexion macOS
 # "of" est un alias court intégré pour "obsidian-forge"
 # → votre coffre traite, lie et valide maintenant automatiquement
 ```
@@ -106,7 +106,7 @@ of init my-brain
 of vault add ~/my-brain
 
 # 4. Installer le daemon en arrière-plan
-of daemon install
+of daemon enable
 
 # Terminé — déposez des notes dans 00-Inbox/ et obsidian-forge s'occupe du reste
 ```
@@ -158,8 +158,8 @@ obsidian-forge process-all        [--vault <name>]   # traitement IA de la boît
 ### Daemon en arrière-plan (macOS LaunchAgent)
 
 ```bash
-obsidian-forge daemon install     # écrire le plist + bootstrap (élément de connexion)
-obsidian-forge daemon uninstall   # bootout + supprimer le plist
+obsidian-forge daemon enable     # écrire le plist + bootstrap (élément de connexion)
+obsidian-forge daemon disable   # bootout + supprimer le plist
 obsidian-forge daemon start
 obsidian-forge daemon stop
 obsidian-forge daemon status      # affiche le PID et le dernier code de sortie
