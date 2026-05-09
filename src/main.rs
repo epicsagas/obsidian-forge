@@ -11,10 +11,13 @@ mod watcher;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::{fs, path::{Path, PathBuf}};
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-use config::{default_vault_toml_template, ForgeConfig, GlobalConfig};
+use config::{ForgeConfig, GlobalConfig, default_vault_toml_template};
 
 #[derive(Parser)]
 #[command(name = "obsidian-forge")]
@@ -110,6 +113,16 @@ enum Commands {
         vault: Option<String>,
     },
 
+    /// Diagnose vault health (alias for status)
+    Doctor {
+        /// Specific vault name (from global config)
+        #[arg(long)]
+        vault: Option<String>,
+        /// Skip AI connectivity test
+        #[arg(long)]
+        no_ping: bool,
+    },
+
     /// Show vault and AI configuration status
     Status {
         /// Specific vault name (from global config)
@@ -163,6 +176,8 @@ enum DaemonAction {
     Stop,
     /// Show daemon status
     Status,
+    /// Restart the daemon (stop then start)
+    Restart,
 }
 
 #[derive(Subcommand)]
@@ -282,9 +297,18 @@ async fn main() -> Result<()> {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
             graph::strengthen_graph(&vault, &config)?;
         }
-        Commands::Graph { ref action, vault: filter } => {
+        Commands::Graph {
+            ref action,
+            vault: filter,
+        } => {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
             handle_graph_action(action, &vault, &config).await?;
+        }
+        Commands::Doctor {
+            vault: filter,
+            no_ping,
+        } => {
+            run_status_command(cli.vault_path, filter, no_ping).await?;
         }
         Commands::Status {
             vault: filter,
@@ -302,7 +326,11 @@ async fn main() -> Result<()> {
 // Graph subcommands
 // ---------------------------------------------------------------------------
 
-async fn handle_graph_action(action: &GraphAction, vault: &Path, config: &ForgeConfig) -> Result<()> {
+async fn handle_graph_action(
+    action: &GraphAction,
+    vault: &Path,
+    config: &ForgeConfig,
+) -> Result<()> {
     match action {
         GraphAction::Health => {
             let health = graph::graph_health(vault, config)?;
@@ -348,7 +376,13 @@ async fn handle_graph_action(action: &GraphAction, vault: &Path, config: &ForgeC
                 } else {
                     println!("Extracted {} relationships:", relationships.len());
                     for r in &relationships {
-                        println!("  {} --{}-> {} ({:.0}%)", r.source, r.relation, r.target, r.confidence * 100.0);
+                        println!(
+                            "  {} --{}-> {} ({:.0}%)",
+                            r.source,
+                            r.relation,
+                            r.target,
+                            r.confidence * 100.0
+                        );
                     }
                     graph::save_relationships_manifest(vault, &relationships)?;
                 }
@@ -424,6 +458,18 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
             launchctl(&["bootout", &format!("gui/{}/{}", uid(), label)])?;
             println!("⏹️  Daemon stopped ({})", label);
         }
+        DaemonAction::Restart => {
+            if !plist_path.exists() {
+                anyhow::bail!("Daemon not installed. Run `obsidian-forge daemon install` first.");
+            }
+            let _ = launchctl(&["bootout", &format!("gui/{}/{}", uid(), label)]);
+            launchctl(&[
+                "bootstrap",
+                &format!("gui/{}", uid()),
+                &plist_path.to_string_lossy(),
+            ])?;
+            println!("🔄 Daemon restarted ({})", label);
+        }
         DaemonAction::Status => {
             // ── Plist installation ──
             let installed = plist_path.exists();
@@ -432,7 +478,11 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
             println!(
                 "  Plist:       {} ({})",
                 plist_path.display(),
-                if installed { "installed" } else { "not installed" }
+                if installed {
+                    "installed"
+                } else {
+                    "not installed"
+                }
             );
 
             // ── Running state from launchctl ──
@@ -499,10 +549,7 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
             let log_dir = dirs_home().join(".obsidian-forge/logs");
             let stdout_log = log_dir.join("forge.log");
             let stderr_log = log_dir.join("forge.err");
-            print!(
-                "  Stdout log:  {} ",
-                stdout_log.display()
-            );
+            print!("  Stdout log:  {} ", stdout_log.display());
             if stdout_log.exists() {
                 match fs::metadata(&stdout_log) {
                     Ok(meta) => println!("({})", format_bytes(meta.len())),
@@ -511,10 +558,7 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
             } else {
                 println!("(not created)");
             }
-            print!(
-                "  Stderr log:  {} ",
-                stderr_log.display()
-            );
+            print!("  Stderr log:  {} ", stderr_log.display());
             if stderr_log.exists() {
                 match fs::metadata(&stderr_log) {
                     Ok(meta) => println!("({})", format_bytes(meta.len())),
@@ -814,7 +858,7 @@ async fn run_watch(filter: Option<String>, interval_override: Option<u64>) -> Re
         let config_for_sync = config.clone();
         let interval_secs = resolve_interval(&config, interval_override);
         tokio::spawn(async move {
-            use tokio::time::{sleep, Duration};
+            use tokio::time::{Duration, sleep};
             loop {
                 run_sync_cycle(&vault_for_sync, &config_for_sync);
                 sleep(Duration::from_secs(interval_secs)).await;
@@ -853,7 +897,7 @@ async fn run_watch(filter: Option<String>, interval_override: Option<u64>) -> Re
         let vp = vault_path.clone();
         let cfg = config.clone();
         tokio::spawn(async move {
-            use tokio::time::{sleep, Duration};
+            use tokio::time::{Duration, sleep};
             loop {
                 tracing::debug!("Sync cycle: {}", vp.display());
                 run_sync_cycle(&vp, &cfg);
@@ -1088,9 +1132,7 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
     println!("  Path:       {}", vault.display());
     let inbox = vault.join(&config.vault.inbox_dir);
     let inbox_count = if inbox.exists() {
-        fs::read_dir(&inbox)
-            .map(|r| r.count())
-            .unwrap_or(0)
+        fs::read_dir(&inbox).map(|r| r.count()).unwrap_or(0)
     } else {
         0
     };
@@ -1141,10 +1183,38 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
     // ── Graph ──
     println!();
     println!("Graph");
-    println!("  Backlinks:      {}", if config.graph.backlinks { "✓ on" } else { "✗ off" });
-    println!("  Bridge notes:   {}", if config.graph.bridge_notes { "✓ on" } else { "✗ off" });
-    println!("  Auto tags:      {}", if config.graph.auto_tags { "✓ on" } else { "✗ off" });
-    println!("  Related:        {}", if config.graph.related_projects { "✓ on" } else { "✗ off" });
+    println!(
+        "  Backlinks:      {}",
+        if config.graph.backlinks {
+            "✓ on"
+        } else {
+            "✗ off"
+        }
+    );
+    println!(
+        "  Bridge notes:   {}",
+        if config.graph.bridge_notes {
+            "✓ on"
+        } else {
+            "✗ off"
+        }
+    );
+    println!(
+        "  Auto tags:      {}",
+        if config.graph.auto_tags {
+            "✓ on"
+        } else {
+            "✗ off"
+        }
+    );
+    println!(
+        "  Related:        {}",
+        if config.graph.related_projects {
+            "✓ on"
+        } else {
+            "✗ off"
+        }
+    );
     if !config.graph.concepts.is_empty() {
         println!("  Concepts:       {} defined", config.graph.concepts.len());
     }
@@ -1189,7 +1259,11 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
             .filter(|s| !s.is_empty());
         if let Some(changes) = dirty {
             let count = changes.lines().count();
-            println!("  Working:    {} uncommitted change{}", count, if count == 1 { "" } else { "s" });
+            println!(
+                "  Working:    {} uncommitted change{}",
+                count,
+                if count == 1 { "" } else { "s" }
+            );
         } else {
             println!("  Working:    clean");
         }

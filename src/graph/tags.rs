@@ -56,9 +56,7 @@ impl std::fmt::Display for TagNormalizationResult {
 
 fn fm_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").expect("valid frontmatter regex")
-    })
+    RE.get_or_init(|| Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").expect("valid frontmatter regex"))
 }
 
 fn tags_re() -> &'static Regex {
@@ -174,19 +172,13 @@ pub fn cluster_tags_by_cooccurrence(
     let mut cluster_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for tag in &tags {
         let root = find(&parent, tag);
-        cluster_map
-            .entry(root)
-            .or_default()
-            .push((*tag).clone());
+        cluster_map.entry(root).or_default().push((*tag).clone());
     }
 
     cluster_map
         .into_iter()
         .map(|(canonical, aliases)| {
-            let doc_count = tag_docs
-                .get(&canonical)
-                .map(|s| s.len())
-                .unwrap_or(0);
+            let doc_count = tag_docs.get(&canonical).map(|s| s.len()).unwrap_or(0);
             TagCluster {
                 canonical,
                 aliases,
@@ -229,7 +221,12 @@ pub async fn normalize_tags(
         .values()
         .map(|tags| {
             tags.iter()
-                .map(|t| canonical_map.get(&normalize_tag(t)).cloned().unwrap_or_else(|| normalize_tag(t)))
+                .map(|t| {
+                    canonical_map
+                        .get(&normalize_tag(t))
+                        .cloned()
+                        .unwrap_or_else(|| normalize_tag(t))
+                })
                 .collect::<BTreeSet<String>>()
                 .len()
         })
@@ -413,10 +410,7 @@ mod tests {
             "rust-lang".into(),
             BTreeSet::from(["a.md".into(), "b.md".into()]),
         );
-        tag_docs.insert(
-            "python".into(),
-            BTreeSet::from(["d.md".into()]),
-        );
+        tag_docs.insert("python".into(), BTreeSet::from(["d.md".into()]));
 
         let clusters = cluster_tags_by_cooccurrence(&tag_docs);
 

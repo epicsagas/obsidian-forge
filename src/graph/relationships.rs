@@ -88,10 +88,8 @@ pub async fn extract_relationships(
     let concurrency = config.ai.max_concurrent.unwrap_or(5);
 
     let batch_size = 15usize;
-    let batches: Vec<Vec<(String, String)>> = pairs
-        .chunks(batch_size)
-        .map(|c| c.to_vec())
-        .collect();
+    let batches: Vec<Vec<(String, String)>> =
+        pairs.chunks(batch_size).map(|c| c.to_vec()).collect();
 
     let all_relationships: Vec<Relationship> = stream::iter(batches)
         .map(|batch| {
@@ -106,10 +104,7 @@ pub async fn extract_relationships(
         .flatten()
         .collect();
 
-    info!(
-        "Extracted {} relationships",
-        all_relationships.len()
-    );
+    info!("Extracted {} relationships", all_relationships.len());
 
     Ok(all_relationships)
 }
@@ -129,8 +124,7 @@ fn collect_candidate_pairs(graph: &VaultGraph) -> Vec<(String, String)> {
 
             if let Some(second_hop) = graph.outgoing.get(target) {
                 for hop_target in second_hop {
-                    if hop_target != source
-                        && !seen.contains(&(hop_target.clone(), source.clone()))
+                    if hop_target != source && !seen.contains(&(hop_target.clone(), source.clone()))
                     {
                         seen.insert((source.clone(), hop_target.clone()));
                         pairs.push((source.clone(), hop_target.clone()));
@@ -143,10 +137,7 @@ fn collect_candidate_pairs(graph: &VaultGraph) -> Vec<(String, String)> {
     pairs
 }
 
-fn build_summary_cache(
-    vault_root: &Path,
-    graph: &VaultGraph,
-) -> BTreeMap<String, String> {
+fn build_summary_cache(vault_root: &Path, graph: &VaultGraph) -> BTreeMap<String, String> {
     let mut cache = BTreeMap::new();
     for file in &graph.all_files {
         let path = vault_root.join(file);

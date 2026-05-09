@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::ai::AiClient;
 use crate::config::ForgeConfig;
 
-use super::wikilinks::{build_vault_graph, VaultGraph};
+use super::wikilinks::{VaultGraph, build_vault_graph};
 
 pub fn detect_orphans(vault_root: &Path, config: &ForgeConfig) -> Result<Vec<String>> {
     let graph = build_vault_graph(vault_root, config)?;

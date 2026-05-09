@@ -312,8 +312,7 @@ mod tests {
 
     #[test]
     fn test_extract_preserved_sections_with_related() {
-        let content =
-            "## Core Docs\n- [[note]]\n\n## Related Projects\n- [[X/X]]\n\n## Key Concepts\n- [[Y/Y]]\n";
+        let content = "## Core Docs\n- [[note]]\n\n## Related Projects\n- [[X/X]]\n\n## Key Concepts\n- [[Y/Y]]\n";
         let result = extract_preserved_sections(content);
         assert!(result.contains("## Related Projects"));
         assert!(result.contains("## Key Concepts"));

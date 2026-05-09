@@ -127,7 +127,10 @@ impl AiClient {
         }
         if self.provider == "openrouter" {
             req = req
-                .header("HTTP-Referer", "https://github.com/epicsagas/obsidian-forge")
+                .header(
+                    "HTTP-Referer",
+                    "https://github.com/epicsagas/obsidian-forge",
+                )
                 .header("X-Title", "obsidian-forge");
         }
 

@@ -73,7 +73,7 @@ impl VaultGraph {
             .map(|(path, links)| (path.clone(), links.len()))
             .filter(|(_, count)| *count > 0)
             .collect();
-        hubs.sort_by(|a, b| b.1.cmp(&a.1));
+        hubs.sort_by_key(|b| std::cmp::Reverse(b.1));
         hubs.truncate(top_n);
         hubs
     }
@@ -116,7 +116,9 @@ impl VaultGraph {
 
 fn wikilink_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]").expect("valid wikilink regex"))
+    RE.get_or_init(|| {
+        Regex::new(r"\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]").expect("valid wikilink regex")
+    })
 }
 
 pub fn build_vault_graph(vault_root: &Path, _config: &ForgeConfig) -> Result<VaultGraph> {
@@ -190,7 +192,9 @@ pub fn build_vault_graph(vault_root: &Path, _config: &ForgeConfig) -> Result<Vau
         }
 
         if !resolved_targets.is_empty() {
-            graph.outgoing.insert(source.clone(), resolved_targets.clone());
+            graph
+                .outgoing
+                .insert(source.clone(), resolved_targets.clone());
             for target in &resolved_targets {
                 graph
                     .incoming
@@ -362,10 +366,9 @@ mod tests {
     fn test_vault_graph_broken_links() {
         let mut graph = VaultGraph::default();
         graph.all_files.insert("a.md".into());
-        graph.outgoing.insert(
-            "a.md".into(),
-            BTreeSet::from(["missing.md".into()]),
-        );
+        graph
+            .outgoing
+            .insert("a.md".into(), BTreeSet::from(["missing.md".into()]));
 
         let broken = graph.broken_links();
         assert_eq!(broken.len(), 1);

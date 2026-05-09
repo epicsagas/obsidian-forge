@@ -174,7 +174,9 @@ pub fn update_related_projects(
             }
         }
 
-        let new_content = if existing.contains("## Related Projects") || existing.contains("## Key Concepts") {
+        let new_content = if existing.contains("## Related Projects")
+            || existing.contains("## Key Concepts")
+        {
             let cleaned = remove_sections(&existing, &["## Related Projects", "## Key Concepts"]);
             format!("{}\n\n{}\n", cleaned.trim_end(), section)
         } else {

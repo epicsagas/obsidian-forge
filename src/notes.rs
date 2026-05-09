@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use futures::stream::{self, StreamExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -56,11 +56,7 @@ pub async fn process_all(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            if is_pdf(&path) {
-                Some(path)
-            } else {
-                None
-            }
+            if is_pdf(&path) { Some(path) } else { None }
         })
         .map(|path| async move {
             match crate::converter::convert_pdf_to_md(&path, vault_root, config).await {
@@ -221,11 +217,7 @@ async fn classify_by_title_or_ai(
         );
     }
     if book.iter().any(|kw| title_lower.contains(kw)) {
-        return (
-            "Resources".into(),
-            "Reference".into(),
-            "Books-Notes".into(),
-        );
+        return ("Resources".into(), "Reference".into(), "Books-Notes".into());
     }
 
     #[derive(serde::Deserialize, Default)]
@@ -311,8 +303,15 @@ fn split_frontmatter(input: &str) -> Result<(Option<Frontmatter>, String)> {
         Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").expect("valid frontmatter regex")
     });
     if let Some(caps) = re.captures(input) {
-        let yaml = caps.get(1).expect("capture group 1 always present").as_str();
-        let body = caps.get(2).expect("capture group 2 always present").as_str().to_string();
+        let yaml = caps
+            .get(1)
+            .expect("capture group 1 always present")
+            .as_str();
+        let body = caps
+            .get(2)
+            .expect("capture group 2 always present")
+            .as_str()
+            .to_string();
         let fm: Frontmatter = serde_yaml::from_str(yaml).unwrap_or_default();
         Ok((Some(fm), body))
     } else {
@@ -459,16 +458,28 @@ mod tests {
 
     #[test]
     fn test_classify_book_keywords() {
-        let title_hits = ["Book review: Rust in Action", "ISBN 978-3-16", "book summary of DDIA"];
+        let title_hits = [
+            "Book review: Rust in Action",
+            "ISBN 978-3-16",
+            "book summary of DDIA",
+        ];
         let title_misses = ["Chapter 3: Kubernetes", "Reading sensor data"];
         let book = ["book review", "book note", "book summary", "isbn"];
         for title in &title_hits {
             let t = title.to_lowercase();
-            assert!(book.iter().any(|kw| t.contains(kw)), "should match: {}", title);
+            assert!(
+                book.iter().any(|kw| t.contains(kw)),
+                "should match: {}",
+                title
+            );
         }
         for title in &title_misses {
             let t = title.to_lowercase();
-            assert!(!book.iter().any(|kw| t.contains(kw)), "should NOT match: {}", title);
+            assert!(
+                !book.iter().any(|kw| t.contains(kw)),
+                "should NOT match: {}",
+                title
+            );
         }
     }
 

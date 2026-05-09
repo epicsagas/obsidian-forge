@@ -3,8 +3,8 @@ use std::{fs, path::Path, process::Command};
 use tracing::{info, warn};
 
 use crate::config::{
-    default_vault_toml_template, ForgeConfig, GlobalConfig, CONFIG_FILE, SETTINGS_DIRS,
-    SETTINGS_FILES,
+    CONFIG_FILE, ForgeConfig, GlobalConfig, SETTINGS_DIRS, SETTINGS_FILES,
+    default_vault_toml_template,
 };
 
 /// Initialize a vault. Works for both new and existing directories.

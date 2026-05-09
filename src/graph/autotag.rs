@@ -5,8 +5,8 @@ use std::{
     collections::BTreeSet,
     fs,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         OnceLock,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 use tracing::{debug, info};
@@ -21,8 +21,7 @@ pub fn auto_tag_documents(profiles: &[ProjectProfile], config: &ForgeConfig) -> 
     let fm_re = FM_RE.get_or_init(|| {
         Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").expect("valid frontmatter regex")
     });
-    let tags_re =
-        TAGS_RE.get_or_init(|| Regex::new(r"(?m)^tags:\s*\[").expect("valid tags regex"));
+    let tags_re = TAGS_RE.get_or_init(|| Regex::new(r"(?m)^tags:\s*\[").expect("valid tags regex"));
 
     let tagged_count = AtomicUsize::new(0);
 
@@ -54,10 +53,7 @@ pub fn auto_tag_documents(profiles: &[ProjectProfile], config: &ForgeConfig) -> 
                 }
             }
 
-            let stem = doc_path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("");
+            let stem = doc_path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
             match stem {
                 "PRD" => {
                     tags.insert("prd".into());

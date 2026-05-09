@@ -1,9 +1,6 @@
 use anyhow::Result;
 use rayon::prelude::*;
-use std::{
-    fs,
-    path::Path,
-};
+use std::{fs, path::Path};
 use tracing::{debug, info};
 
 use crate::moc::replace_section;
