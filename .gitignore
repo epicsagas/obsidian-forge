@@ -206,3 +206,9 @@ $RECYCLE.BIN/
 logs/
 tmp/
 temp/
+
+# Claude Code
+.claude/
+
+# AI tool configs (local only)
+GEMINI.md
