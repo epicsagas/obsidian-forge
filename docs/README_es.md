@@ -121,6 +121,9 @@ of daemon enable
 obsidian-forge init <name>
 obsidian-forge init <name> --path ~/vaults
 obsidian-forge init <name> --clone-settings-from ~/other-vault
+
+# Reejecutar en una bóveda existente para reparar/actualizar (idempotente — nunca sobrescribe)
+obsidian-forge init my-brain --path ~/
 ```
 
 ### Gestión de múltiples bóvedas
@@ -135,15 +138,31 @@ obsidian-forge vault pause   <name>         # omitir demonio; sincronización ma
 obsidian-forge vault resume  <name>
 ```
 
-### Almacén de configuración
+### Gestión de configuración
 
-Sincroniza plugins, temas y fragmentos de `.obsidian/` en todas las bóvedas.
+Sincroniza plugins, temas y fragmentos de `.obsidian/` entre bóvedas.
 
 ```bash
 obsidian-forge settings import <vault>      # importar configuración al almacén global
 obsidian-forge settings push   <vault>      # enviar configuración global a una bóveda
 obsidian-forge settings push-all            # enviar a TODAS las bóvedas registradas
 obsidian-forge settings status
+
+# Clonación directa entre dos bóvedas
+obsidian-forge clone-settings <source> <target>
+```
+
+### Operaciones de grafo
+
+```bash
+obsidian-forge graph health                 # mostrar estadísticas y métricas de salud
+obsidian-forge graph orphans [--auto-link]  # listar huérfanos (o auto-enlazar con IA)
+obsidian-forge graph extract [--no-ai]      # extraer enlaces y relaciones
+obsidian-forge graph tags [--dry-run]       # normalizar y agrupar etiquetas
+obsidian-forge graph strengthen             # ejecutar flujo completo
+
+# Alias heredado (ejecuta el flujo completo)
+obsidian-forge strengthen-graph
 ```
 
 ### Operaciones únicas
@@ -151,18 +170,20 @@ obsidian-forge settings status
 ```bash
 obsidian-forge sync               [--vault <name>]   # MOC → grafo → git
 obsidian-forge update-mocs        [--vault <name>]
-obsidian-forge strengthen-graph   [--vault <name>]
 obsidian-forge process-all        [--vault <name>]   # procesamiento IA de bandeja
+obsidian-forge status             [--vault <name>]   # mostrar estado de config e IA
+obsidian-forge doctor             [--vault <name>]   # diagnosticar salud de la bóveda
 ```
 
 ### Demonio en segundo plano (macOS LaunchAgent)
 
 ```bash
 obsidian-forge daemon enable     # escribir plist + bootstrap (elemento de inicio)
-obsidian-forge daemon disable   # bootout + eliminar plist
+obsidian-forge daemon disable    # bootout + eliminar plist
 obsidian-forge daemon start
 obsidian-forge daemon stop
-obsidian-forge daemon status      # muestra PID y último código de salida
+obsidian-forge daemon restart
+obsidian-forge daemon status     # muestra PID, último código de salida y bóvedas programadas
 ```
 
 > Registros → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
@@ -171,7 +192,7 @@ obsidian-forge daemon status      # muestra PID y último código de salida
 
 ```bash
 obsidian-forge watch              # todas las bóvedas vigilables
-obsidian-forge watch --vault <name>
+obsidian-forge watch --vault <name> --interval <segundos>
 ```
 
 ---
@@ -268,7 +289,17 @@ obsidian-forge/
 │   ├── config.rs      vault.toml + estructuras de configuración global
 │   ├── init.rs        construcción de bóvedas, importación/envío de configuración
 │   ├── moc.rs         generación de archivos hub MOC
-│   ├── graph.rs       backlinks, notas puente, etiquetas automáticas
+│   ├── graph/         Flujo de fortalecimiento del grafo
+│   │   ├── mod.rs       coordinador del flujo
+│   │   ├── scan.rs      escaneo del grafo en toda la bóveda
+│   │   ├── tags.rs      etiquetado automático basado en conceptos
+│   │   ├── wikilinks.rs extracción e inyección de wikilinks
+│   │   ├── backlinks.rs generación de sección de backlinks
+│   │   ├── bridges.rs   creación de notas puente
+│   │   ├── relationships.rs enlace de proyectos relacionados
+│   │   ├── orphans.rs   detección de notas huérfanas
+│   │   ├── autotag.rs   orquestación de etiquetas automáticas
+│   │   └── health.rs    informe de salud del grafo
 │   ├── git.rs         commit + push automático (commits convencionales)
 │   ├── notes.rs       procesamiento de bandeja + enrutamiento PARA
 │   ├── converter.rs   PDF → Markdown
@@ -277,6 +308,33 @@ obsidian-forge/
 │   └── watcher.rs     vigilante del sistema de archivos (crate notify)
 └── vault.toml         configuración por bóveda (creada por init)
 ```
+
+### Ecosistema (Ecosystem)
+
+obsidian-forge es el **proyecto compañero de [alcove](https://github.com/epicsagas/alcove)** — un servidor MCP que sirve documentos de proyecto a agentes IA. Comparten un espacio de trabajo Cargo y trabajan juntos para cerrar el ciclo entre el conocimiento personal y la inteligencia de proyecto:
+
+- **obsidian-forge** = **La Forja (The Forge)** (escribir/empujar). Demonio en segundo plano que automatiza el mantenimiento de la bóveda, fortalece el grafo de conocimiento y sincroniza con git.
+- **alcove** = **La Biblioteca (The Library)** (leer/tirar). Servidor MCP que proporciona a los agentes IA acceso bajo demanda y searchable a la documentación sin inflar la ventana de contexto.
+
+```mermaid
+graph LR
+    A[Bóveda Obsidian] -->|of daemon| B(obsidian-forge)
+    B -->|of sync| C[Repositorio Git]
+    A -->|alcove promote| D[.alcove / docs]
+    D -->|Herramientas MCP| E[Agente IA]
+    E -.->|Referencia a| D
+```
+
+### Integración con Alcove
+
+Mientras `obsidian-forge` se centra en construir y automatizar tu grafo de conocimiento, [Alcove](https://github.com/epicsagas/alcove) asegura que el conocimiento sea accionable para los agentes de codificación IA.
+
+#### Cómo usarlos juntos:
+
+1.  **Construye en Obsidian**: Usa `obsidian-forge` para mantener la salud de tu bóveda, crear MOCs y auto-enlazar conceptos relacionados.
+2.  **Promociona a Documentos de Proyecto**: Cuando una nota (ej. una decisión arquitectónica o una especificación de característica) esté lista para un proyecto, ejecuta `alcove promote --source ruta/a/nota.md`.
+3.  **Descubrimiento por el Agente**: Tu agente IA (usando el servidor MCP Alcove) ahora puede "descubrir" esa nota vía `search_project_docs` o `get_doc_file` en lugar de que tú tengas que copiar y pegar en el chat.
+4.  **Cumplimiento de Políticas**: Usa `validate_docs` de Alcove para asegurar que tus notas promocionadas cumplan con los estándares de documentación del proyecto (definidos en `policy.toml`).
 
 ---
 

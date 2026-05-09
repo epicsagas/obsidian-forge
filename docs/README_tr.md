@@ -121,6 +121,9 @@ of daemon enable
 obsidian-forge init <name>
 obsidian-forge init <name> --path ~/vaults
 obsidian-forge init <name> --clone-settings-from ~/other-vault
+
+# Mevcut bir kasada onarmak/yükseltmek için yeniden çalıştırın (idempotent — asla üzerine yazmaz)
+obsidian-forge init my-brain --path ~/
 ```
 
 ### Çoklu Kasa Yönetimi
@@ -135,15 +138,31 @@ obsidian-forge vault pause   <name>         # daemonu atla; manuel senkronizasyo
 obsidian-forge vault resume  <name>
 ```
 
-### Ayarlar Deposu
+### Ayarlar Yönetimi
 
-Tüm kasalarda `.obsidian/` eklentilerini, temalarını ve snippet'lerini senkronize eder.
+Kasalar arasında `.obsidian/` eklentilerini, temalarını ve snippet'lerini senkronize eder.
 
 ```bash
 obsidian-forge settings import <vault>      # ayarları global depoya çek
 obsidian-forge settings push   <vault>      # global ayarları bir kasaya gönder
 obsidian-forge settings push-all            # TÜM kayıtlı kasalara gönder
 obsidian-forge settings status
+
+# İki kasa arasında doğrudan klonlama
+obsidian-forge clone-settings <source> <target>
+```
+
+### Grafik İşlemleri
+
+```bash
+obsidian-forge graph health                 # istatistikleri ve sağlık metriklerini göster
+obsidian-forge graph orphans [--auto-link]  # yetim notları listele (veya AI ile otomatik bağla)
+obsidian-forge graph extract [--no-ai]      # bağlantıları ve ilişkileri çıkar
+obsidian-forge graph tags [--dry-run]       # etiketleri normalleştir ve kümele
+obsidian-forge graph strengthen             # tam boru hattını çalıştır
+
+# Eski takma ad (tam boru hattını çalıştırır)
+obsidian-forge strengthen-graph
 ```
 
 ### Tek Seferlik İşlemler
@@ -151,18 +170,20 @@ obsidian-forge settings status
 ```bash
 obsidian-forge sync               [--vault <name>]   # MOC → grafik → git
 obsidian-forge update-mocs        [--vault <name>]
-obsidian-forge strengthen-graph   [--vault <name>]
 obsidian-forge process-all        [--vault <name>]   # AI gelen kutusu işleme
+obsidian-forge status             [--vault <name>]   # yapılandırma ve AI durumunu göster
+obsidian-forge doctor             [--vault <name>]   # kasa sağlığını teşhis et
 ```
 
 ### Arka Plan Daemonu (macOS LaunchAgent)
 
 ```bash
 obsidian-forge daemon enable     # plist yaz + bootstrap (giriş öğesi)
-obsidian-forge daemon disable   # bootout + plist kaldır
+obsidian-forge daemon disable    # bootout + plist kaldır
 obsidian-forge daemon start
 obsidian-forge daemon stop
-obsidian-forge daemon status      # PID ve son çıkış kodunu gösterir
+obsidian-forge daemon restart
+obsidian-forge daemon status     # PID, son çıkış kodu ve planlanmış kasaları gösterir
 ```
 
 > Günlükler → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
@@ -171,7 +192,7 @@ obsidian-forge daemon status      # PID ve son çıkış kodunu gösterir
 
 ```bash
 obsidian-forge watch              # izlenebilir tüm kasalar
-obsidian-forge watch --vault <name>
+obsidian-forge watch --vault <name> --interval <saniye>
 ```
 
 ---
@@ -268,7 +289,17 @@ obsidian-forge/
 │   ├── config.rs      vault.toml + global yapılandırma yapıları
 │   ├── init.rs        kasa kurulumu, ayar içe aktarma/gönderme
 │   ├── moc.rs         MOC merkez dosyası oluşturma
-│   ├── graph.rs       geri bağlantılar, köprü notları, otomatik etiketler
+│   ├── graph/         Grafik güçlendirme boru hattı
+│   │   ├── mod.rs       boru hattı koordinatörü
+│   │   ├── scan.rs      kasa çapında grafik tarama
+│   │   ├── tags.rs      kavram tabanlı otomatik etiketleme
+│   │   ├── wikilinks.rs wikilink çıkarma ve enjeksiyonu
+│   │   ├── backlinks.rs geri bağlantı bölümü oluşturma
+│   │   ├── bridges.rs   köprü notu oluşturma
+│   │   ├── relationships.rs ilgili proje bağlantılama
+│   │   ├── orphans.rs   yetim not tespiti
+│   │   ├── autotag.rs   otomatik etiket orkestrasyonu
+│   │   └── health.rs    grafik sağlık raporlaması
 │   ├── git.rs         otomatik commit + push (conventional commits)
 │   ├── notes.rs       gelen kutusu işleme + PARA yönlendirme
 │   ├── converter.rs   PDF → Markdown
@@ -277,6 +308,33 @@ obsidian-forge/
 │   └── watcher.rs     dosya sistemi izleyici (notify crate)
 └── vault.toml         kasa başına yapılandırma (init tarafından oluşturulur)
 ```
+
+### Ekosistem (Ecosystem)
+
+obsidian-forge, AI ajanlarına proje belgeleri sunan bir MCP sunucusu olan **[alcove](https://github.com/epicsagas/alcove)**'un kardeş projesidir. Bir Cargo çalışma alanını paylaşırlar ve kişisel bilgi ile proje zekası arasındaki döngüyü kapatmak için birlikte çalışırlar:
+
+- **obsidian-forge** = **Demirhane (The Forge)** (yazma/itme). Kasa bakımını otomatikleştiren, bilgi grafiğini güçlendiren ve git ile senkronize eden arka plan daemonu.
+- **alcove** = **Kütüphane (The Library)** (okuma/çekme). AI ajanlarına, bağlam penceresini şişirmeden belgelere on-demand ve aranabilir erişim sağlayan MCP sunucusu.
+
+```mermaid
+graph LR
+    A[Obsidian Kasası] -->|of daemon| B(obsidian-forge)
+    B -->|of sync| C[Git Deposu]
+    A -->|alcove promote| D[.alcove / docs]
+    D -->|MCP Araçları| E[AI Ajanı]
+    E -.->|Şuna atıfta bulunur| D
+```
+
+### Alcove ile Entegrasyon
+
+`obsidian-forge` bilgi grafiğinizi oluşturmaya ve otomatikleştirmeye odaklanırken, [Alcove](https://github.com/epicsagas/alcove) bu bilginin AI kodlama ajanları için eyleme dönüştürülebilir olmasını sağlar.
+
+#### Birlikte nasıl kullanılır:
+
+1.  **Obsidian'da İnşa Edin**: Kasanızın sağlığını korumak, MOC'ler oluşturmak ve ilgili kavramları otomatik olarak bağlamak için `obsidian-forge` kullanın.
+2.  **Proje Belgelerine Yükseltin**: Bir not (örneğin bir mimari karar veya özellik spesifikasyonu) bir proje için hazır olduğunda, `alcove promote --source path/to/note.md` komutunu çalıştırın.
+3.  **Ajan Keşfi**: AI ajanınız (Alcove MCP sunucusunu kullanarak) artık sohbet kutusuna kopyalayıp yapıştırmanıza gerek kalmadan `search_project_docs` veya `get_doc_file` aracılığıyla o notu "keşfedebilir".
+4.  **Politika Uyumluluğu**: Yükseltilen notlarınızın projenin belge standartlarını (`policy.toml` içinde tanımlanan) karşıladığından emin olmak için Alcove'un `validate_docs` aracını kullanın.
 
 ---
 

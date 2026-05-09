@@ -138,15 +138,31 @@ obsidian-forge vault pause   <name>         # skip daemon; manual sync ok
 obsidian-forge vault resume  <name>
 ```
 
-### Settings Store
+### Settings Management
 
-Sync `.obsidian/` plugins, themes, and snippets across all vaults.
+Sync `.obsidian/` plugins, themes, and snippets across vaults.
 
 ```bash
 obsidian-forge settings import <vault>      # pull settings into global store
 obsidian-forge settings push   <vault>      # push global settings to one vault
 obsidian-forge settings push-all            # push to ALL registered vaults
 obsidian-forge settings status
+
+# Direct clone between two vaults
+obsidian-forge clone-settings <source> <target>
+```
+
+### Graph Operations
+
+```bash
+obsidian-forge graph health                 # show statistics and health metrics
+obsidian-forge graph orphans [--auto-link]  # list orphans (or auto-link with AI)
+obsidian-forge graph extract [--no-ai]      # extract links and relationships
+obsidian-forge graph tags [--dry-run]       # normalize and cluster tags
+obsidian-forge graph strengthen             # run full pipeline
+
+# Legacy alias (runs full pipeline)
+obsidian-forge strengthen-graph
 ```
 
 ### One-off Operations
@@ -154,18 +170,20 @@ obsidian-forge settings status
 ```bash
 obsidian-forge sync               [--vault <name>]   # MOC → graph → git
 obsidian-forge update-mocs        [--vault <name>]
-obsidian-forge strengthen-graph   [--vault <name>]
 obsidian-forge process-all        [--vault <name>]   # AI inbox processing
+obsidian-forge status             [--vault <name>]   # show config and AI status
+obsidian-forge doctor             [--vault <name>]   # diagnose vault health
 ```
 
 ### Background Daemon (macOS LaunchAgent)
 
 ```bash
 obsidian-forge daemon enable     # write plist + bootstrap (login item)
-obsidian-forge daemon disable   # bootout + remove plist
+obsidian-forge daemon disable    # bootout + remove plist
 obsidian-forge daemon start
 obsidian-forge daemon stop
-obsidian-forge daemon status      # shows PID and last exit code
+obsidian-forge daemon restart
+obsidian-forge daemon status     # shows PID, last exit, and scheduled vaults
 ```
 
 > Logs → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
@@ -174,7 +192,7 @@ obsidian-forge daemon status      # shows PID and last exit code
 
 ```bash
 obsidian-forge watch              # all watchable vaults
-obsidian-forge watch --vault <name>
+obsidian-forge watch --vault <name> --interval <seconds>
 ```
 
 ---
@@ -293,16 +311,30 @@ obsidian-forge/
 
 ### Ecosystem
 
-obsidian-forge is the **companion project to [alcove](https://github.com/epicsagas/alcove)** — an MCP server that serves project docs to AI agents. They share a Cargo workspace:
+obsidian-forge is the **companion project to [alcove](https://github.com/epicsagas/alcove)** — an MCP server that serves project docs to AI agents. They share a Cargo workspace and work together to close the loop between personal knowledge and project intelligence:
 
-- **alcove** = read/pull (MCP server, on-demand search via BM25 + vector)
-- **obsidian-forge** = write/push (daemon, vault automation + graph strengthening)
+- **obsidian-forge** = **The Forge** (write/push). Background daemon that automates vault maintenance, strengthens the knowledge graph, and syncs to git.
+- **alcove** = **The Library** (read/pull). MCP server that provides AI agents with on-demand, searchable access to documentation without bloating the context window.
 
+```mermaid
+graph LR
+    A[Obsidian Vault] -->|of daemon| B(obsidian-forge)
+    B -->|of sync| C[Git Repo]
+    A -->|alcove promote| D[.alcove / docs]
+    D -->|MCP Tools| E[AI Agent]
+    E -.->|Refers to| D
 ```
-obsidian-forge (vault automation)   →   alcove (MCP server)
-  graph strengthening, MOC, sync         BM25 search, project docs
-  daemon (24/7 background)               request-based (stdio JSON-RPC)
-```
+
+### Integration with Alcove
+
+While `obsidian-forge` focuses on building and automating your knowledge graph, [Alcove](https://github.com/epicsagas/alcove) ensures that knowledge is actionable for AI coding agents.
+
+#### How to use them together:
+
+1.  **Build in Obsidian**: Use `obsidian-forge` to maintain your vault's health, create MOCs, and auto-link related concepts.
+2.  **Promote to Project Docs**: When a note (e.g., an architectural decision or a feature spec) is ready for a project, run `alcove promote --source path/to/note.md`.
+3.  **Agent Discovery**: Your AI agent (using the Alcove MCP server) can now "discover" that note via `search_project_docs` or `get_doc_file` instead of you having to copy-paste it into the chat.
+4.  **Policy Compliance**: Use Alcove's `validate_docs` to ensure your promoted notes meet the project's documentation standards (defined in `policy.toml`).
 
 ---
 

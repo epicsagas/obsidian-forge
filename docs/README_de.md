@@ -121,6 +121,9 @@ of daemon enable
 obsidian-forge init <name>
 obsidian-forge init <name> --path ~/vaults
 obsidian-forge init <name> --clone-settings-from ~/other-vault
+
+# In einem bestehenden Tresor erneut ausführen, um ihn zu reparieren/zu aktualisieren (idempotent — überschreibt niemals)
+obsidian-forge init my-brain --path ~/
 ```
 
 ### Multi-Tresor-Verwaltung
@@ -144,6 +147,22 @@ obsidian-forge settings import <vault>      # Einstellungen in globalen Speicher
 obsidian-forge settings push   <vault>      # globale Einstellungen an einen Tresor übertragen
 obsidian-forge settings push-all            # an ALLE registrierten Tresore übertragen
 obsidian-forge settings status
+
+# Direktes Klonen zwischen zwei Tresoren
+obsidian-forge clone-settings <source> <target>
+```
+
+### Graph-Operationen
+
+```bash
+obsidian-forge graph health                 # Statistiken und Gesundheitsmetriken anzeigen
+obsidian-forge graph orphans [--auto-link]  # Waisen auflisten (oder automatisch mit KI verlinken)
+obsidian-forge graph extract [--no-ai]      # Links und Beziehungen extrahieren
+obsidian-forge graph tags [--dry-run]       # Tags normalisieren und gruppieren
+obsidian-forge graph strengthen             # volle Pipeline ausführen
+
+# Vererbter Alias (führt die volle Pipeline aus)
+obsidian-forge strengthen-graph
 ```
 
 ### Einmalige Operationen
@@ -151,18 +170,20 @@ obsidian-forge settings status
 ```bash
 obsidian-forge sync               [--vault <name>]   # MOC → Graph → git
 obsidian-forge update-mocs        [--vault <name>]
-obsidian-forge strengthen-graph   [--vault <name>]
 obsidian-forge process-all        [--vault <name>]   # KI-Posteingangsverarbeitung
+obsidian-forge status             [--vault <name>]   # Konfig- und KI-Status anzeigen
+obsidian-forge doctor             [--vault <name>]   # Tresorgesundheit diagnostizieren
 ```
 
 ### Hintergrund-Daemon (macOS LaunchAgent)
 
 ```bash
 obsidian-forge daemon enable     # plist schreiben + Bootstrap (Anmeldeobjekt)
-obsidian-forge daemon disable   # Bootout + plist entfernen
+obsidian-forge daemon disable    # Bootout + plist entfernen
 obsidian-forge daemon start
 obsidian-forge daemon stop
-obsidian-forge daemon status      # zeigt PID und letzten Exit-Code
+obsidian-forge daemon restart
+obsidian-forge daemon status     # zeigt PID, letzten Exit-Code und geplante Tresore
 ```
 
 > Protokolle → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
@@ -171,7 +192,7 @@ obsidian-forge daemon status      # zeigt PID und letzten Exit-Code
 
 ```bash
 obsidian-forge watch              # alle überwachbaren Tresore
-obsidian-forge watch --vault <name>
+obsidian-forge watch --vault <name> --interval <sekunden>
 ```
 
 ---
@@ -268,7 +289,17 @@ obsidian-forge/
 │   ├── config.rs      vault.toml + globale Konfigurationsstrukturen
 │   ├── init.rs        Tresor-Aufbau, Einstellungen importieren/übertragen
 │   ├── moc.rs         MOC-Hub-Datei-Generierung
-│   ├── graph.rs       Rückverweise, Brückennotizen, automatische Tags
+│   ├── graph/         Graph-Verstärkungs-Pipeline
+│   │   ├── mod.rs       Pipeline-Koordinator
+│   │   ├── scan.rs      tresorweiter Graph-Scan
+│   │   ├── tags.rs      konzeptbasiertes automatisches Tagging
+│   │   ├── wikilinks.rs Wikilink-Extraktion und -Injektion
+│   │   ├── backlinks.rs Rückverweis-Sektions-Generierung
+│   │   ├── bridges.rs   Brückennotizen-Erstellung
+│   │   ├── relationships.rs Verknüpfung verwandter Projekte
+│   │   ├── orphans.rs   Waisenerkennung
+│   │   ├── autotag.rs   Orchestrierung automatischer Tags
+│   │   └── health.rs    Graph-Gesundheitsbericht
 │   ├── git.rs         automatischer Commit + Push (Conventional Commits)
 │   ├── notes.rs       Posteingangsverarbeitung + PARA-Routing
 │   ├── converter.rs   PDF → Markdown
@@ -277,6 +308,33 @@ obsidian-forge/
 │   └── watcher.rs     Dateisystem-Watcher (notify-Crate)
 └── vault.toml         tresorspezifische Konfiguration (von init erstellt)
 ```
+
+### Ökosystem (Ecosystem)
+
+obsidian-forge ist das **Partnerprojekt von [alcove](https://github.com/epicsagas/alcove)** — einem MCP-Server, der Projektdokumente für KI-Agenten bereitstellt. Sie teilen sich einen Cargo-Workspace und arbeiten zusammen, um den Kreislauf zwischen persönlichem Wissen und Projektintelligenz zu schließen:
+
+- **obsidian-forge** = **Die Schmiede (The Forge)** (schreiben/pushen). Hintergrund-Daemon, der die Tresor-Pflege automatisiert, den Wissensgraphen stärkt und mit git synchronisiert.
+- **alcove** = **Die Bibliothek (The Library)** (lesen/pullen). MCP-Server, der KI-Agenten On-Demand- und durchsuchbaren Zugriff auf Dokumentationen bietet, ohne das Kontextfenster aufzublähen.
+
+```mermaid
+graph LR
+    A[Obsidian-Tresor] -->|of daemon| B(obsidian-forge)
+    B -->|of sync| C[Git-Repo]
+    A -->|alcove promote| D[.alcove / docs]
+    D -->|MCP-Tools| E[KI-Agent]
+    E -.->|Bezieht sich auf| D
+```
+
+### Integration mit Alcove
+
+Während sich `obsidian-forge` auf den Aufbau und die Automatisierung Ihres Wissensgraphen konzentriert, stellt [Alcove](https://github.com/epicsagas/alcove) sicher, dass dieses Wissen für KI-Coding-Agenten nutzbar ist.
+
+#### Wie man sie zusammen verwendet:
+
+1.  **In Obsidian aufbauen**: Verwenden Sie `obsidian-forge`, um die Gesundheit Ihres Tresors zu erhalten, MOCs zu erstellen und verwandte Konzepte automatisch zu verlinken.
+2.  **Zu Projektdokumenten befördern**: Wenn eine Notiz (z. B. eine Architekturentscheidung oder eine Funktionsspezifikation) bereit für ein Projekt ist, führen Sie `alcove promote --source pfad/zu/notiz.md` aus.
+3.  **Agenten-Entdeckung**: Ihr KI-Agent (der den Alcove-MCP-Server verwendet) kann diese Notiz nun über `search_project_docs` oder `get_doc_file` "entdecken", anstatt dass Sie sie manuell in den Chat kopieren müssen.
+4.  **Richtlinienkonformität**: Verwenden Sie Alcoves `validate_docs`, um sicherzustellen, dass Ihre beförderten Notizen den Dokumentationsstandards des Projekts entsprechen (definiert in `policy.toml`).
 
 ---
 

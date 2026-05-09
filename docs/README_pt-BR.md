@@ -121,6 +121,9 @@ of daemon enable
 obsidian-forge init <name>
 obsidian-forge init <name> --path ~/vaults
 obsidian-forge init <name> --clone-settings-from ~/other-vault
+
+# Re-execute em um cofre existente para reparar/atualizar (idempotente — nunca sobrescreve)
+obsidian-forge init my-brain --path ~/
 ```
 
 ### Gerenciamento de Múltiplos Cofres
@@ -135,15 +138,31 @@ obsidian-forge vault pause   <name>         # pular daemon; sincronização manu
 obsidian-forge vault resume  <name>
 ```
 
-### Armazenamento de Configurações
+### Gerenciamento de Configurações
 
-Sincroniza plugins, temas e snippets de `.obsidian/` em todos os cofres.
+Sincroniza plugins, temas e snippets de `.obsidian/` entre cofres.
 
 ```bash
 obsidian-forge settings import <vault>      # importar configurações para o armazenamento global
 obsidian-forge settings push   <vault>      # enviar configurações globais para um cofre
 obsidian-forge settings push-all            # enviar para TODOS os cofres registrados
 obsidian-forge settings status
+
+# Clone direto entre dois cofres
+obsidian-forge clone-settings <source> <target>
+```
+
+### Operações de Grafo
+
+```bash
+obsidian-forge graph health                 # mostrar estatísticas e métricas de saúde
+obsidian-forge graph orphans [--auto-link]  # listar órfãos (ou auto-linkar com IA)
+obsidian-forge graph extract [--no-ai]      # extrair links e relacionamentos
+obsidian-forge graph tags [--dry-run]       # normalizar e agrupar tags
+obsidian-forge graph strengthen             # executar pipeline completo
+
+# Alias herdado (executa o pipeline completo)
+obsidian-forge strengthen-graph
 ```
 
 ### Operações Únicas
@@ -151,18 +170,20 @@ obsidian-forge settings status
 ```bash
 obsidian-forge sync               [--vault <name>]   # MOC → grafo → git
 obsidian-forge update-mocs        [--vault <name>]
-obsidian-forge strengthen-graph   [--vault <name>]
 obsidian-forge process-all        [--vault <name>]   # processamento de caixa de entrada por IA
+obsidian-forge status             [--vault <name>]   # mostrar status de config e IA
+obsidian-forge doctor             [--vault <name>]   # diagnosticar saúde do cofre
 ```
 
 ### Daemon em Segundo Plano (macOS LaunchAgent)
 
 ```bash
 obsidian-forge daemon enable     # escrever plist + bootstrap (item de login)
-obsidian-forge daemon disable   # bootout + remover plist
+obsidian-forge daemon disable    # bootout + remover plist
 obsidian-forge daemon start
 obsidian-forge daemon stop
-obsidian-forge daemon status      # mostra PID e último código de saída
+obsidian-forge daemon restart
+obsidian-forge daemon status     # mostra PID, último código de saída e cofres agendados
 ```
 
 > Logs → `~/.obsidian-forge/logs/obsidian-forge/forge.log`
@@ -171,7 +192,7 @@ obsidian-forge daemon status      # mostra PID e último código de saída
 
 ```bash
 obsidian-forge watch              # todos os cofres monitoráveis
-obsidian-forge watch --vault <name>
+obsidian-forge watch --vault <name> --interval <segundos>
 ```
 
 ---
@@ -268,7 +289,17 @@ obsidian-forge/
 │   ├── config.rs      vault.toml + estruturas de configuração global
 │   ├── init.rs        montagem de cofre, importação/envio de configurações
 │   ├── moc.rs         geração de arquivo hub MOC
-│   ├── graph.rs       backlinks, notas ponte, tags automáticas
+│   ├── graph/         Pipeline de fortalecimento do grafo
+│   │   ├── mod.rs       coordenador do pipeline
+│   │   ├── scan.rs      escaneamento do grafo em todo o cofre
+│   │   ├── tags.rs      etiquetagem automática baseada em conceitos
+│   │   ├── wikilinks.rs extração e injeção de wikilinks
+│   │   ├── backlinks.rs geração de seção de backlinks
+│   │   ├── bridges.rs   criação de notas ponte
+│   │   ├── relationships.rs linkagem de projetos relacionados
+│   │   ├── orphans.rs   detecção de notas órfãs
+│   │   ├── autotag.rs   orquestação de tags automáticas
+│   │   └── health.rs    relatório de saúde do grafo
 │   ├── git.rs         commit + push automático (commits convencionais)
 │   ├── notes.rs       processamento de caixa de entrada + roteamento PARA
 │   ├── converter.rs   PDF → Markdown
@@ -277,6 +308,33 @@ obsidian-forge/
 │   └── watcher.rs     monitor do sistema de arquivos (crate notify)
 └── vault.toml         configuração por cofre (criada pelo init)
 ```
+
+### Ecossistema (Ecosystem)
+
+obsidian-forge é o **projeto parceiro do [alcove](https://github.com/epicsagas/alcove)** — um servidor MCP que fornece documentos de projeto para agentes de IA. Eles compartilham um workspace Cargo e trabalham juntos para fechar o ciclo entre o conhecimento pessoal e a inteligência de projeto:
+
+- **obsidian-forge** = **A Forja (The Forge)** (escrever/empurrar). Daemon em segundo plano que automatiza a manutenção do cofre, fortalece o grafo de conhecimento e sincroniza com o git.
+- **alcove** = **A Biblioteca (The Library)** (ler/puxar). Servidor MCP que fornece aos agentes de IA acesso sob demanda e pesquisável à documentação sem sobrecarregar a janela de contexto.
+
+```mermaid
+graph LR
+    A[Cofre Obsidian] -->|of daemon| B(obsidian-forge)
+    B -->|of sync| C[Repositório Git]
+    A -->|alcove promote| D[.alcove / docs]
+    D -->|Ferramentas MCP| E[Agente de IA]
+    E -.->|Refere-se a| D
+```
+
+### Integração com o Alcove
+
+Enquanto o `obsidian-forge` se concentra em construir e automatizar seu grafo de conhecimento, o [Alcove](https://github.com/epicsagas/alcove) garante que o conhecimento seja acionável para agentes de codificação de IA.
+
+#### Como usá-los juntos:
+
+1.  **Construa no Obsidian**: Use o `obsidian-forge` para manter a saúde do seu cofre, criar MOCs e auto-linkar conceitos relacionados.
+2.  **Promova para Documentos de Projeto**: Quando uma nota (ex: uma decisão arquitetural ou uma especificação de funcionalidade) estiver pronta para um projeto, execute `alcove promote --source caminho/para/nota.md`.
+3.  **Descoberta pelo Agente**: Seu agente de IA (usando o servidor MCP Alcove) agora pode "descoberta" essa nota via `search_project_docs` ou `get_doc_file` em vez de você ter que copiar e colar no chat.
+4.  **Conformidade com Políticas**: Use o `validate_docs` do Alcove para garantir que suas notas promovidas atendam aos padrões de documentação do projeto (definidos em `policy.toml`).
 
 ---
 
