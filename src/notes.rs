@@ -139,26 +139,16 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
 
     // Case 1: Human has confirmed the suggestions -> MOVE FILE
     if status == "confirmed" {
-        let category = current_fm
-            .category
-            .clone()
-            .or(current_fm.candidate_type.clone())
-            .unwrap_or_else(|| "Resources".into());
-        let subcategory = current_fm
-            .subcategory
-            .clone()
-            .unwrap_or_else(|| "Reference".into());
-        let detail = current_fm
-            .detail
-            .clone()
-            .unwrap_or_else(|| "Articles-Papers".into());
-
+        let (category, subcategory, detail) = resolve_confirmed_targets(&current_fm);
         info!("Moving confirmed file: {}", path.display());
+
+        // Move first to avoid marking "processed" if move fails
+        let dest = move_to_para(path, &category, &subcategory, &detail, config, vault_root)?;
+
         current_fm.status = Some("processed".to_string());
         let updated = join_frontmatter(&current_fm, &body);
-        tokio::fs::write(path, &updated).await?;
+        tokio::fs::write(&dest, &updated).await?;
 
-        move_to_para(path, &category, &subcategory, &detail, config, vault_root)?;
         return Ok(());
     }
 
@@ -209,6 +199,8 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
     current_fm.candidate_concepts = cand.candidate_concepts;
     current_fm.recommended_action = cand.recommended_action;
     current_fm.reasoning = cand.reasoning;
+    current_fm.subcategory = cand.subcategory;
+    current_fm.detail = cand.detail;
     current_fm.tags = Some(merge_vec(
         current_fm.tags.take().unwrap_or_default(),
         gen_tags,
@@ -235,6 +227,28 @@ struct AiCandidates {
     candidate_concepts: Option<Vec<String>>,
     recommended_action: Option<String>,
     reasoning: Option<String>,
+    subcategory: Option<String>,
+    detail: Option<String>,
+}
+
+fn resolve_confirmed_targets(fm: &Frontmatter) -> (String, String, String) {
+    let category = fm.category.clone().or_else(|| {
+        fm.candidate_type.as_ref().map(|t| match t.as_str() {
+            "ConceptSeed" => "Zettelkasten".into(),
+            "Project" => "Projects".into(),
+            "Area" => "Areas".into(),
+            other => other.into(),
+        })
+    }).unwrap_or_else(|| "Resources".into());
+
+    let subcategory = fm.subcategory.clone().unwrap_or_else(|| match category.as_str() {
+        "Zettelkasten" => "fleeting".into(),
+        _ => "Reference".into(),
+    });
+
+    let detail = fm.detail.clone().unwrap_or_else(|| "Articles-Papers".into());
+
+    (category, subcategory, detail)
 }
 
 async fn get_ai_candidates(
@@ -253,7 +267,7 @@ fn move_to_para(
     detail: &str,
     config: &ForgeConfig,
     vault_root: &Path,
-) -> Result<()> {
+) -> Result<PathBuf> {
     let dest_dir = resolve_dest_dir(vault_root, category, subcategory, detail, config);
     fs::create_dir_all(&dest_dir)?;
 
@@ -265,7 +279,7 @@ fn move_to_para(
         fs::rename(path, &dest)?;
         info!("File moved: {} -> {}", path.display(), dest.display());
     }
-    Ok(())
+    Ok(dest)
 }
 
 fn resolve_dest_dir(
@@ -351,6 +365,24 @@ fn iso_now() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn create(path: &Path) -> std::result::Result<Self, std::io::Error> {
+            if path.exists() {
+                fs::remove_dir_all(path)?;
+            }
+            fs::create_dir_all(path)?;
+            Ok(TempDir(path.to_path_buf()))
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
 
     #[test]
     fn test_split_frontmatter_with_frontmatter() {
@@ -469,31 +501,24 @@ mod tests {
 
     #[tokio::test]
     async fn test_process_one_confirmed_moves_file() -> Result<()> {
-        use std::fs::File;
-        use std::io::Write;
         let test_root = std::env::current_dir()?
             .join("target")
             .join("test_inbox_move");
-        if test_root.exists() {
-            fs::remove_dir_all(&test_root)?;
-        }
-        fs::create_dir_all(&test_root)?;
+        let _guard = TempDir::create(&test_root)?;
 
-        let vault_root = &test_root;
+        let vault_root = test_root.as_path();
         let inbox_dir = vault_root.join("00-Inbox");
         fs::create_dir_all(&inbox_dir)?;
 
         let note_path = inbox_dir.join("test_note.md");
         let content = "---\nstatus: confirmed\ncategory: Projects\n---\n# Test Note\nBody";
-        let mut file = File::create(&note_path)?;
-        file.write_all(content.as_bytes())?;
+        fs::write(&note_path, content)?;
 
         let mut config = ForgeConfig::default_for("test");
         config.vault.inbox_dir = "00-Inbox".to_string();
 
         process_one(&note_path, &config, vault_root).await?;
 
-        // Should be moved to 01-Projects
         let expected_path = vault_root.join("01-Projects").join("test_note.md");
         assert!(expected_path.exists());
         assert!(!note_path.exists());
@@ -501,8 +526,83 @@ mod tests {
         let new_content = fs::read_to_string(expected_path)?;
         assert!(new_content.contains("status: processed"));
 
-        fs::remove_dir_all(&test_root)?;
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_process_one_needs_review_skips() -> Result<()> {
+        let test_root = std::env::current_dir()?
+            .join("target")
+            .join("test_needs_review_skip");
+        let _guard = TempDir::create(&test_root)?;
+
+        let vault_root = test_root.as_path();
+        let inbox_dir = vault_root.join("00-Inbox");
+        fs::create_dir_all(&inbox_dir)?;
+
+        let note_path = inbox_dir.join("review_note.md");
+        let content = "---\nstatus: needs_review\nsummary: test\n---\n# Review Note\nBody";
+        fs::write(&note_path, content)?;
+
+        let config = ForgeConfig::default_for("test");
+        process_one(&note_path, &config, vault_root).await?;
+
+        assert!(note_path.exists(), "needs_review file should stay in inbox");
+        let result = fs::read_to_string(&note_path)?;
+        assert!(result.contains("status: needs_review"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_process_one_processed_skips() -> Result<()> {
+        let test_root = std::env::current_dir()?
+            .join("target")
+            .join("test_processed_skip");
+        let _guard = TempDir::create(&test_root)?;
+
+        let vault_root = test_root.as_path();
+        let inbox_dir = vault_root.join("00-Inbox");
+        fs::create_dir_all(&inbox_dir)?;
+
+        let note_path = inbox_dir.join("done_note.md");
+        let content = "---\nstatus: processed\n---\n# Done Note\nBody";
+        fs::write(&note_path, content)?;
+
+        let config = ForgeConfig::default_for("test");
+        process_one(&note_path, &config, vault_root).await?;
+
+        assert!(note_path.exists(), "processed file should stay untouched");
+        let result = fs::read_to_string(&note_path)?;
+        assert!(result.contains("status: processed"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_resolve_confirmed_targets_concept_seed() {
+        let mut fm = Frontmatter::default();
+        fm.candidate_type = Some("ConceptSeed".into());
+        let (cat, sub, _detail) = resolve_confirmed_targets(&fm);
+        assert_eq!(cat, "Zettelkasten");
+        assert_eq!(sub, "fleeting");
+    }
+
+    #[test]
+    fn test_resolve_confirmed_targets_project() {
+        let mut fm = Frontmatter::default();
+        fm.candidate_type = Some("Project".into());
+        let (cat, _, _) = resolve_confirmed_targets(&fm);
+        assert_eq!(cat, "Projects");
+    }
+
+    #[test]
+    fn test_resolve_confirmed_targets_explicit_category_wins() {
+        let mut fm = Frontmatter::default();
+        fm.category = Some("Resources".into());
+        fm.candidate_type = Some("Project".into());
+        let (cat, _, _) = resolve_confirmed_targets(&fm);
+        assert_eq!(cat, "Resources");
     }
 
     #[test]
