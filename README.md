@@ -285,7 +285,7 @@ obsidian-forge/
 │   ├── git.rs         auto commit + push (conventional commits)
 │   ├── notes.rs       inbox processing + PARA routing
 │   ├── converter.rs   PDF → Markdown
-│   ├── ai.rs          AI client (Ollama, OpenAI, OpenRouter, LM Studio, OpenAI-compatible)
+│   ├── ai.rs          AI client (Ollama + OpenAI-compatible providers)
 │   ├── prompts.rs     LLM prompt templates
 │   └── watcher.rs     filesystem watcher (notify crate)
 └── vault.toml         per-vault config (created by init)
