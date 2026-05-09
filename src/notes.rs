@@ -29,6 +29,21 @@ pub struct Frontmatter {
     pub category: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subcategory: Option<String>,
+
+    // AI Suggestions (Rule A: Suggest, don't move)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub candidate_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub candidate_project: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub candidate_area: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub candidate_concepts: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recommended_action: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -117,12 +132,43 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
         .await
         .with_context(|| format!("read {}", path.display()))?;
     let (fm, body) = split_frontmatter(&content)?;
+    let mut current_fm = fm.unwrap_or_default();
 
-    if fm.as_ref().and_then(|f| f.status.as_deref()) == Some("processed") {
-        debug!("Already processed, skipping: {}", path.display());
+    // Check current status
+    let status = current_fm.status.as_deref().unwrap_or("inbox");
+
+    // Case 1: Human has confirmed the suggestions -> MOVE FILE
+    if status == "confirmed" {
+        let category = current_fm
+            .category
+            .clone()
+            .or(current_fm.candidate_type.clone())
+            .unwrap_or_else(|| "Resources".into());
+        let subcategory = current_fm
+            .subcategory
+            .clone()
+            .unwrap_or_else(|| "Reference".into());
+        let detail = current_fm
+            .detail
+            .clone()
+            .unwrap_or_else(|| "Articles-Papers".into());
+
+        info!("Moving confirmed file: {}", path.display());
+        current_fm.status = Some("processed".to_string());
+        let updated = join_frontmatter(&current_fm, &body);
+        tokio::fs::write(path, &updated).await?;
+
+        move_to_para(path, &category, &subcategory, &detail, config, vault_root)?;
         return Ok(());
     }
 
+    // Case 2: Already waiting for review or already processed -> SKIP
+    if status == "needs_review" || status == "processed" {
+        debug!("Skipping (status={}): {}", status, path.display());
+        return Ok(());
+    }
+
+    // Case 3: New or unclassified file -> ANALYZE
     let ollama = AiClient::from_config(&config.ai);
     let prompts = load_prompts();
 
@@ -138,11 +184,12 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
         .replace("{existing_tags}", "[]")
         .replace("{content}", &body);
 
-    // Execute independent AI calls in parallel using tokio::join!
-    let (summary, questions, gen_tags) = tokio::join!(
+    // Execute independent AI calls in parallel
+    let (summary, questions, gen_tags, candidates) = tokio::join!(
         ollama.summarize(&body, 200),
         ollama.generate_json::<Vec<String>>(&q_prompt),
-        ollama.generate_json::<Vec<String>>(&t_prompt)
+        ollama.generate_json::<Vec<String>>(&t_prompt),
+        get_ai_candidates(&body, &ollama, &prompts)
     );
 
     let summary = summary.unwrap_or_default();
@@ -151,88 +198,52 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
         warn!("Tag generation failed: {:?}", e);
         vec![]
     });
+    let cand = candidates.unwrap_or_default();
 
-    let title = body
-        .lines()
-        .find(|line| line.starts_with("# "))
-        .map(|line| line.trim_start_matches("# ").to_string())
-        .unwrap_or_else(|| {
-            path.file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_string()
-        });
+    current_fm.status = Some("needs_review".to_string());
+    current_fm.summary = Some(summary);
+    current_fm.questions = Some(questions);
+    current_fm.candidate_type = Some(cand.candidate_type.unwrap_or_else(|| "Resource".into()));
+    current_fm.candidate_project = cand.candidate_project;
+    current_fm.candidate_area = cand.candidate_area;
+    current_fm.candidate_concepts = cand.candidate_concepts;
+    current_fm.recommended_action = cand.recommended_action;
+    current_fm.reasoning = cand.reasoning;
+    current_fm.tags = Some(merge_vec(
+        current_fm.tags.take().unwrap_or_default(),
+        gen_tags,
+    ));
+    current_fm.processed_at = Some(iso_now());
 
-    let (category, subcategory, detail) =
-        classify_by_title_or_ai(&title, &body, &ollama, &prompts).await;
-    info!(
-        "Classification: {} / {} / {}",
-        category, subcategory, detail
-    );
-
-    let mut new_fm = fm.unwrap_or_default();
-    new_fm.status = Some("processed".to_string());
-    new_fm.summary = Some(summary);
-    new_fm.questions = Some(questions);
-    new_fm.category = Some(category.clone());
-    new_fm.subcategory = Some(subcategory.clone());
-    new_fm.detail = Some(detail.clone());
-    new_fm.tags = Some(merge_vec(new_fm.tags.take().unwrap_or_default(), gen_tags));
-    new_fm.processed_at = Some(iso_now());
-
-    let updated = join_frontmatter(&new_fm, &body);
+    let updated = join_frontmatter(&current_fm, &body);
     tokio::fs::write(path, &updated)
         .await
         .with_context(|| format!("write {}", path.display()))?;
 
-    move_to_para(path, &category, &subcategory, &detail, config, vault_root)?;
-
-    info!("Done: {}", path.display());
+    info!(
+        "AI Analysis complete, waiting for human review: {}",
+        path.display()
+    );
     Ok(())
 }
 
-async fn classify_by_title_or_ai(
-    title: &str,
+#[derive(serde::Deserialize, Default)]
+struct AiCandidates {
+    candidate_type: Option<String>,
+    candidate_project: Option<Vec<String>>,
+    candidate_area: Option<Vec<String>>,
+    candidate_concepts: Option<Vec<String>>,
+    recommended_action: Option<String>,
+    reasoning: Option<String>,
+}
+
+async fn get_ai_candidates(
     body: &str,
     ollama: &AiClient,
     prompts: &crate::prompts::LoadedPrompts,
-) -> (String, String, String) {
-    let title_lower = title.to_lowercase();
-    let how_to = ["how to", "how-to", "guide", "setup", "install", "configure"];
-    let research = ["paper", "research", "study", "survey", "analysis"];
-    let book = ["book review", "book note", "book summary", "isbn"];
-
-    if how_to.iter().any(|kw| title_lower.contains(kw)) {
-        return (
-            "Resources".into(),
-            "Reference".into(),
-            "Tutorials-Guides".into(),
-        );
-    }
-    if research.iter().any(|kw| title_lower.contains(kw)) {
-        return (
-            "Resources".into(),
-            "Reference".into(),
-            "Articles-Papers".into(),
-        );
-    }
-    if book.iter().any(|kw| title_lower.contains(kw)) {
-        return ("Resources".into(), "Reference".into(), "Books-Notes".into());
-    }
-
-    #[derive(serde::Deserialize, Default)]
-    struct Cat {
-        category: Option<String>,
-        subcategory: Option<String>,
-        detail: Option<String>,
-    }
+) -> Result<AiCandidates> {
     let c_prompt = prompts.category_template.replace("{content}", body);
-    let cat: Cat = ollama.generate_json(&c_prompt).await.unwrap_or_default();
-    (
-        cat.category.unwrap_or_else(|| "Resources".into()),
-        cat.subcategory.unwrap_or_else(|| "Reference".into()),
-        cat.detail.unwrap_or_else(|| "Articles-Papers".into()),
-    )
+    ollama.generate_json(&c_prompt).await
 }
 
 fn move_to_para(
@@ -454,6 +465,44 @@ mod tests {
         let cfg = ForgeConfig::default_for("v");
         let dest = resolve_dest_dir(&vault, "Zettelkasten", "unknown-garbage", "", &cfg);
         assert_eq!(dest, vault.join("10-Zettelkasten/fleeting"));
+    }
+
+    #[tokio::test]
+    async fn test_process_one_confirmed_moves_file() -> Result<()> {
+        use std::fs::File;
+        use std::io::Write;
+        let test_root = std::env::current_dir()?
+            .join("target")
+            .join("test_inbox_move");
+        if test_root.exists() {
+            fs::remove_dir_all(&test_root)?;
+        }
+        fs::create_dir_all(&test_root)?;
+
+        let vault_root = &test_root;
+        let inbox_dir = vault_root.join("00-Inbox");
+        fs::create_dir_all(&inbox_dir)?;
+
+        let note_path = inbox_dir.join("test_note.md");
+        let content = "---\nstatus: confirmed\ncategory: Projects\n---\n# Test Note\nBody";
+        let mut file = File::create(&note_path)?;
+        file.write_all(content.as_bytes())?;
+
+        let mut config = ForgeConfig::default_for("test");
+        config.vault.inbox_dir = "00-Inbox".to_string();
+
+        process_one(&note_path, &config, vault_root).await?;
+
+        // Should be moved to 01-Projects
+        let expected_path = vault_root.join("01-Projects").join("test_note.md");
+        assert!(expected_path.exists());
+        assert!(!note_path.exists());
+
+        let new_content = fs::read_to_string(expected_path)?;
+        assert!(new_content.contains("status: processed"));
+
+        fs::remove_dir_all(&test_root)?;
+        Ok(())
     }
 
     #[test]

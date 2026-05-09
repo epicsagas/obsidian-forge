@@ -98,24 +98,24 @@ fn default_questions() -> String {
 }
 
 fn default_category() -> String {
-    r#"Classify the following text into a PARA + Zettelkasten category.
+    r#"Classify this text into PARA + Zettelkasten candidates.
+Follow the ontology:
+- Project: Active endeavors with a goal.
+- Area: Ongoing responsibilities.
+- Resource: Reference material or interests.
+- ConceptSeed: Atomic ideas for Zettelkasten.
 
-Categories:
-- Projects: tasks with a deadline or specific goal
-- Areas: ongoing responsibilities
-- Resources: reference material for future use
-- Zettelkasten: atomic ideas and knowledge notes
-- Archive: inactive material
+Identify related project names and existing concept links if applicable.
 
-For Resources, also provide subcategory (Technical, Reference) and detail.
-  Reference detail: Articles-Papers, Books-Notes, Tutorials-Guides, Cheat-Sheets
-
-For Zettelkasten, provide subcategory:
-  - fleeting: quick captures, raw thoughts, unprocessed ideas
-  - literature: extracted ideas from books, articles, talks (with source attribution)
-  - permanent: fully developed, self-contained ideas in your own words
-
-Output JSON only: {"category": "...", "subcategory": "...", "detail": "..."}
+Output valid JSON only:
+{
+  "candidate_type": "Project | Area | Resource | ConceptSeed",
+  "candidate_project": ["ProjectName"],
+  "candidate_area": ["AreaName"],
+  "candidate_concepts": ["ConceptLink"],
+  "recommended_action": "move_to_resource | link_existing_concept | promote_to_zettel",
+  "reasoning": "Why this classification?"
+}
 
 Text:
 {content}"#
