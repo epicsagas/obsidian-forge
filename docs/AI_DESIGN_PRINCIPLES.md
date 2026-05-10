@@ -39,8 +39,8 @@ AI MUST NOT:
 
 ## 5. Policy Layer (Source of Truth for AI)
 AI in `obsidian-forge` must use the following documents as its policy layer:
-- `INBOX_CLASSIFICATION_GUIDE.md`: Standards for classification.
-- `RESOURCE_TO_ZETTEL_WORKFLOW.md`: Standards for extraction.
-- `ZETTEL_PROMOTION_DASHBOARD.md`: List of candidates for review.
-- `ONTOLOGY_TAGGING_STANDARD.md`: Constraints on tag generation.
-- `ZETTEL_TEMPLATE.md`: Output format for promoted notes.
+- `docs/policy/INBOX_CLASSIFICATION_GUIDE.md`: Standards for classification.
+- `docs/policy/RESOURCE_TO_ZETTEL_WORKFLOW.md`: Standards for extraction.
+- `docs/policy/ZETTEL_PROMOTION_DASHBOARD.md`: List of candidates for review.
+- `docs/policy/ONTOLOGY_TAGGING_STANDARD.md`: Constraints on tag generation.
+- `docs/policy/ZETTEL_TEMPLATE.md`: Output format for promoted notes.

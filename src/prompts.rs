@@ -113,9 +113,14 @@ Output valid JSON only:
   "candidate_project": ["ProjectName"],
   "candidate_area": ["AreaName"],
   "candidate_concepts": ["ConceptLink"],
-  "recommended_action": "move_to_resource | link_existing_concept | promote_to_zettel",
-  "reasoning": "Why this classification?"
+  "recommended_action": "move | link_existing | promote_to_zettel",
+  "reasoning": "Why this classification?",
+  "subcategory": "Technical | Reference | fleeting | literature | permanent",
+  "detail": "Articles-Papers | Books-Notes | Tutorials-Guides | Cheat-Sheets"
 }
+
+Subcategory is required for Resources and ConceptSeed.
+Detail is only required for Resources/Reference.
 
 Text:
 {content}"#
