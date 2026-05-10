@@ -237,7 +237,7 @@ enum SettingsAction {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load .env from home dir or CWD (whichever exists).
-    let home_env = dirs_home().join(".config/obsidian-forge/.env");
+    let home_env = dirs_home().join(config::GLOBAL_DIR).join(".env");
     if home_env.exists() {
         dotenv::from_path(&home_env).ok();
     } else {
@@ -1422,7 +1422,7 @@ fn format_bytes(bytes: u64) -> String {
 
 fn setup_logging() {
     let log_dir = std::env::var("HOME")
-        .map(|h| PathBuf::from(h).join(".config/obsidian-forge/logs"))
+        .map(|h| PathBuf::from(h).join(config::GLOBAL_DIR).join("logs"))
         .unwrap_or_else(|_| PathBuf::from("logs"));
     fs::create_dir_all(&log_dir).ok();
 
