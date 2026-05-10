@@ -193,7 +193,8 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
     current_fm.status = Some("needs_review".to_string());
     current_fm.summary = Some(summary);
     current_fm.questions = Some(questions);
-    current_fm.candidate_type = Some(cand.candidate_type.unwrap_or_else(|| "Resource".into()));
+    const DEFAULT_CANDIDATE_TYPE: &str = "Resource";
+    current_fm.candidate_type = Some(cand.candidate_type.unwrap_or_else(|| DEFAULT_CANDIDATE_TYPE.into()));
     current_fm.candidate_project = cand.candidate_project;
     current_fm.candidate_area = cand.candidate_area;
     current_fm.candidate_concepts = cand.candidate_concepts;

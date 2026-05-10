@@ -9,7 +9,7 @@ This defines how information is extracted from `03-Resources` to become concepts
 
 ## 2. Promotion Criteria
 - Is the idea **Atomic**? (One idea per note)
-- is the idea **Universal**? (Independent of the project context)
+- Is the idea **Universal**? (Independent of the project context)
 - Is the idea **Non-Redundant**? (Does not already exist in Zettelkasten)
 
 ## 3. AI Role
