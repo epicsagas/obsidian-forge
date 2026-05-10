@@ -194,11 +194,17 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
     current_fm.summary = Some(summary);
     current_fm.questions = Some(questions);
     const DEFAULT_CANDIDATE_TYPE: &str = "Resource";
-    current_fm.candidate_type = Some(cand.candidate_type.unwrap_or_else(|| DEFAULT_CANDIDATE_TYPE.into()));
+    current_fm.candidate_type = Some(
+        cand.candidate_type
+            .unwrap_or_else(|| DEFAULT_CANDIDATE_TYPE.into()),
+    );
     current_fm.candidate_project = cand.candidate_project;
     current_fm.candidate_area = cand.candidate_area;
     current_fm.candidate_concepts = cand.candidate_concepts;
-    current_fm.recommended_action = cand.recommended_action;
+    const VALID_ACTIONS: &[&str] = &["move", "link_existing", "promote_to_zettel"];
+    current_fm.recommended_action = cand
+        .recommended_action
+        .filter(|a| VALID_ACTIONS.iter().any(|v| a.eq_ignore_ascii_case(v)));
     current_fm.reasoning = cand.reasoning;
     current_fm.subcategory = cand.subcategory;
     current_fm.detail = cand.detail;
@@ -233,21 +239,35 @@ struct AiCandidates {
 }
 
 fn resolve_confirmed_targets(fm: &Frontmatter) -> (String, String, String) {
-    let category = fm.category.clone().or_else(|| {
-        fm.candidate_type.as_ref().map(|t| match t.as_str() {
-            "ConceptSeed" => "Zettelkasten".into(),
-            "Project" => "Projects".into(),
-            "Area" => "Areas".into(),
-            other => other.into(),
+    let category = fm
+        .category
+        .clone()
+        .or_else(|| {
+            fm.candidate_type.as_ref().map(|t| match t.as_str() {
+                "ConceptSeed" => "Zettelkasten".into(),
+                "Project" => "Projects".into(),
+                "Area" => "Areas".into(),
+                "Resource" => "Resources".into(),
+                other => other.into(),
+            })
         })
-    }).unwrap_or_else(|| "Resources".into());
+        .unwrap_or_else(|| "Resources".into());
 
-    let subcategory = fm.subcategory.clone().unwrap_or_else(|| match category.as_str() {
-        "Zettelkasten" => "fleeting".into(),
-        _ => "Reference".into(),
-    });
+    let subcategory = fm
+        .subcategory
+        .clone()
+        .unwrap_or_else(|| match category.as_str() {
+            "Zettelkasten" => "fleeting".into(),
+            _ => "Reference".into(),
+        });
 
-    let detail = fm.detail.clone().unwrap_or_else(|| "Articles-Papers".into());
+    let detail = fm
+        .detail
+        .clone()
+        .unwrap_or_else(|| match category.as_str() {
+            "Resources" => "Articles-Papers".into(),
+            _ => String::new(),
+        });
 
     (category, subcategory, detail)
 }
@@ -604,6 +624,31 @@ mod tests {
         fm.candidate_type = Some("Project".into());
         let (cat, _, _) = resolve_confirmed_targets(&fm);
         assert_eq!(cat, "Resources");
+    }
+
+    #[test]
+    fn test_resolve_confirmed_targets_area() {
+        let mut fm = Frontmatter::default();
+        fm.candidate_type = Some("Area".into());
+        let (cat, _, _) = resolve_confirmed_targets(&fm);
+        assert_eq!(cat, "Areas");
+    }
+
+    #[test]
+    fn test_resolve_confirmed_targets_zettelkasten_detail_is_empty() {
+        let mut fm = Frontmatter::default();
+        fm.candidate_type = Some("ConceptSeed".into());
+        let (_, _, detail) = resolve_confirmed_targets(&fm);
+        assert!(detail.is_empty(), "Zettelkasten should have no detail");
+    }
+
+    #[test]
+    fn test_resolve_confirmed_targets_resources_detail_default() {
+        let mut fm = Frontmatter::default();
+        fm.candidate_type = Some("Resource".into());
+        let (cat, _, detail) = resolve_confirmed_targets(&fm);
+        assert_eq!(cat, "Resources");
+        assert_eq!(detail, "Articles-Papers");
     }
 
     #[test]
