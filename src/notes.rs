@@ -602,8 +602,10 @@ mod tests {
 
     #[test]
     fn test_resolve_confirmed_targets_concept_seed() {
-        let mut fm = Frontmatter::default();
-        fm.candidate_type = Some("ConceptSeed".into());
+        let fm = Frontmatter {
+            candidate_type: Some("ConceptSeed".into()),
+            ..Default::default()
+        };
         let (cat, sub, _detail) = resolve_confirmed_targets(&fm);
         assert_eq!(cat, "Zettelkasten");
         assert_eq!(sub, "fleeting");
@@ -611,41 +613,51 @@ mod tests {
 
     #[test]
     fn test_resolve_confirmed_targets_project() {
-        let mut fm = Frontmatter::default();
-        fm.candidate_type = Some("Project".into());
+        let fm = Frontmatter {
+            candidate_type: Some("Project".into()),
+            ..Default::default()
+        };
         let (cat, _, _) = resolve_confirmed_targets(&fm);
         assert_eq!(cat, "Projects");
     }
 
     #[test]
     fn test_resolve_confirmed_targets_explicit_category_wins() {
-        let mut fm = Frontmatter::default();
-        fm.category = Some("Resources".into());
-        fm.candidate_type = Some("Project".into());
+        let fm = Frontmatter {
+            category: Some("Resources".into()),
+            candidate_type: Some("Project".into()),
+            ..Default::default()
+        };
         let (cat, _, _) = resolve_confirmed_targets(&fm);
         assert_eq!(cat, "Resources");
     }
 
     #[test]
     fn test_resolve_confirmed_targets_area() {
-        let mut fm = Frontmatter::default();
-        fm.candidate_type = Some("Area".into());
+        let fm = Frontmatter {
+            candidate_type: Some("Area".into()),
+            ..Default::default()
+        };
         let (cat, _, _) = resolve_confirmed_targets(&fm);
         assert_eq!(cat, "Areas");
     }
 
     #[test]
     fn test_resolve_confirmed_targets_zettelkasten_detail_is_empty() {
-        let mut fm = Frontmatter::default();
-        fm.candidate_type = Some("ConceptSeed".into());
+        let fm = Frontmatter {
+            candidate_type: Some("ConceptSeed".into()),
+            ..Default::default()
+        };
         let (_, _, detail) = resolve_confirmed_targets(&fm);
         assert!(detail.is_empty(), "Zettelkasten should have no detail");
     }
 
     #[test]
     fn test_resolve_confirmed_targets_resources_detail_default() {
-        let mut fm = Frontmatter::default();
-        fm.candidate_type = Some("Resource".into());
+        let fm = Frontmatter {
+            candidate_type: Some("Resource".into()),
+            ..Default::default()
+        };
         let (cat, _, detail) = resolve_confirmed_targets(&fm);
         assert_eq!(cat, "Resources");
         assert_eq!(detail, "Articles-Papers");
