@@ -49,57 +49,34 @@ of daemon enable         # register as a macOS login item
 
 ## Installation
 
-### Quick install (macOS / Linux)
-
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
-```
+# macOS / Linux — pre-built binary, no Rust required
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
 
-### Quick install (Windows)
-
-```powershell
+# Windows — pre-built binary, no Rust required
 irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
-```
 
-### Homebrew (macOS / Linux)
+# Homebrew (macOS / Linux)
+brew install epicsagas/tap/obsidian-forge
 
-```bash
-brew tap epicsagas/tap
-brew install obsidian-forge
-```
+# cargo-binstall — pre-built binary via Rust toolchain
+cargo binstall obsidian-forge
 
-Both `obsidian-forge` and `of` (short alias) are installed.
-
-### via crates.io
-
-```bash
+# cargo install — build from source (requires Rust toolchain)
 cargo install obsidian-forge
-# installs both `obsidian-forge` and `of` (short alias)
 ```
 
-### From source
-
-```bash
-git clone https://github.com/epicsagas/obsidian-forge.git
-cd obsidian-forge
-cargo install --path .
-# installs both `obsidian-forge` and `of` (short alias)
-```
-
-### Pre-built binaries
-
-Download the latest release for your platform from the
-[releases page](https://github.com/epicsagas/obsidian-forge/releases).
+Both `obsidian-forge` and `of` (short alias) are installed by all methods above.
 
 ## Updating
 
 | Method | Command |
 |--------|---------|
 | Homebrew | `brew upgrade obsidian-forge` |
-| cargo | `cargo install obsidian-forge@latest` |
-| curl installer (macOS/Linux) | Re-run the install script |
-| PowerShell installer (Windows) | Re-run the install command |
-| Source | `git pull && cargo install --path .` |
+| curl installer (macOS/Linux) | Re-run the install script above |
+| PowerShell installer (Windows) | Re-run the install command above |
+| cargo binstall | `cargo binstall obsidian-forge@latest` |
+| cargo install | `cargo install obsidian-forge@latest` |
 
 Verify the installed version:
 
