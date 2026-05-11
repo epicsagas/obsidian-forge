@@ -16,6 +16,8 @@ tap = "epicsagas/homebrew-tap"
 formula = "obsidian-forge"
 # Publish jobs
 publish-jobs = ["homebrew"]
+macos-sign = true
+macos-notarize = true
 # Install location (matches cargo install behavior)
 install-path = "CARGO_HOME"
 # Run dist plan on PRs for early error detection
