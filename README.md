@@ -5,7 +5,7 @@
 **Obsidian vault generator, automation daemon, and graph strengthener**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![Crates.io](https://img.shields.io/crates/v/obsidian-forge.svg)](https://crates.io/crates/obsidian-forge)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
@@ -49,15 +49,26 @@ of daemon enable         # register as a macOS login item
 
 ## Installation
 
-### via cargo-binstall (fastest - pre-built binaries)
+### Quick install (macOS / Linux)
 
 ```bash
-cargo install obsidian-forge
-# installs both `obsidian-forge` and `of` (short alias)
+curl --proto '=https' --tlsv1.2 -sSf https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
 ```
 
-> Requires [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) installed first:
-> `cargo install cargo-binstall`
+### Quick install (Windows)
+
+```powershell
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+```
+
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap epicsagas/tap
+brew install obsidian-forge
+```
+
+Both `obsidian-forge` and `of` (short alias) are installed.
 
 ### via crates.io
 
@@ -75,19 +86,43 @@ cargo install --path .
 # installs both `obsidian-forge` and `of` (short alias)
 ```
 
+### Pre-built binaries
+
+Download the latest release for your platform from the
+[releases page](https://github.com/epicsagas/obsidian-forge/releases).
+
+## Updating
+
+| Method | Command |
+|--------|---------|
+| Homebrew | `brew upgrade obsidian-forge` |
+| cargo | `cargo install obsidian-forge@latest` |
+| curl installer (macOS/Linux) | Re-run the install script |
+| PowerShell installer (Windows) | Re-run the install command |
+| Source | `git pull && cargo install --path .` |
+
+Verify the installed version:
+
+```bash
+of --version
+```
+
 ### Platform Support
 
-| Platform | Status |
-|---|---|
-| macOS | ✅ Fully supported (including LaunchAgent daemon) |
-| Linux | ✅ Fully supported |
-| Windows | ⚠️ Partially supported (no LaunchAgent equivalent; foreground watch works) |
+| Platform | Architecture | Status |
+|---|---|---|
+| macOS | Apple Silicon (aarch64) | ✅ Fully supported |
+| macOS | Intel (x86_64) | ✅ Fully supported |
+| Linux | x86_64 (glibc) | ✅ Fully supported |
+| Linux | x86_64 (musl/static) | ✅ Fully supported |
+| Linux | ARM64 (aarch64) | ✅ Fully supported |
+| Windows | x86_64 (MSVC) | ⚠️ Partially supported (no LaunchAgent) |
 
 ### Prerequisites
 
 | Tool | Required | Purpose |
 |---|---|---|
-| Rust 1.75+ | ✅ | Build |
+| Rust 1.85+ | source builds only | Compile |
 | git | ✅ | Vault versioning |
 | Ollama / OpenAI / OpenRouter / LM Studio | ⬜ optional | AI tagging (`process-all`) |
 | marker_single | ⬜ optional | High-quality PDF conversion |

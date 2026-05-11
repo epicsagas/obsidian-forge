@@ -5,6 +5,7 @@ edition = "2024"
 description = "Obsidian vault generator, automation daemon, and graph strengthener"
 license = "Apache-2.0"
 repository = "https://github.com/epicsagas/obsidian-forge"
+homepage = "https://github.com/epicsagas/obsidian-forge"
 keywords = ["obsidian", "vault", "pkm", "zettelkasten", "automation"]
 categories = ["command-line-utilities"]
 
@@ -46,10 +47,16 @@ debug = 1
 
 [profile.release]
 opt-level = 3
-lto = "thin"
+lto = true
 codegen-units = 1
 strip = "symbols"
+panic = "abort"
 
 [profile.release.package."*"]
 opt-level = 3
 codegen-units = 4
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
