@@ -41,6 +41,15 @@ tokio-stream = "0.1"
 # Build optimizations
 # ---------------------------------------------------------------------------
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.xz"
+pkg-fmt = "txz"
+bin-dir = "{ name }-{ target }/{ bin }"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+bin-dir = "{ bin }.exe"
+
 [profile.dev]
 opt-level = 0
 debug = 1
