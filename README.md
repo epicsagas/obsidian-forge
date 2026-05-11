@@ -49,40 +49,35 @@ of daemon enable         # register as a macOS login item
 
 ## Installation
 
+### macOS / Linux
+
 ```bash
-# macOS / Linux — pre-built binary, no Rust required
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
-
-# Windows — pre-built binary, no Rust required
-irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
-
-# Homebrew (macOS / Linux)
 brew install epicsagas/tap/obsidian-forge
+```
 
-# cargo-binstall — pre-built binary via Rust toolchain
-cargo binstall obsidian-forge
+No Homebrew? Use the installer script:
 
-# cargo install — build from source (requires Rust toolchain)
-cargo install obsidian-forge
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
+```
+
+### Windows
+
+```powershell
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+```
+
+### Via Rust toolchain
+
+```bash
+cargo binstall obsidian-forge   # pre-built binary (fast)
+cargo install obsidian-forge    # build from source
 ```
 
 Both `obsidian-forge` and `of` (short alias) are installed by all methods above.
 
-## Updating
-
-| Method | Command |
-|--------|---------|
-| Homebrew | `brew upgrade obsidian-forge` |
-| curl installer (macOS/Linux) | Re-run the install script above |
-| PowerShell installer (Windows) | Re-run the install command above |
-| cargo binstall | `cargo binstall obsidian-forge@latest` |
-| cargo install | `cargo install obsidian-forge@latest` |
-
-Verify the installed version:
-
-```bash
-of --version
-```
+> `of --version` to verify. Update with `brew upgrade obsidian-forge` or re-run the installer script.
 
 ### Platform Support
 
