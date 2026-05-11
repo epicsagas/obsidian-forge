@@ -5,7 +5,7 @@
 **Obsidian kasa oluşturucu, otomasyon daemonu ve grafik güçlendirici**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![Crates.io](https://img.shields.io/crates/v/obsidian-forge.svg)](https://crates.io/crates/obsidian-forge)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
@@ -22,10 +22,10 @@
 `obsidian-forge`, [Obsidian](https://obsidian.md) kasalarını kuran, otomatikleştiren ve bakımını yapan bir Rust CLI aracıdır. Arka planda bir daemon olarak çalışır; gelen kutunuzu izler, bilgi grafiğinizi güçlendirir ve git ile senkronize eder — böylece siz yazmaya odaklanabilirsiniz.
 
 ```
-of init my-brain                      # saniyeler içinde yeni kasa kur
-of daemon enable                     # macOS giriş öğesi olarak kaydet
-# "of", "obsidian-forge" için yerleşik kısa takma addır
+of init my-brain          # saniyeler içinde yeni kasa kur
+of daemon enable         # macOS giriş öğesi olarak kaydet
 # → kasanız artık otomatik işliyor, bağlantı kuruyor ve commit yapıyor
+# "of", "obsidian-forge" için yerleşik kısa takma addır
 ```
 
 ---
@@ -49,45 +49,52 @@ of daemon enable                     # macOS giriş öğesi olarak kaydet
 
 ## Kurulum
 
-### cargo-binstall ile (en hızlı - önceden derlenmiş binariler)
+### macOS / Linux
 
 ```bash
-cargo binstall obsidian-forge
-# hem `obsidian-forge` hem de `of` (kısa takma ad) kurulur
+brew install epicsagas/tap/obsidian-forge
 ```
 
-> Önce [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) kurulu olmalıdır:
-> `cargo install cargo-binstall`
-
-### crates.io ile
+Homebrew yok mu? Kurulum betiğini kullanın:
 
 ```bash
-cargo install obsidian-forge
-# hem `obsidian-forge` hem de `of` (kısa takma ad) kurulur
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
 ```
 
-### Kaynaktan
+### Windows
+
+```powershell
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+```
+
+### Rust araç zinciri ile
 
 ```bash
-git clone https://github.com/epicsagas/obsidian-forge.git
-cd obsidian-forge
-cargo install --path .
-# hem `obsidian-forge` hem de `of` (kısa takma ad) kurulur
+cargo binstall obsidian-forge   # önceden derlenmiş binary (hızlı)
+cargo install obsidian-forge    # kaynaktan derle
 ```
+
+Yukarıdaki tüm yöntemlerle hem `obsidian-forge` hem de `of` (kısa takma ad) kurulur.
+
+> Doğrulamak için `of --version` komutunu çalıştırın. Güncellemek için `brew upgrade obsidian-forge` veya kurulum betiğini yeniden çalıştırın.
 
 ### Platform Desteği
 
-| Platform | Durum |
-|---|---|
-| macOS | ✅ Tam desteklenir (LaunchAgent daemon dahil) |
-| Linux | ✅ Tam desteklenir |
-| Windows | ⚠️ Kısmen desteklenir (LaunchAgent eşdeğeri yok; ön plan izleme çalışır) |
+| Platform | Mimari | Durum |
+|---|---|---|
+| macOS | Apple Silicon (aarch64) | ✅ Tam desteklenir |
+| macOS | Intel (x86_64) | ✅ Tam desteklenir |
+| Linux | x86_64 (glibc) | ✅ Tam desteklenir |
+| Linux | x86_64 (musl/statik) | ✅ Tam desteklenir |
+| Linux | ARM64 (aarch64) | ✅ Tam desteklenir |
+| Windows | x86_64 (MSVC) | ⚠️ Kısmen desteklenir (LaunchAgent yok) |
 
 ### Ön koşullar
 
 | Araç | Gerekli | Amaç |
 |---|---|---|
-| Rust 1.75+ | ✅ | Derleme |
+| Rust 1.85+ | yalnızca kaynaktan derleme için | Derleme |
 | git | ✅ | Kasa sürümleme |
 | Ollama / OpenAI / OpenRouter / LM Studio | ⬜ isteğe bağlı | AI etiketleme (`process-all`) |
 | marker_single | ⬜ isteğe bağlı | Yüksek kaliteli PDF dönüştürme |
@@ -224,13 +231,13 @@ related_projects = true
 [sync]
 git_auto_commit  = true
 git_auto_push    = true
-interval_minutes = 5
+interval_minutes = 60
 
 [ai]
 # provider: ollama | openai | openrouter | lmstudio | openai-compatible
 provider = "ollama"
 model    = "gemma3"
-# base_url = "http://localhost:1234/v1"  # openai-compatible için gerekli; diğerlerinin varsayılanı var
+base_url = "http://192.168.0.28:1234/v1"  # openai-compatible için gerekli; diğerlerinin varsayılanı var
 # api_key  = ""                          # isteğe bağlı — ortam değişkeni tercih edilir (aşağıya bkz.)
 
 [daemon]
@@ -309,7 +316,7 @@ obsidian-forge/
 └── vault.toml         kasa başına yapılandırma (init tarafından oluşturulur)
 ```
 
-### Ekosistem (Ecosystem)
+### Ekosistem
 
 obsidian-forge, AI ajanlarına proje belgeleri sunan bir MCP sunucusu olan **[alcove](https://github.com/epicsagas/alcove)**'un kardeş projesidir. Bir Cargo çalışma alanını paylaşırlar ve kişisel bilgi ile proje zekası arasındaki döngüyü kapatmak için birlikte çalışırlar:
 

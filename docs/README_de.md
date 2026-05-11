@@ -5,7 +5,7 @@
 **Obsidian-Tresor-Generator, Automatisierungs-Daemon und Graph-Verstärker**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![Crates.io](https://img.shields.io/crates/v/obsidian-forge.svg)](https://crates.io/crates/obsidian-forge)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
@@ -22,10 +22,10 @@
 `obsidian-forge` ist eine Rust-CLI, die [Obsidian](https://obsidian.md)-Tresore aufbaut, automatisiert und pflegt. Es läuft als Hintergrund-Daemon, der Ihren Posteingang überwacht, Ihren Wissensgraphen stärkt und mit git synchronisiert — damit Sie sich auf das Schreiben konzentrieren können.
 
 ```
-of init my-brain                      # neuen Tresor in Sekunden aufbauen
-of daemon enable                     # als macOS-Anmeldeobjekt registrieren
-# "of" ist ein eingebauter Kurzalias für "obsidian-forge"
+of init my-brain          # neuen Tresor in Sekunden aufbauen
+of daemon enable         # als macOS-Anmeldeobjekt registrieren
 # → Ihr Tresor verarbeitet, verknüpft und committet jetzt automatisch
+# "of" ist ein eingebauter Kurzalias für "obsidian-forge"
 ```
 
 ---
@@ -49,45 +49,52 @@ of daemon enable                     # als macOS-Anmeldeobjekt registrieren
 
 ## Installation
 
-### via cargo-binstall (am schnellsten - vorkompilierte Binaries)
+### macOS / Linux
 
 ```bash
-cargo binstall obsidian-forge
-# installiert sowohl `obsidian-forge` als auch `of` (Kurzalias)
+brew install epicsagas/tap/obsidian-forge
 ```
 
-> Erfordert, dass [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) zuerst installiert ist:
-> `cargo install cargo-binstall`
-
-### via crates.io
+Kein Homebrew? Verwenden Sie das Installationsskript:
 
 ```bash
-cargo install obsidian-forge
-# installiert sowohl `obsidian-forge` als auch `of` (Kurzalias)
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
 ```
 
-### Aus dem Quellcode
+### Windows
+
+```powershell
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+```
+
+### Via Rust-Werkzeugkette
 
 ```bash
-git clone https://github.com/epicsagas/obsidian-forge.git
-cd obsidian-forge
-cargo install --path .
-# installiert sowohl `obsidian-forge` als auch `of` (Kurzalias)
+cargo binstall obsidian-forge   # vorkompilierte Binärdatei (schnell)
+cargo install obsidian-forge    # aus dem Quellcode kompilieren
 ```
+
+Sowohl `obsidian-forge` als auch `of` (Kurzalias) werden von allen oben genannten Methoden installiert.
+
+> `of --version` zur Überprüfung. Aktualisieren mit `brew upgrade obsidian-forge` oder durch erneutes Ausführen des Installationsskripts.
 
 ### Plattformunterstützung
 
-| Plattform | Status |
-|---|---|
-| macOS | ✅ Vollständig unterstützt (inkl. LaunchAgent-Daemon) |
-| Linux | ✅ Vollständig unterstützt |
-| Windows | ⚠️ Teilweise unterstützt (kein LaunchAgent-Äquivalent; Vordergrund-Überwachung funktioniert) |
+| Plattform | Architektur | Status |
+|---|---|---|
+| macOS | Apple Silicon (aarch64) | ✅ Vollständig unterstützt |
+| macOS | Intel (x86_64) | ✅ Vollständig unterstützt |
+| Linux | x86_64 (glibc) | ✅ Vollständig unterstützt |
+| Linux | x86_64 (musl/static) | ✅ Vollständig unterstützt |
+| Linux | ARM64 (aarch64) | ✅ Vollständig unterstützt |
+| Windows | x86_64 (MSVC) | ⚠️ Teilweise unterstützt (kein LaunchAgent) |
 
 ### Voraussetzungen
 
 | Werkzeug | Erforderlich | Zweck |
 |---|---|---|
-| Rust 1.75+ | ✅ | Build |
+| Rust 1.85+ | nur Quellcode-Builds | Kompilieren |
 | git | ✅ | Tresor-Versionierung |
 | Ollama / OpenAI / OpenRouter / LM Studio | ⬜ optional | KI-Tagging (`process-all`) |
 | marker_single | ⬜ optional | Hochwertige PDF-Konvertierung |
@@ -224,13 +231,13 @@ related_projects = true
 [sync]
 git_auto_commit  = true
 git_auto_push    = true
-interval_minutes = 5
+interval_minutes = 60
 
 [ai]
 # provider: ollama | openai | openrouter | lmstudio | openai-compatible
 provider = "ollama"
 model    = "gemma3"
-# base_url = "http://localhost:1234/v1"  # für openai-compatible erforderlich; andere haben Standardwerte
+base_url = "http://192.168.0.28:1234/v1"  # erforderlich für openai-compatible; andere haben Standardwerte
 # api_key  = ""                          # optional — Umgebungsvariable wird bevorzugt (siehe unten)
 
 [daemon]
@@ -303,18 +310,18 @@ obsidian-forge/
 │   ├── git.rs         automatischer Commit + Push (Conventional Commits)
 │   ├── notes.rs       Posteingangsverarbeitung + PARA-Routing
 │   ├── converter.rs   PDF → Markdown
-│   ├── ai.rs          KI-Client (Ollama, OpenAI-kompatible Anbieter)
+│   ├── ai.rs          KI-Client (Ollama + OpenAI-kompatible Anbieter)
 │   ├── prompts.rs     LLM-Prompt-Vorlagen
 │   └── watcher.rs     Dateisystem-Watcher (notify-Crate)
 └── vault.toml         tresorspezifische Konfiguration (von init erstellt)
 ```
 
-### Ökosystem (Ecosystem)
+### Ökosystem
 
 obsidian-forge ist das **Partnerprojekt von [alcove](https://github.com/epicsagas/alcove)** — einem MCP-Server, der Projektdokumente für KI-Agenten bereitstellt. Sie teilen sich einen Cargo-Workspace und arbeiten zusammen, um den Kreislauf zwischen persönlichem Wissen und Projektintelligenz zu schließen:
 
-- **obsidian-forge** = **Die Schmiede (The Forge)** (schreiben/pushen). Hintergrund-Daemon, der die Tresor-Pflege automatisiert, den Wissensgraphen stärkt und mit git synchronisiert.
-- **alcove** = **Die Bibliothek (The Library)** (lesen/pullen). MCP-Server, der KI-Agenten On-Demand- und durchsuchbaren Zugriff auf Dokumentationen bietet, ohne das Kontextfenster aufzublähen.
+- **obsidian-forge** = **Die Schmiede** (schreiben/pushen). Hintergrund-Daemon, der die Tresor-Pflege automatisiert, den Wissensgraphen stärkt und mit git synchronisiert.
+- **alcove** = **Die Bibliothek** (lesen/pullen). MCP-Server, der KI-Agenten On-Demand- und durchsuchbaren Zugriff auf Dokumentationen bietet, ohne das Kontextfenster aufzublähen.
 
 ```mermaid
 graph LR

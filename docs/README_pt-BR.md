@@ -5,7 +5,7 @@
 **Gerador de cofres Obsidian, daemon de automação e fortalecedor de grafos**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![Crates.io](https://img.shields.io/crates/v/obsidian-forge.svg)](https://crates.io/crates/obsidian-forge)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
@@ -22,10 +22,10 @@
 `obsidian-forge` é uma CLI em Rust que monta, automatiza e mantém cofres do [Obsidian](https://obsidian.md). Ele roda como um daemon em segundo plano monitorando sua caixa de entrada, fortalecendo seu grafo de conhecimento e sincronizando com o git — para que você possa se concentrar em escrever.
 
 ```
-of init my-brain                      # monta um novo cofre em segundos
-of daemon enable                     # registra como item de login do macOS
-# "of" é um alias curto integrado para "obsidian-forge"
+of init my-brain          # monta um novo cofre em segundos
+of daemon enable         # registra como item de login do macOS
 # → seu cofre agora processa, linka e faz commit automaticamente
+# "of" é um alias curto integrado para "obsidian-forge"
 ```
 
 ---
@@ -49,45 +49,52 @@ of daemon enable                     # registra como item de login do macOS
 
 ## Instalação
 
-### via cargo-binstall (mais rápido - binários pré-compilados)
+### macOS / Linux
 
 ```bash
-cargo binstall obsidian-forge
-# instala tanto `obsidian-forge` quanto `of` (alias curto)
+brew install epicsagas/tap/obsidian-forge
 ```
 
-> Requer que [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) esteja instalado primeiro:
-> `cargo install cargo-binstall`
-
-### via crates.io
+Sem Homebrew? Use o script de instalação:
 
 ```bash
-cargo install obsidian-forge
-# instala tanto `obsidian-forge` quanto `of` (alias curto)
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
 ```
 
-### A partir do código-fonte
+### Windows
+
+```powershell
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+```
+
+### Via toolchain Rust
 
 ```bash
-git clone https://github.com/epicsagas/obsidian-forge.git
-cd obsidian-forge
-cargo install --path .
-# instala tanto `obsidian-forge` quanto `of` (alias curto)
+cargo binstall obsidian-forge   # binário pré-compilado (rápido)
+cargo install obsidian-forge    # compilar a partir do código-fonte
 ```
 
-### Suporte de plataforma
+Tanto `obsidian-forge` quanto `of` (alias curto) são instalados por todos os métodos acima.
 
-| Plataforma | Status |
-|---|---|
-| macOS | ✅ Completamente suportado (incluindo daemon LaunchAgent) |
-| Linux | ✅ Completamente suportado |
-| Windows | ⚠️ Parcialmente suportado (sem equivalente LaunchAgent; monitoramento em primeiro plano funciona) |
+> Use `of --version` para verificar. Atualize com `brew upgrade obsidian-forge` ou execute novamente o script de instalação.
+
+### Suporte de Plataforma
+
+| Plataforma | Arquitetura | Status |
+|---|---|---|
+| macOS | Apple Silicon (aarch64) | ✅ Completamente suportado |
+| macOS | Intel (x86_64) | ✅ Completamente suportado |
+| Linux | x86_64 (glibc) | ✅ Completamente suportado |
+| Linux | x86_64 (musl/static) | ✅ Completamente suportado |
+| Linux | ARM64 (aarch64) | ✅ Completamente suportado |
+| Windows | x86_64 (MSVC) | ⚠️ Parcialmente suportado (sem LaunchAgent) |
 
 ### Pré-requisitos
 
 | Ferramenta | Necessário | Finalidade |
 |---|---|---|
-| Rust 1.75+ | ✅ | Compilação |
+| Rust 1.85+ | apenas compilação a partir do fonte | Compilação |
 | git | ✅ | Versionamento do cofre |
 | Ollama / OpenAI / OpenRouter / LM Studio | ⬜ opcional | Tags por IA (`process-all`) |
 | marker_single | ⬜ opcional | Conversão PDF de alta qualidade |
@@ -192,7 +199,7 @@ obsidian-forge daemon status     # mostra PID, último código de saída e cofre
 
 ```bash
 obsidian-forge watch              # todos os cofres monitoráveis
-obsidian-forge watch --vault <name> --interval <segundos>
+obsidian-forge watch --vault <name> --interval <seconds>
 ```
 
 ---
@@ -224,13 +231,13 @@ related_projects = true
 [sync]
 git_auto_commit  = true
 git_auto_push    = true
-interval_minutes = 5
+interval_minutes = 60
 
 [ai]
 # provider: ollama | openai | openrouter | lmstudio | openai-compatible
 provider = "ollama"
 model    = "gemma3"
-# base_url = "http://localhost:1234/v1"  # necessário para openai-compatible; outros têm padrões
+base_url = "http://192.168.0.28:1234/v1"  # necessário para openai-compatible; outros têm padrões
 # api_key  = ""                          # opcional — variável de ambiente é preferida (veja abaixo)
 
 [daemon]
@@ -298,23 +305,23 @@ obsidian-forge/
 │   │   ├── bridges.rs   criação de notas ponte
 │   │   ├── relationships.rs linkagem de projetos relacionados
 │   │   ├── orphans.rs   detecção de notas órfãs
-│   │   ├── autotag.rs   orquestação de tags automáticas
+│   │   ├── autotag.rs   orquestração de tags automáticas
 │   │   └── health.rs    relatório de saúde do grafo
 │   ├── git.rs         commit + push automático (commits convencionais)
 │   ├── notes.rs       processamento de caixa de entrada + roteamento PARA
 │   ├── converter.rs   PDF → Markdown
-│   ├── ai.rs          cliente IA (Ollama, provedores compatíveis com OpenAI)
+│   ├── ai.rs          cliente IA (Ollama + provedores compatíveis com OpenAI)
 │   ├── prompts.rs     templates de prompts LLM
 │   └── watcher.rs     monitor do sistema de arquivos (crate notify)
 └── vault.toml         configuração por cofre (criada pelo init)
 ```
 
-### Ecossistema (Ecosystem)
+### Ecossistema
 
 obsidian-forge é o **projeto parceiro do [alcove](https://github.com/epicsagas/alcove)** — um servidor MCP que fornece documentos de projeto para agentes de IA. Eles compartilham um workspace Cargo e trabalham juntos para fechar o ciclo entre o conhecimento pessoal e a inteligência de projeto:
 
-- **obsidian-forge** = **A Forja (The Forge)** (escrever/empurrar). Daemon em segundo plano que automatiza a manutenção do cofre, fortalece o grafo de conhecimento e sincroniza com o git.
-- **alcove** = **A Biblioteca (The Library)** (ler/puxar). Servidor MCP que fornece aos agentes de IA acesso sob demanda e pesquisável à documentação sem sobrecarregar a janela de contexto.
+- **obsidian-forge** = **A Forja** (escrever/empurrar). Daemon em segundo plano que automatiza a manutenção do cofre, fortalece o grafo de conhecimento e sincroniza com o git.
+- **alcove** = **A Biblioteca** (ler/puxar). Servidor MCP que fornece aos agentes de IA acesso sob demanda e pesquisável à documentação sem sobrecarregar a janela de contexto.
 
 ```mermaid
 graph LR
@@ -333,7 +340,7 @@ Enquanto o `obsidian-forge` se concentra em construir e automatizar seu grafo de
 
 1.  **Construa no Obsidian**: Use o `obsidian-forge` para manter a saúde do seu cofre, criar MOCs e auto-linkar conceitos relacionados.
 2.  **Promova para Documentos de Projeto**: Quando uma nota (ex: uma decisão arquitetural ou uma especificação de funcionalidade) estiver pronta para um projeto, execute `alcove promote --source caminho/para/nota.md`.
-3.  **Descoberta pelo Agente**: Seu agente de IA (usando o servidor MCP Alcove) agora pode "descoberta" essa nota via `search_project_docs` ou `get_doc_file` em vez de você ter que copiar e colar no chat.
+3.  **Descoberta pelo Agente**: Seu agente de IA (usando o servidor MCP Alcove) agora pode "descobrir" essa nota via `search_project_docs` ou `get_doc_file` em vez de você ter que copiar e colar no chat.
 4.  **Conformidade com Políticas**: Use o `validate_docs` do Alcove para garantir que suas notas promovidas atendam aos padrões de documentação do projeto (definidos em `policy.toml`).
 
 ---

@@ -5,7 +5,7 @@
 **Obsidian 볼트 생성기, 자동화 데몬, 그래프 강화 도구**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![Crates.io](https://img.shields.io/crates/v/obsidian-forge.svg)](https://crates.io/crates/obsidian-forge)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
@@ -22,10 +22,10 @@
 `obsidian-forge`는 [Obsidian](https://obsidian.md) 볼트를 스캐폴딩, 자동화, 유지 관리하는 Rust CLI 도구입니다. 백그라운드 데몬으로 실행되어 인박스를 감시하고, 지식 그래프를 강화하며, git에 동기화합니다 — 당신은 글쓰기에만 집중할 수 있습니다.
 
 ```
-of init my-brain                      # 몇 초 만에 새 볼트 스캐폴딩
-of daemon enable                     # macOS 로그인 항목으로 등록
-# "of"는 "obsidian-forge"의 내장 단축 별칭입니다
+of init my-brain          # 몇 초 만에 새 볼트 스캐폴딩
+of daemon enable         # macOS 로그인 항목으로 등록
 # → 이제 볼트가 자동 처리, 자동 링크, 자동 커밋됩니다
+# "of"는 "obsidian-forge"의 내장 단축 별칭입니다
 ```
 
 ---
@@ -49,45 +49,52 @@ of daemon enable                     # macOS 로그인 항목으로 등록
 
 ## 설치
 
-### cargo-binstall을 통한 설치 (가장 빠름 - 미리 컴파일된 바이너리)
+### macOS / Linux
 
 ```bash
-cargo binstall obsidian-forge
-# `obsidian-forge`와 `of` (단축 별칭) 모두 설치됩니다
+brew install epicsagas/tap/obsidian-forge
 ```
 
-> 먼저 [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall)이 설치되어 있어야 합니다:
-> `cargo install cargo-binstall`
-
-### crates.io를 통한 설치
+Homebrew가 없다면 설치 스크립트를 사용하세요:
 
 ```bash
-cargo install obsidian-forge
-# `obsidian-forge`와 `of` (단축 별칭) 모두 설치됩니다
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
 ```
 
-### 소스에서 빌드
+### Windows
+
+```powershell
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+```
+
+### Rust 툴체인으로 설치
 
 ```bash
-git clone https://github.com/epicsagas/obsidian-forge.git
-cd obsidian-forge
-cargo install --path .
-# `obsidian-forge`와 `of` (단축 별칭) 모두 설치됩니다
+cargo binstall obsidian-forge   # 미리 컴파일된 바이너리 (빠름)
+cargo install obsidian-forge    # 소스에서 빌드
 ```
+
+위의 모든 방법으로 `obsidian-forge`와 `of`(단축 별칭)가 함께 설치됩니다.
+
+> `of --version`으로 확인. 업데이트는 `brew upgrade obsidian-forge` 또는 설치 스크립트 재실행.
 
 ### 플랫폼 지원
 
-| 플랫폼 | 상태 |
-|---|---|
-| macOS | ✅ 완전 지원 (LaunchAgent 데몬 포함) |
-| Linux | ✅ 완전 지원 |
-| Windows | ⚠️ 부분 지원 (LaunchAgent 대체 기능 없음; 포그라운드 감시는 작동) |
+| 플랫폼 | 아키텍처 | 상태 |
+|---|---|---|
+| macOS | Apple Silicon (aarch64) | ✅ 완전 지원 |
+| macOS | Intel (x86_64) | ✅ 완전 지원 |
+| Linux | x86_64 (glibc) | ✅ 완전 지원 |
+| Linux | x86_64 (musl/static) | ✅ 완전 지원 |
+| Linux | ARM64 (aarch64) | ✅ 완전 지원 |
+| Windows | x86_64 (MSVC) | ⚠️ 부분 지원 (LaunchAgent 없음) |
 
 ### 사전 요구사항
 
 | 도구 | 필수 여부 | 목적 |
 |---|---|---|
-| Rust 1.75+ | ✅ | 빌드 |
+| Rust 1.85+ | 소스 빌드 시에만 | 컴파일 |
 | git | ✅ | 볼트 버전 관리 |
 | Ollama / OpenAI / OpenRouter / LM Studio | ⬜ 선택사항 | AI 태깅 (`process-all`) |
 | marker_single | ⬜ 선택사항 | 고품질 PDF 변환 |
@@ -138,7 +145,7 @@ obsidian-forge vault pause   <name>         # 데몬 건너뜀; 수동 동기화
 obsidian-forge vault resume  <name>
 ```
 
-### 설정 관리 (Settings Management)
+### 설정 관리
 
 모든 볼트에 걸쳐 `.obsidian/` 플러그인, 테마, 스니펫을 동기화합니다.
 
@@ -152,7 +159,7 @@ obsidian-forge settings status
 obsidian-forge clone-settings <source> <target>
 ```
 
-### 그래프 작업 (Graph Operations)
+### 그래프 작업
 
 ```bash
 obsidian-forge graph health                 # 통계 및 건강 메트릭 표시
@@ -224,13 +231,13 @@ related_projects = true
 [sync]
 git_auto_commit  = true
 git_auto_push    = true
-interval_minutes = 5
+interval_minutes = 60
 
 [ai]
 # provider: ollama | openai | openrouter | lmstudio | openai-compatible
 provider = "ollama"
 model    = "gemma3"
-# base_url = "http://localhost:1234/v1"  # openai-compatible에 필요; 다른 것은 기본값 있음
+base_url = "http://192.168.0.28:1234/v1"  # openai-compatible에 필요; 다른 것은 기본값 있음
 # api_key  = ""                          # 선택사항 — 환경 변수가 권장됨 (아래 참조)
 
 [daemon]
@@ -303,13 +310,13 @@ obsidian-forge/
 │   ├── git.rs         자동 커밋 + 푸시 (컨벤셔널 커밋)
 │   ├── notes.rs       인박스 처리 + PARA 라우팅
 │   ├── converter.rs   PDF → 마크다운
-│   ├── ai.rs          AI 클라이언트 (Ollama, OpenAI 호환 프로바이더)
+│   ├── ai.rs          AI 클라이언트 (Ollama + OpenAI 호환 프로바이더)
 │   ├── prompts.rs     LLM 프롬프트 템플릿
 │   └── watcher.rs     파일시스템 감시기 (notify 크레이트)
 └── vault.toml         볼트별 설정 (init 시 생성)
 ```
 
-### 생태계 (Ecosystem)
+### 생태계
 
 `obsidian-forge`는 AI 에이전트에게 프로젝트 문서를 제공하는 MCP 서버인 **[alcove](https://github.com/epicsagas/alcove)**의 자매 프로젝트입니다. 이들은 Cargo 워크스페이스를 공유하며 개인의 지식과 프로젝트 인텔리전스 사이의 루프를 완성합니다:
 

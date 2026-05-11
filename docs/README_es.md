@@ -5,7 +5,7 @@
 **Generador de bóvedas Obsidian, demonio de automatización y potenciador de grafos**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
 [![Crates.io](https://img.shields.io/crates/v/obsidian-forge.svg)](https://crates.io/crates/obsidian-forge)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
 
@@ -22,10 +22,10 @@
 `obsidian-forge` es una CLI de Rust que construye, automatiza y mantiene bóvedas de [Obsidian](https://obsidian.md). Se ejecuta como un demonio en segundo plano vigilando tu bandeja de entrada, fortaleciendo tu grafo de conocimiento y sincronizando con git — para que puedas centrarte en escribir.
 
 ```
-of init my-brain                      # construye una nueva bóveda en segundos
-of daemon enable                     # registra como elemento de inicio de macOS
-# "of" es un alias corto integrado para "obsidian-forge"
+of init my-brain          # construye una nueva bóveda en segundos
+of daemon enable         # registra como elemento de inicio de macOS
 # → tu bóveda ahora se procesa, enlaza y confirma automáticamente
+# "of" es un alias corto integrado para "obsidian-forge"
 ```
 
 ---
@@ -49,45 +49,52 @@ of daemon enable                     # registra como elemento de inicio de macOS
 
 ## Instalación
 
-### vía cargo-binstall (más rápido - binarios preconstruidos)
+### macOS / Linux
 
 ```bash
-cargo binstall obsidian-forge
-# instala tanto `obsidian-forge` como `of` (alias corto)
+brew install epicsagas/tap/obsidian-forge
 ```
 
-> Requiere que [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) esté instalado primero:
-> `cargo install cargo-binstall`
-
-### vía crates.io
+¿No tienes Homebrew? Usa el script de instalación:
 
 ```bash
-cargo install obsidian-forge
-# instala tanto `obsidian-forge` como `of` (alias corto)
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
 ```
 
-### Desde el código fuente
+### Windows
+
+```powershell
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+```
+
+### Vía toolchain de Rust
 
 ```bash
-git clone https://github.com/epicsagas/obsidian-forge.git
-cd obsidian-forge
-cargo install --path .
-# instala tanto `obsidian-forge` como `of` (alias corto)
+cargo binstall obsidian-forge   # binario preconstruido (rápido)
+cargo install obsidian-forge    # compilar desde el código fuente
 ```
+
+Todos los métodos anteriores instalan tanto `obsidian-forge` como `of` (alias corto).
+
+> Ejecuta `of --version` para verificar. Actualiza con `brew upgrade obsidian-forge` o vuelve a ejecutar el script de instalación.
 
 ### Soporte de plataformas
 
-| Plataforma | Estado |
-|---|---|
-| macOS | ✅ Completamente soportado (incluye daemon LaunchAgent) |
-| Linux | ✅ Completamente soportado |
-| Windows | ⚠️ Parcialmente soportado (sin equivalente LaunchAgent; vigilancia en primer plano funciona) |
+| Plataforma | Arquitectura | Estado |
+|---|---|---|
+| macOS | Apple Silicon (aarch64) | ✅ Completamente soportado |
+| macOS | Intel (x86_64) | ✅ Completamente soportado |
+| Linux | x86_64 (glibc) | ✅ Completamente soportado |
+| Linux | x86_64 (musl/static) | ✅ Completamente soportado |
+| Linux | ARM64 (aarch64) | ✅ Completamente soportado |
+| Windows | x86_64 (MSVC) | ⚠️ Parcialmente soportado (sin LaunchAgent) |
 
 ### Requisitos previos
 
 | Herramienta | Requerida | Propósito |
 |---|---|---|
-| Rust 1.75+ | ✅ | Compilación |
+| Rust 1.85+ | solo compilación desde fuente | Compilación |
 | git | ✅ | Versionado de bóvedas |
 | Ollama / OpenAI / OpenRouter / LM Studio | ⬜ opcional | Etiquetado IA (`process-all`) |
 | marker_single | ⬜ opcional | Conversión PDF de alta calidad |
@@ -224,13 +231,13 @@ related_projects = true
 [sync]
 git_auto_commit  = true
 git_auto_push    = true
-interval_minutes = 5
+interval_minutes = 60
 
 [ai]
 # provider: ollama | openai | openrouter | lmstudio | openai-compatible
 provider = "ollama"
 model    = "gemma3"
-# base_url = "http://localhost:1234/v1"  # requerido para openai-compatible; otros tienen valores por defecto
+base_url = "http://192.168.0.28:1234/v1"  # requerido para openai-compatible; otros tienen valores por defecto
 # api_key  = ""                          # opcional — se prefiere variable de entorno (ver abajo)
 
 [daemon]
@@ -309,20 +316,20 @@ obsidian-forge/
 └── vault.toml         configuración por bóveda (creada por init)
 ```
 
-### Ecosistema (Ecosystem)
+### Ecosistema
 
 obsidian-forge es el **proyecto compañero de [alcove](https://github.com/epicsagas/alcove)** — un servidor MCP que sirve documentos de proyecto a agentes IA. Comparten un espacio de trabajo Cargo y trabajan juntos para cerrar el ciclo entre el conocimiento personal y la inteligencia de proyecto:
 
-- **obsidian-forge** = **La Forja (The Forge)** (escribir/empujar). Demonio en segundo plano que automatiza el mantenimiento de la bóveda, fortalece el grafo de conocimiento y sincroniza con git.
-- **alcove** = **La Biblioteca (The Library)** (leer/tirar). Servidor MCP que proporciona a los agentes IA acceso bajo demanda y searchable a la documentación sin inflar la ventana de contexto.
+- **obsidian-forge** = **La Forja** (escribir/empujar). Demonio en segundo plano que automatiza el mantenimiento de la bóveda, fortalece el grafo de conocimiento y sincroniza con git.
+- **alcove** = **La Biblioteca** (leer/tirar). Servidor MCP que proporciona a los agentes IA acceso bajo demanda y con capacidad de búsqueda a la documentación sin inflar la ventana de contexto.
 
 ```mermaid
 graph LR
-    A[Bóveda Obsidian] -->|of daemon| B(obsidian-forge)
-    B -->|of sync| C[Repositorio Git]
+    A[Obsidian Vault] -->|of daemon| B(obsidian-forge)
+    B -->|of sync| C[Git Repo]
     A -->|alcove promote| D[.alcove / docs]
-    D -->|Herramientas MCP| E[Agente IA]
-    E -.->|Referencia a| D
+    D -->|MCP Tools| E[AI Agent]
+    E -.->|Refers to| D
 ```
 
 ### Integración con Alcove
