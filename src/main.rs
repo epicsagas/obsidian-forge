@@ -460,6 +460,11 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
             fs::write(&plist_path, plist)?;
             println!("✅ Plist written: {}", plist_path.display());
 
+            if is_agent_loaded(&label) {
+                println!("ℹ️  Already loaded — restarting to apply changes");
+                let _ = launchctl(&["bootout", &format!("gui/{}/{}", uid(), label)]);
+            }
+
             launchctl(&[
                 "bootstrap",
                 &format!("gui/{}", uid()),
@@ -479,6 +484,10 @@ fn handle_daemon_action(action: &DaemonAction) -> Result<()> {
         DaemonAction::Start => {
             if !plist_path.exists() {
                 anyhow::bail!("Daemon not installed. Run `obsidian-forge daemon enable` first.");
+            }
+            if is_agent_loaded(&label) {
+                println!("ℹ️  Daemon already running ({})", label);
+                return Ok(());
             }
             launchctl(&[
                 "bootstrap",
@@ -705,6 +714,14 @@ fn launchctl(args: &[&str]) -> Result<()> {
         anyhow::bail!("launchctl {} failed (exit: {})", args.join(" "), status);
     }
     Ok(())
+}
+
+fn is_agent_loaded(label: &str) -> bool {
+    std::process::Command::new("launchctl")
+        .args(["list", label])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 // ---------------------------------------------------------------------------
