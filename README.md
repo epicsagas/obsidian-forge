@@ -59,13 +59,13 @@ No Homebrew? Use the installer script:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.sh | sh
 ```
 
 ### Windows
 
 ```powershell
-irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.ps1 | iex
 ```
 
 ### Via Rust toolchain
