@@ -90,6 +90,17 @@ Both `obsidian-forge` and `of` (short alias) are installed by all methods above.
 | Linux | ARM64 (aarch64) | ✅ Fully supported |
 | Windows | x86_64 (MSVC) | ⚠️ Partially supported (no LaunchAgent) |
 
+### Claude Code Skill
+
+If you use [Claude Code](https://claude.ai/code), install the obsidian-forge skill to get context-aware AI assistance for `of` commands:
+
+```bash
+mkdir -p ~/.claude/skills/obsidian-forge
+cp "$(of --skill-path 2>/dev/null || echo ./SKILL.md)" ~/.claude/skills/obsidian-forge/SKILL.md
+```
+
+Or copy `SKILL.md` from this repo root manually. Once installed, Claude automatically triggers the skill when you ask about vault management, PARA routing, graph operations, or daemon issues.
+
 ### Prerequisites
 
 | Tool | Required | Purpose |
