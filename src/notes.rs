@@ -343,12 +343,14 @@ fn resolve_dest_dir(
 }
 
 fn split_frontmatter(input: &str) -> Result<(Option<Frontmatter>, String)> {
+    // Normalize CRLF to LF so the regex matches regardless of line ending style
+    let normalized = input.replace("\r\n", "\n");
     use std::sync::OnceLock;
     static RE: OnceLock<Regex> = OnceLock::new();
     let re = RE.get_or_init(|| {
-        Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").expect("valid frontmatter regex")
+        Regex::new(r"(?s)^---\n(.*?)\n---\n?(.*)$").expect("valid frontmatter regex")
     });
-    if let Some(caps) = re.captures(input) {
+    if let Some(caps) = re.captures(&normalized) {
         let yaml = caps
             .get(1)
             .expect("capture group 1 always present")
@@ -702,5 +704,136 @@ mod tests {
         assert!(!is_pdf(&md));
         let _ = std::fs::remove_file(&pdf);
         let _ = std::fs::remove_file(&md);
+    }
+
+    // --- DEBT-006 regression tests ---
+
+    #[test]
+    fn test_split_frontmatter_crlf_line_endings() {
+        let input = "---\r\ntitle: Hello\r\ntags: [test]\r\n---\r\n# Body\r\nContent here.";
+        let (fm, body) = split_frontmatter(input).unwrap();
+        assert!(fm.is_some(), "CRLF frontmatter must be detected");
+        let fm = fm.unwrap();
+        assert_eq!(fm.status, None); // no status field in this test
+        assert!(
+            body.contains("# Body"),
+            "Body must be preserved with CRLF. Got: {:?}",
+            body
+        );
+        assert!(
+            body.contains("Content here."),
+            "Full body must be preserved with CRLF. Got: {:?}",
+            body
+        );
+    }
+
+    #[test]
+    fn test_split_frontmatter_no_trailing_newline() {
+        let input = "---\ntitle: Hello\n---";
+        let (fm, body) = split_frontmatter(input).unwrap();
+        assert!(
+            fm.is_some(),
+            "Frontmatter without trailing newline must be detected"
+        );
+        assert!(
+            body.is_empty(),
+            "Body should be empty when no content after ---. Got: {:?}",
+            body
+        );
+    }
+
+    #[test]
+    fn test_join_frontmatter_preserves_body_on_crlf_input() {
+        let fm = Frontmatter {
+            status: Some("needs_review".into()),
+            ..Default::default()
+        };
+        let body = "# Title\r\n\r\nBody content with CRLF.";
+        let joined = join_frontmatter(&fm, body);
+        assert!(
+            joined.contains("# Title\r\n\r\nBody content with CRLF."),
+            "join_frontmatter must preserve body verbatim. Got: {:?}",
+            joined
+        );
+    }
+
+    #[test]
+    fn test_split_frontmatter_roundtrip_crlf() {
+        let original_body =
+            "# 페이팔 마피아\r\n\r\n이것은 본문입니다.\r\n한글 내용이 포함되어 있습니다.";
+        let input = format!("---\ntitle: Test\n---\n{}", original_body);
+        let (fm, body) = split_frontmatter(&input).unwrap();
+        assert!(fm.is_some());
+        let mut fm = fm.unwrap();
+        fm.status = Some("needs_review".into());
+        let joined = join_frontmatter(&fm, &body);
+        let expected_body = original_body.replace("\r\n", "\n");
+        assert!(
+            joined.contains(&expected_body),
+            "Roundtrip must preserve body content. Body: {:?}",
+            body
+        );
+    }
+
+    // --- DEBT-007 regression tests ---
+
+    #[test]
+    fn test_resolve_confirmed_targets_resource_with_ai_subcategory() {
+        let fm = Frontmatter {
+            candidate_type: Some("Resource".into()),
+            subcategory: Some("Technical".into()),
+            detail: None,
+            ..Default::default()
+        };
+        let (cat, sub, detail) = resolve_confirmed_targets(&fm);
+        assert_eq!(cat, "Resources");
+        assert_eq!(sub, "Technical", "AI-returned subcategory must be used");
+        assert_eq!(
+            detail, "Articles-Papers",
+            "Default detail when not specified"
+        );
+    }
+
+    #[test]
+    fn test_resolve_confirmed_targets_resource_with_ai_subcategory_and_detail() {
+        let fm = Frontmatter {
+            candidate_type: Some("Resource".into()),
+            subcategory: Some("Reference".into()),
+            detail: Some("Books-Notes".into()),
+            ..Default::default()
+        };
+        let (cat, sub, detail) = resolve_confirmed_targets(&fm);
+        assert_eq!(cat, "Resources");
+        assert_eq!(sub, "Reference");
+        assert_eq!(detail, "Books-Notes", "AI-returned detail must be used");
+    }
+
+    #[test]
+    fn test_resolve_confirmed_targets_concept_seed_with_ai_subcategory() {
+        let fm = Frontmatter {
+            candidate_type: Some("ConceptSeed".into()),
+            subcategory: Some("permanent".into()),
+            ..Default::default()
+        };
+        let (cat, sub, _detail) = resolve_confirmed_targets(&fm);
+        assert_eq!(cat, "Zettelkasten");
+        assert_eq!(
+            sub, "permanent",
+            "AI-returned subcategory must be used for ConceptSeed"
+        );
+    }
+
+    #[test]
+    fn test_resolve_confirmed_targets_concept_seed_default_fleeting() {
+        let fm = Frontmatter {
+            candidate_type: Some("ConceptSeed".into()),
+            ..Default::default()
+        };
+        let (cat, sub, _detail) = resolve_confirmed_targets(&fm);
+        assert_eq!(cat, "Zettelkasten");
+        assert_eq!(
+            sub, "fleeting",
+            "Default subcategory for ConceptSeed should be fleeting"
+        );
     }
 }
