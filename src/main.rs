@@ -3,6 +3,7 @@ mod config;
 mod converter;
 mod git;
 mod graph;
+mod index;
 mod init;
 mod moc;
 mod notes;
@@ -214,6 +215,8 @@ enum GraphAction {
     },
     /// Run the full graph strengthening pipeline
     Strengthen,
+    /// Generate the agent entry point index.md at the vault root
+    Index,
 }
 
 #[derive(Subcommand)]
@@ -411,6 +414,10 @@ async fn handle_graph_action(
         GraphAction::Strengthen => {
             graph::strengthen_graph(vault, config)?;
             println!("Graph strengthening complete.");
+        }
+        GraphAction::Index => {
+            index::generate_index(vault, config)?;
+            println!("index.md generated.");
         }
     }
     Ok(())
@@ -1051,6 +1058,9 @@ fn run_sync_all(filter: Option<String>) -> Result<()> {
 fn run_sync_cycle(vault: &Path, config: &ForgeConfig) {
     if let Err(e) = moc::update_all_mocs(vault, config) {
         tracing::warn!("[{}] MOC update error: {:?}", config.vault.name, e);
+    }
+    if let Err(e) = index::generate_index(vault, config) {
+        tracing::warn!("[{}] Index generation error: {:?}", config.vault.name, e);
     }
     if let Err(e) = graph::strengthen_graph(vault, config) {
         tracing::warn!("[{}] Graph error: {:?}", config.vault.name, e);
