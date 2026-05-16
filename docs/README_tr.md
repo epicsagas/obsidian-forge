@@ -44,6 +44,7 @@ of daemon enable         # macOS giriş öğesi olarak kaydet
 | 📄 | **PDF → Markdown** | `marker_single` ile dönüştürme, `pdftotext` yedek seçeneğiyle |
 | 🍎 | **Giriş öğesi** | macOS LaunchAgent olarak kurulur — otomatik başlar ve yeniden başlar |
 | ♻️ | **Idempotent** | Her işlem birden fazla kez güvenle çalıştırılabilir; yinelenen çıktı yok |
+| 📚 | **Kitap projeleri** | Kasa tümleşik yazma projelerini başlatın, takip edin, dışa aktarın ve kaynakları senkronize edin |
 
 ---
 
@@ -202,6 +203,19 @@ obsidian-forge watch              # izlenebilir tüm kasalar
 obsidian-forge watch --vault <name> --interval <saniye>
 ```
 
+### Kitap Projeleri
+
+Kitap yazma projelerini doğrudan kasa içinden yönetin.
+
+```bash
+of book init <name> [--genre <genre>] [--lang <lang>]   # 01-Projects/ altında yapı oluştur
+of book status [<name>]                                   # taslak / düzenleme / yayın aşaması ilerleme
+of book export <name> [--output <dir>]                   # book-forge için dışa aktar
+of book sync   <name>                                     # etiketli notları sources/ klasörüne bağla
+```
+
+Kasada `book/<name>` etiketiyle işaretlenmiş notlar, `book sync` komutuyla `sources/` klasörüne otomatik olarak sembolik bağlantı olarak eklenir.
+
 ---
 
 ## Yapılandırma
@@ -322,6 +336,7 @@ obsidian-forge, AI ajanlarına proje belgeleri sunan bir MCP sunucusu olan **[al
 
 - **obsidian-forge** = **Demirhane (The Forge)** (yazma/itme). Kasa bakımını otomatikleştiren, bilgi grafiğini güçlendiren ve git ile senkronize eden arka plan daemonu.
 - **alcove** = **Kütüphane (The Library)** (okuma/çekme). AI ajanlarına, bağlam penceresini şişirmeden belgelere on-demand ve aranabilir erişim sağlayan MCP sunucusu.
+- **[book-forge](https://github.com/epicsagas/book-forge)** = **Matbaa (The Press)** (yazma/yayımlama). `of book export` ile dışa aktarılan dizini alıp taslak → düzenleme → yayımlama pipeline'ını yöneten AI destekli kitap yazma araç takımı.
 
 ```mermaid
 graph LR
@@ -330,6 +345,8 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Araçları| E[AI Ajanı]
     E -.->|Şuna atıfta bulunur| D
+    B -->|of book export| F(book-forge)
+    F -->|taslak / düzenleme / yayın| G[Kitap]
 ```
 
 ### Alcove ile Entegrasyon
@@ -342,6 +359,34 @@ graph LR
 2.  **Proje Belgelerine Yükseltin**: Bir not (örneğin bir mimari karar veya özellik spesifikasyonu) bir proje için hazır olduğunda, `alcove promote --source path/to/note.md` komutunu çalıştırın.
 3.  **Ajan Keşfi**: AI ajanınız (Alcove MCP sunucusunu kullanarak) artık sohbet kutusuna kopyalayıp yapıştırmanıza gerek kalmadan `search_project_docs` veya `get_doc_file` aracılığıyla o notu "keşfedebilir".
 4.  **Politika Uyumluluğu**: Yükseltilen notlarınızın projenin belge standartlarını (`policy.toml` içinde tanımlanan) karşıladığından emin olmak için Alcove'un `validate_docs` aracını kullanın.
+
+### book-forge ile Entegrasyon
+
+[book-forge](https://github.com/epicsagas/book-forge), AI destekli kitap yazma için özel araç takımıdır. `obsidian-forge` **kasa tarafını** yönetir — notları düzenleme, araştırmaları etiketleme, proje yapısını oluşturma. `book-forge` **yazma tarafını** yönetir — bölüm taslakları, düzenleme turları, yayına hazırlama.
+
+#### İş akışı: Kasa → Kitap
+
+```bash
+# 1. Kasadaki araştırma notlarını etiketleyin
+#    İlgili notların frontmatter tags alanına "book/kitabim" ekleyin
+
+# 2. Kitap projesini başlatın
+of book init kitabim --genre non-fiction --lang tr
+
+# 3. Etiketli notları sources/ klasörüne senkronize edin
+of book sync kitabim
+
+# 4. book-forge uyumlu dizine aktarın
+of book export kitabim --output ~/books/
+
+# 5. book-forge'a devredin
+cd ~/books/kitabim
+book-forge draft        # sources/ temelinde AI bölüm taslakları
+book-forge edit         # çok turlu düzenleme pipeline'ı
+book-forge publish      # EPUB / PDF paketleme
+```
+
+Dışa aktarılan dizin `PRD.md` (hedefler), `STYLE.md` (stil kılavuzu), `drafts/`, `edits/` ve `publish/` içerir — tam olarak `book-forge`'un beklediği yapı.
 
 ---
 
