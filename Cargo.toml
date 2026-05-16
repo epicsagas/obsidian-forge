@@ -1,6 +1,6 @@
 [package]
 name = "obsidian-forge"
-version = "0.1.11-dev"
+version = "0.2.0"
 edition = "2024"
 description = "Obsidian vault generator, automation daemon, and graph strengthener"
 license = "Apache-2.0"
@@ -37,9 +37,15 @@ futures = "0.3"
 rayon = "1.8"
 tokio-stream = "0.1"
 
+[dev-dependencies]
+tempfile = "3"
+
 # ---------------------------------------------------------------------------
 # Build optimizations
 # ---------------------------------------------------------------------------
+
+[dev-dependencies]
+tempfile = "3"
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.xz"
