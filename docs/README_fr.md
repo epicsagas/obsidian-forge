@@ -44,6 +44,7 @@ of daemon enable         # enregistre comme élément de connexion macOS
 | 📄 | **PDF → Markdown** | Convertit via `marker_single` avec repli sur `pdftotext` |
 | 🍎 | **Élément de connexion** | S'installe comme macOS LaunchAgent — démarrage et redémarrage automatiques |
 | ♻️ | **Idempotent** | Toute opération est sûre à exécuter plusieurs fois ; aucune sortie en double |
+| 📚 | **Projets de livre** | Initialiser, suivre, exporter et synchroniser des projets d'écriture intégrés au coffre |
 
 ---
 
@@ -201,6 +202,19 @@ obsidian-forge daemon status     # affiche le PID, le dernier code de sortie et 
 obsidian-forge watch              # tous les coffres surveillables
 obsidian-forge watch --vault <name> --interval <secondes>
 ```
+
+### Projets de livre
+
+Gérez vos projets d'écriture de livres directement depuis le coffre.
+
+```bash
+of book init <name> [--genre <genre>] [--lang <lang>]   # créer la structure dans 01-Projects/
+of book status [<name>]                                   # avancement : brouillon / édition / publication
+of book export <name> [--output <dir>]                   # exporter pour book-forge
+of book sync   <name>                                     # lier les notes étiquetées → sources/
+```
+
+Les notes du coffre portant le tag `book/<name>` sont automatiquement liées dans `sources/` par `book sync`.
 
 ---
 

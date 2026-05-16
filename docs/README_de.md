@@ -44,6 +44,7 @@ of daemon enable         # als macOS-Anmeldeobjekt registrieren
 | 📄 | **PDF → Markdown** | Konvertierung über `marker_single` mit `pdftotext`-Fallback |
 | 🍎 | **Anmeldeobjekt** | Wird als macOS LaunchAgent installiert — automatischer Start und Neustart |
 | ♻️ | **Idempotent** | Jede Operation ist beliebig oft sicher ausführbar; keine doppelte Ausgabe |
+| 📚 | **Buchprojekte** | Vault-integrierte Schreibprojekte initialisieren, verfolgen, exportieren und synchronisieren |
 
 ---
 
@@ -201,6 +202,19 @@ obsidian-forge daemon status     # zeigt PID, letzten Exit-Code und geplante Tre
 obsidian-forge watch              # alle überwachbaren Tresore
 obsidian-forge watch --vault <name> --interval <sekunden>
 ```
+
+### Buchprojekte
+
+Buchschreibprojekte direkt aus dem Tresor heraus verwalten.
+
+```bash
+of book init <name> [--genre <genre>] [--lang <lang>]   # Scaffold in 01-Projects/
+of book status [<name>]                                   # Fortschritt: Entwurf / Bearbeitung / Veröffentlichung
+of book export <name> [--output <dir>]                   # Export für book-forge
+of book sync   <name>                                     # getaggte Notizen → sources/ verknüpfen
+```
+
+Notizen im Tresor mit dem Tag `book/<name>` werden durch `book sync` automatisch als Symlinks in `sources/` eingetragen.
 
 ---
 

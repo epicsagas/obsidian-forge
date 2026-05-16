@@ -44,6 +44,7 @@ of daemon enable         # registra como elemento de inicio de macOS
 | 📄 | **PDF → Markdown** | Convierte mediante `marker_single` con `pdftotext` como respaldo |
 | 🍎 | **Elemento de inicio** | Se instala como macOS LaunchAgent — se inicia y reinicia automáticamente |
 | ♻️ | **Idempotente** | Cualquier operación es segura de ejecutar múltiples veces; sin salida duplicada |
+| 📚 | **Proyectos de libro** | Inicializar, rastrear, exportar y sincronizar proyectos de escritura integrados en la bóveda |
 
 ---
 
@@ -201,6 +202,19 @@ obsidian-forge daemon status     # muestra PID, último código de salida y bóv
 obsidian-forge watch              # todas las bóvedas vigilables
 obsidian-forge watch --vault <name> --interval <segundos>
 ```
+
+### Proyectos de libro
+
+Gestiona proyectos de escritura de libros directamente desde la bóveda.
+
+```bash
+of book init <name> [--genre <genre>] [--lang <lang>]   # crear estructura en 01-Projects/
+of book status [<name>]                                   # progreso: borrador / edición / publicación
+of book export <name> [--output <dir>]                   # exportar para book-forge
+of book sync   <name>                                     # enlazar notas etiquetadas → sources/
+```
+
+Las notas etiquetadas con `book/<name>` en la bóveda se enlazan automáticamente en `sources/` mediante `book sync`.
 
 ---
 

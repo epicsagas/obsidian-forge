@@ -44,6 +44,7 @@ of daemon enable         # macOSログイン項目として登録
 | 📄 | **PDF → Markdown** | `marker_single`による変換、`pdftotext`フォールバック対応 |
 | 🍎 | **ログイン項目** | macOS LaunchAgentとしてインストール — 自動起動、自動再起動 |
 | ♻️ | **冪等性** | どの操作も複数回実行しても安全。重複出力なし |
+| 📚 | **書籍プロジェクト** | vault統合執筆プロジェクトの初期化、追跡、エクスポート、ソース同期 |
 
 ---
 
@@ -201,6 +202,19 @@ obsidian-forge daemon status     # PID、最終終了コード、スケジュー
 obsidian-forge watch              # 監視可能なすべてのvault
 obsidian-forge watch --vault <name> --interval <seconds>
 ```
+
+### 書籍プロジェクト
+
+vaultから直接書籍執筆プロジェクトを管理します。
+
+```bash
+of book init <name> [--genre <genre>] [--lang <lang>]   # 01-Projects/ 下にスキャフォールド
+of book status [<name>]                                   # 初稿 / 編集 / 出版フェーズの進捗
+of book export <name> [--output <dir>]                   # book-forge 互換ディレクトリにエクスポート
+of book sync   <name>                                     # タグ付きノートを sources/ にリンク
+```
+
+`book/<name>` タグが付いたvaultのノートは、`book sync` によって `sources/` にシンボリックリンクとして自動的に追加されます。
 
 ---
 

@@ -44,6 +44,7 @@ of daemon enable         # macOS giriş öğesi olarak kaydet
 | 📄 | **PDF → Markdown** | `marker_single` ile dönüştürme, `pdftotext` yedek seçeneğiyle |
 | 🍎 | **Giriş öğesi** | macOS LaunchAgent olarak kurulur — otomatik başlar ve yeniden başlar |
 | ♻️ | **Idempotent** | Her işlem birden fazla kez güvenle çalıştırılabilir; yinelenen çıktı yok |
+| 📚 | **Kitap projeleri** | Kasa tümleşik yazma projelerini başlatın, takip edin, dışa aktarın ve kaynakları senkronize edin |
 
 ---
 
@@ -201,6 +202,19 @@ obsidian-forge daemon status     # PID, son çıkış kodu ve planlanmış kasal
 obsidian-forge watch              # izlenebilir tüm kasalar
 obsidian-forge watch --vault <name> --interval <saniye>
 ```
+
+### Kitap Projeleri
+
+Kitap yazma projelerini doğrudan kasa içinden yönetin.
+
+```bash
+of book init <name> [--genre <genre>] [--lang <lang>]   # 01-Projects/ altında yapı oluştur
+of book status [<name>]                                   # taslak / düzenleme / yayın aşaması ilerleme
+of book export <name> [--output <dir>]                   # book-forge için dışa aktar
+of book sync   <name>                                     # etiketli notları sources/ klasörüne bağla
+```
+
+Kasada `book/<name>` etiketiyle işaretlenmiş notlar, `book sync` komutuyla `sources/` klasörüne otomatik olarak sembolik bağlantı olarak eklenir.
 
 ---
 

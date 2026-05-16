@@ -44,6 +44,7 @@ of daemon enable         # register as a macOS login item
 | 📄 | **PDF → Markdown** | Converts via `marker_single` with `pdftotext` fallback |
 | 🍎 | **Login item** | Installs as a macOS LaunchAgent — auto-starts, auto-restarts |
 | ♻️ | **Idempotent** | Safe to run any operation multiple times; no duplicate output |
+| 📚 | **Book projects** | Init, track, export, and source-sync vault-integrated writing projects |
 
 ---
 
@@ -213,6 +214,19 @@ obsidian-forge watch              # all watchable vaults
 obsidian-forge watch --vault <name> --interval <seconds>
 ```
 
+### Book Projects
+
+Manage book writing projects from within the vault.
+
+```bash
+of book init <name> [--genre <genre>] [--lang <lang>]   # scaffold in 01-Projects/
+of book status [<name>]                                   # draft / edit / publish progress
+of book export <name> [--output <dir>]                   # export for book-forge
+of book sync   <name>                                     # link tagged notes → sources/
+```
+
+Notes tagged `book/<name>` in the vault are auto-linked into `sources/` by `book sync`.
+
 ---
 
 ## Configuration
@@ -318,6 +332,7 @@ obsidian-forge/
 │   │   ├── orphans.rs   orphan detection
 │   │   ├── autotag.rs   auto-tag orchestration
 │   │   └── health.rs    graph health reporting
+│   ├── book.rs        Book project management (init, status, export, sync)
 │   ├── git.rs         auto commit + push (conventional commits)
 │   ├── notes.rs       inbox processing + PARA routing
 │   ├── converter.rs   PDF → Markdown

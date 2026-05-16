@@ -44,6 +44,7 @@ of daemon enable         # registra como item de login do macOS
 | 📄 | **PDF → Markdown** | Converte via `marker_single` com fallback para `pdftotext` |
 | 🍎 | **Item de login** | Instala como macOS LaunchAgent — inicia e reinicia automaticamente |
 | ♻️ | **Idempotente** | Qualquer operação é segura para executar múltiplas vezes; sem saída duplicada |
+| 📚 | **Projetos de livro** | Inicializar, acompanhar, exportar e sincronizar projetos de escrita integrados ao cofre |
 
 ---
 
@@ -201,6 +202,19 @@ obsidian-forge daemon status     # mostra PID, último código de saída e cofre
 obsidian-forge watch              # todos os cofres monitoráveis
 obsidian-forge watch --vault <name> --interval <seconds>
 ```
+
+### Projetos de livro
+
+Gerencie projetos de escrita de livros diretamente do cofre.
+
+```bash
+of book init <name> [--genre <genre>] [--lang <lang>]   # criar estrutura em 01-Projects/
+of book status [<name>]                                   # progresso: rascunho / edição / publicação
+of book export <name> [--output <dir>]                   # exportar para book-forge
+of book sync   <name>                                     # vincular notas marcadas → sources/
+```
+
+Notas do cofre com a tag `book/<name>` são automaticamente vinculadas em `sources/` pelo `book sync`.
 
 ---
 
