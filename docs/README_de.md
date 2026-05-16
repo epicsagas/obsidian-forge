@@ -336,6 +336,7 @@ obsidian-forge ist das **Partnerprojekt von [alcove](https://github.com/epicsaga
 
 - **obsidian-forge** = **Die Schmiede** (schreiben/pushen). Hintergrund-Daemon, der die Tresor-Pflege automatisiert, den Wissensgraphen stärkt und mit git synchronisiert.
 - **alcove** = **Die Bibliothek** (lesen/pullen). MCP-Server, der KI-Agenten On-Demand- und durchsuchbaren Zugriff auf Dokumentationen bietet, ohne das Kontextfenster aufzublähen.
+- **[book-forge](https://github.com/epicsagas/book-forge)** = **Die Druckerei** (verfassen/veröffentlichen). KI-gestütztes Buch-Schreib-Toolkit, das das von `of book export` exportierte Verzeichnis verarbeitet und die vollständige Pipeline von Entwurf → Bearbeitung → Veröffentlichung antreibt.
 
 ```mermaid
 graph LR
@@ -344,6 +345,8 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP-Tools| E[KI-Agent]
     E -.->|Bezieht sich auf| D
+    B -->|of book export| F(book-forge)
+    F -->|Entwurf / Bearbeitung / Veröff.| G[Buch]
 ```
 
 ### Integration mit Alcove
@@ -356,6 +359,34 @@ Während sich `obsidian-forge` auf den Aufbau und die Automatisierung Ihres Wiss
 2.  **Zu Projektdokumenten befördern**: Wenn eine Notiz (z. B. eine Architekturentscheidung oder eine Funktionsspezifikation) bereit für ein Projekt ist, führen Sie `alcove promote --source pfad/zu/notiz.md` aus.
 3.  **Agenten-Entdeckung**: Ihr KI-Agent (der den Alcove-MCP-Server verwendet) kann diese Notiz nun über `search_project_docs` oder `get_doc_file` "entdecken", anstatt dass Sie sie manuell in den Chat kopieren müssen.
 4.  **Richtlinienkonformität**: Verwenden Sie Alcoves `validate_docs`, um sicherzustellen, dass Ihre beförderten Notizen den Dokumentationsstandards des Projekts entsprechen (definiert in `policy.toml`).
+
+### Integration mit book-forge
+
+[book-forge](https://github.com/epicsagas/book-forge) ist das dedizierte KI-Buch-Schreib-Toolkit. `obsidian-forge` übernimmt die **Tresor-Seite** — Notizen organisieren, Recherchen taggen, Projektstruktur aufbauen. `book-forge` übernimmt die **Schreib-Seite** — Kapitelentwürfe, Bearbeitungsdurchläufe, Veröffentlichungspaketierung.
+
+#### Workflow: Tresor → Buch
+
+```bash
+# 1. Recherche-Notizen im Tresor taggen
+#    "book/mein-buch" zu frontmatter tags der relevanten Notizen hinzufügen
+
+# 2. Buchprojekt initialisieren
+of book init mein-buch --genre non-fiction --lang de
+
+# 3. Getaggte Notizen in sources/ synchronisieren
+of book sync mein-buch
+
+# 4. In book-forge-kompatibles Verzeichnis exportieren
+of book export mein-buch --output ~/books/
+
+# 5. An book-forge übergeben
+cd ~/books/mein-buch
+book-forge draft        # KI-Kapitelentwurf aus sources/
+book-forge edit         # Mehrstufige Bearbeitungspipeline
+book-forge publish      # EPUB / PDF packen
+```
+
+Das exportierte Verzeichnis enthält `PRD.md` (Ziele), `STYLE.md` (Stilratgeber), `drafts/`, `edits/` und `publish/` — genau die Struktur, die `book-forge` erwartet.
 
 ---
 

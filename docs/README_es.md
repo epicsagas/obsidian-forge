@@ -336,6 +336,7 @@ obsidian-forge es el **proyecto compañero de [alcove](https://github.com/epicsa
 
 - **obsidian-forge** = **La Forja** (escribir/empujar). Demonio en segundo plano que automatiza el mantenimiento de la bóveda, fortalece el grafo de conocimiento y sincroniza con git.
 - **alcove** = **La Biblioteca** (leer/tirar). Servidor MCP que proporciona a los agentes IA acceso bajo demanda y con capacidad de búsqueda a la documentación sin inflar la ventana de contexto.
+- **[book-forge](https://github.com/epicsagas/book-forge)** = **La Imprenta** (redactar/publicar). Toolkit de escritura de libros asistido por IA que consume el directorio exportado por `of book export` y gestiona el pipeline completo de borrador → edición → publicación.
 
 ```mermaid
 graph LR
@@ -344,6 +345,8 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Tools| E[AI Agent]
     E -.->|Refers to| D
+    B -->|of book export| F(book-forge)
+    F -->|borrador / edición / pub.| G[Libro]
 ```
 
 ### Integración con Alcove
@@ -356,6 +359,34 @@ Mientras `obsidian-forge` se centra en construir y automatizar tu grafo de conoc
 2.  **Promociona a Documentos de Proyecto**: Cuando una nota (ej. una decisión arquitectónica o una especificación de característica) esté lista para un proyecto, ejecuta `alcove promote --source ruta/a/nota.md`.
 3.  **Descubrimiento por el Agente**: Tu agente IA (usando el servidor MCP Alcove) ahora puede "descubrir" esa nota vía `search_project_docs` o `get_doc_file` en lugar de que tú tengas que copiar y pegar en el chat.
 4.  **Cumplimiento de Políticas**: Usa `validate_docs` de Alcove para asegurar que tus notas promocionadas cumplan con los estándares de documentación del proyecto (definidos en `policy.toml`).
+
+### Integración con book-forge
+
+[book-forge](https://github.com/epicsagas/book-forge) es el toolkit dedicado de escritura de libros con IA. `obsidian-forge` gestiona el **lado de la bóveda** — organizar notas, etiquetar investigaciones, crear la estructura del proyecto. `book-forge` gestiona el **lado de la escritura** — borradores de capítulos, pasadas de edición, empaquetado para publicación.
+
+#### Flujo de trabajo: Bóveda → Libro
+
+```bash
+# 1. Etiquetar notas de investigación en la bóveda
+#    Añadir "book/mi-libro" a las tags del frontmatter de las notas relevantes
+
+# 2. Inicializar el proyecto de libro
+of book init mi-libro --genre non-fiction --lang es
+
+# 3. Sincronizar notas etiquetadas en sources/
+of book sync mi-libro
+
+# 4. Exportar a directorio compatible con book-forge
+of book export mi-libro --output ~/books/
+
+# 5. Transferir a book-forge
+cd ~/books/mi-libro
+book-forge draft        # borrador de capítulos con IA desde sources/
+book-forge edit         # pipeline de edición en múltiples pasadas
+book-forge publish      # empaquetar EPUB / PDF
+```
+
+El directorio exportado contiene `PRD.md` (objetivos), `STYLE.md` (guía de estilo), `drafts/`, `edits/` y `publish/` — exactamente la estructura que `book-forge` espera.
 
 ---
 

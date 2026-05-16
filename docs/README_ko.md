@@ -336,6 +336,7 @@ obsidian-forge/
 
 - **obsidian-forge** = **대장간 (The Forge)** (쓰기/푸시). 볼트 유지 관리를 자동화하고, 지식 그래프를 강화하며, git에 동기화하는 백그라운드 데몬입니다.
 - **alcove** = **도서관 (The Library)** (읽기/가져오기). 컨텍스트 창을 비대하게 만들지 않으면서 AI 에이전트에게 온디맨드 검색이 가능한 문서 접근 권한을 제공하는 MCP 서버입니다.
+- **[book-forge](https://github.com/epicsagas/book-forge)** = **인쇄소 (The Press)** (집필/출판). `of book export`로 내보낸 디렉토리를 입력받아 초고 → 편집 → 출판 전체 파이프라인을 구동하는 AI 기반 도서 집필 툴킷입니다.
 
 ```mermaid
 graph LR
@@ -344,6 +345,8 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP 도구| E[AI 에이전트]
     E -.->|참조| D
+    B -->|of book export| F(book-forge)
+    F -->|초고 / 편집 / 출판| G[도서]
 ```
 
 ### Alcove 연동
@@ -356,6 +359,34 @@ graph LR
 2.  **프로젝트 문서로 승급**: 노트(예: 아키텍처 결정 또는 기능 사양)가 프로젝트에 사용될 준비가 되면, `alcove promote --source path/to/note.md`를 실행합니다.
 3.  **에이전트 발견**: 이제 AI 에이전트(Alcove MCP 서버 사용)는 채팅에 일일이 복사-붙여넣기 할 필요 없이 `search_project_docs` 또는 `get_doc_file`을 통해 해당 노트를 "발견"할 수 있습니다.
 4.  **정책 준수**: Alcove의 `validate_docs`를 사용하여 승급된 노트가 프로젝트의 문서 표준(`policy.toml`에 정의됨)을 충족하는지 확인합니다.
+
+### book-forge 연동
+
+[book-forge](https://github.com/epicsagas/book-forge)는 AI 기반 도서 집필 전용 툴킷입니다. `obsidian-forge`는 **볼트 측**을 담당합니다 — 노트 정리, 리서치 태깅, 프로젝트 구조 스캐폴딩. `book-forge`는 **집필 측**을 담당합니다 — 챕터 초안 작성, 편집 패스, 출판용 패키징.
+
+#### 워크플로우: 볼트 → 도서
+
+```bash
+# 1. 볼트의 리서치 노트에 태그 추가
+#    관련 노트의 frontmatter tags에 "book/my-novel" 추가
+
+# 2. 도서 프로젝트 초기화
+of book init my-novel --genre fiction --lang ko
+
+# 3. 태그된 노트를 sources/로 가져오기
+of book sync my-novel
+
+# 4. book-forge 호환 디렉토리로 내보내기
+of book export my-novel --output ~/books/
+
+# 5. book-forge에 인계
+cd ~/books/my-novel
+book-forge draft        # sources/를 기반으로 AI 챕터 초안 작성
+book-forge edit         # 다단계 편집 파이프라인
+book-forge publish      # EPUB / PDF 패키징
+```
+
+내보낸 디렉토리에는 `PRD.md`(목표), `STYLE.md`(어조 가이드), `drafts/`, `edits/`, `publish/`가 포함되며, 이는 `book-forge`가 기대하는 구조와 정확히 일치합니다.
 
 ---
 

@@ -336,6 +336,7 @@ obsidian-forge est le **projet compagnon d'[alcove](https://github.com/epicsagas
 
 - **obsidian-forge** = **La Forge** (écrire/pousser). Daemon en arrière-plan qui automatise la maintenance du coffre, renforce le graphe de connaissances et synchronise avec git.
 - **alcove** = **La Bibliothèque** (lire/tirer). Serveur MCP qui offre aux agents IA un accès à la demande et recherchable à la documentation sans gonfler la fenêtre de contexte.
+- **[book-forge](https://github.com/epicsagas/book-forge)** = **L'Imprimerie** (rédiger/publier). Toolkit d'écriture de livres assisté par IA qui consomme le répertoire exporté par `of book export` et pilote le pipeline complet brouillon → édition → publication.
 
 ```mermaid
 graph LR
@@ -344,6 +345,8 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|Outils MCP| E[Agent IA]
     E -.->|Se réfère à| D
+    B -->|of book export| F(book-forge)
+    F -->|brouillon / édition / pub.| G[Livre]
 ```
 
 ### Intégration avec Alcove
@@ -356,6 +359,34 @@ Alors qu'`obsidian-forge` se concentre sur la construction et l'automatisation d
 2.  **Promouvoir vers les documents du projet** : Lorsqu'une note (ex : une décision architecturale ou une spécification de fonctionnalité) est prête pour un projet, exécutez `alcove promote --source chemin/vers/note.md`.
 3.  **Découverte par l'agent** : Votre agent IA (utilisant le serveur MCP Alcove) peut désormais « découvrir » cette note via `search_project_docs` ou `get_doc_file` au lieu que vous ayez à copier-coller dans le chat.
 4.  **Conformité aux politiques** : Utilisez `validate_docs` d'Alcove pour vous assurer que vos notes promues respectent les normes de documentation du projet (définies dans `policy.toml`).
+
+### Intégration avec book-forge
+
+[book-forge](https://github.com/epicsagas/book-forge) est le toolkit dédié à l'écriture de livres avec l'IA. `obsidian-forge` gère le **côté coffre** — organiser les notes, étiqueter les recherches, créer la structure du projet. `book-forge` gère le **côté rédaction** — brouillons de chapitres, passes d'édition, packaging pour la publication.
+
+#### Flux de travail : Coffre → Livre
+
+```bash
+# 1. Étiqueter les notes de recherche dans le coffre
+#    Ajouter "book/mon-livre" aux tags du frontmatter des notes pertinentes
+
+# 2. Initialiser le projet de livre
+of book init mon-livre --genre non-fiction --lang fr
+
+# 3. Synchroniser les notes étiquetées dans sources/
+of book sync mon-livre
+
+# 4. Exporter vers un répertoire compatible book-forge
+of book export mon-livre --output ~/books/
+
+# 5. Transférer à book-forge
+cd ~/books/mon-livre
+book-forge draft        # rédaction de chapitres par IA depuis sources/
+book-forge edit         # pipeline d'édition en plusieurs passes
+book-forge publish      # packaging EPUB / PDF
+```
+
+Le répertoire exporté contient `PRD.md` (objectifs), `STYLE.md` (guide de style), `drafts/`, `edits/` et `publish/` — exactement la structure qu'attend `book-forge`.
 
 ---
 

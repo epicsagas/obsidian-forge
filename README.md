@@ -348,6 +348,7 @@ obsidian-forge is the **companion project to [alcove](https://github.com/epicsag
 
 - **obsidian-forge** = **The Forge** (write/push). Background daemon that automates vault maintenance, strengthens the knowledge graph, and syncs to git.
 - **alcove** = **The Library** (read/pull). MCP server that provides AI agents with on-demand, searchable access to documentation without bloating the context window.
+- **[book-forge](https://github.com/epicsagas/book-forge)** = **The Press** (compose/publish). AI-assisted book writing toolkit that consumes the exported directory from `of book export` and drives the full drafting → editing → publishing pipeline.
 
 ```mermaid
 graph LR
@@ -356,6 +357,8 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Tools| E[AI Agent]
     E -.->|Refers to| D
+    B -->|of book export| F(book-forge)
+    F -->|draft / edit / publish| G[Book]
 ```
 
 ### Integration with Alcove
@@ -368,6 +371,34 @@ While `obsidian-forge` focuses on building and automating your knowledge graph, 
 2.  **Promote to Project Docs**: When a note (e.g., an architectural decision or a feature spec) is ready for a project, run `alcove promote --source path/to/note.md`.
 3.  **Agent Discovery**: Your AI agent (using the Alcove MCP server) can now "discover" that note via `search_project_docs` or `get_doc_file` instead of you having to copy-paste it into the chat.
 4.  **Policy Compliance**: Use Alcove's `validate_docs` to ensure your promoted notes meet the project's documentation standards (defined in `policy.toml`).
+
+### Integration with book-forge
+
+[book-forge](https://github.com/epicsagas/book-forge) is the dedicated AI book writing toolkit. `obsidian-forge` handles the **vault side** — organizing notes, tagging research, and scaffolding the project structure. `book-forge` handles the **writing side** — drafting chapters, editing passes, and packaging for publishing.
+
+#### Workflow: Vault → Book
+
+```bash
+# 1. Tag research notes in your vault
+#    Add "book/my-novel" to frontmatter tags of any relevant note
+
+# 2. Initialize the book project
+of book init my-novel --genre fiction --lang en
+
+# 3. Pull tagged notes into sources/
+of book sync my-novel
+
+# 4. Export to a book-forge-compatible directory
+of book export my-novel --output ~/books/
+
+# 5. Hand off to book-forge
+cd ~/books/my-novel
+book-forge draft        # AI-assisted chapter drafting from sources/
+book-forge edit         # multi-pass editing pipeline
+book-forge publish      # package EPUB / PDF
+```
+
+The exported directory contains `PRD.md` (goals), `STYLE.md` (voice & tone guide), `drafts/`, `edits/`, and `publish/` — exactly the structure `book-forge` expects.
 
 ---
 
