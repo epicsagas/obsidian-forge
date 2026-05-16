@@ -119,8 +119,18 @@ Output valid JSON only:
   "detail": "Articles-Papers | Books-Notes | Tutorials-Guides | Cheat-Sheets"
 }
 
-Subcategory is required for Resources and ConceptSeed.
-Detail is only required for Resources/Reference.
+Subcategory rules:
+- Resource: "Technical" for code/engineering/DevOps content; "Reference" for everything else.
+- ConceptSeed: "permanent" if the note is a refined, self-contained idea; "literature" if it references a source; "fleeting" if it is a raw capture.
+- Project/Area: subcategory is optional.
+
+Detail rules (only for Resources with subcategory "Reference"):
+- "Articles-Papers": blog posts, academic papers, opinion pieces.
+- "Books-Notes": book summaries, chapter notes, ISBN references.
+- "Tutorials-Guides": step-by-step tutorials, how-to guides.
+- "Cheat-Sheets": quick reference cards, command lists.
+
+You MUST always return both "subcategory" and "detail" fields, even if empty string.
 
 Text:
 {content}"#
