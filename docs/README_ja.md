@@ -44,6 +44,7 @@ of daemon enable         # macOSログイン項目として登録
 | 📄 | **PDF → Markdown** | `marker_single`による変換、`pdftotext`フォールバック対応 |
 | 🍎 | **ログイン項目** | macOS LaunchAgentとしてインストール — 自動起動、自動再起動 |
 | ♻️ | **冪等性** | どの操作も複数回実行しても安全。重複出力なし |
+| 📚 | **書籍プロジェクト** | vault統合執筆プロジェクトの初期化、追跡、エクスポート、ソース同期 |
 
 ---
 
@@ -202,6 +203,19 @@ obsidian-forge watch              # 監視可能なすべてのvault
 obsidian-forge watch --vault <name> --interval <seconds>
 ```
 
+### 書籍プロジェクト
+
+vaultから直接書籍執筆プロジェクトを管理します。
+
+```bash
+of book init <name> [--genre <genre>] [--lang <lang>]   # 01-Projects/ 下にスキャフォールド
+of book status [<name>]                                   # 初稿 / 編集 / 出版フェーズの進捗
+of book export <name> [--output <dir>]                   # book-forge 互換ディレクトリにエクスポート
+of book sync   <name>                                     # タグ付きノートを sources/ にリンク
+```
+
+`book/<name>` タグが付いたvaultのノートは、`book sync` によって `sources/` にシンボリックリンクとして自動的に追加されます。
+
 ---
 
 ## 設定
@@ -322,6 +336,7 @@ obsidian-forge/
 
 - **obsidian-forge** = **The Forge（鍛冶場）**（書き込み/プッシュ）。vaultの保守を自動化し、ナレッジグラフを強化し、gitに同期するバックグラウンドデーモン。
 - **alcove** = **The Library（図書館）**（読み取り/プル）。コンテキストウィンドウを肥大化させることなく、AIエージェントにオンデマンドで検索可能なドキュメントアクセスを提供するMCPサーバー。
+- **[book-forge](https://github.com/epicsagas/book-forge)** = **The Press（印刷所）**（執筆/出版）。`of book export`でエクスポートされたディレクトリを受け取り、初稿 → 編集 → 出版のフルパイプラインを駆動するAI書籍執筆ツールキット。
 
 ```mermaid
 graph LR
@@ -330,6 +345,8 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Tools| E[AI Agent]
     E -.->|Refers to| D
+    B -->|of book export| F(book-forge)
+    F -->|初稿 / 編集 / 出版| G[書籍]
 ```
 
 ### Alcoveとの統合
@@ -342,6 +359,34 @@ graph LR
 2.  **プロジェクトドキュメントへ昇格**: ノート（例: アーキテクチャ決定や機能仕様）がプロジェクトで使用できる状態になったら、`alcove promote --source path/to/note.md`を実行します。
 3.  **エージェントによる発見**: AIエージェント（Alcove MCPサーバー使用）は、チャットにコピーペーストすることなく、`search_project_docs`または`get_doc_file`を通じてそのノートを「発見」できます。
 4.  **ポリシーコンプライアンス**: Alcoveの`validate_docs`を使用して、昇格されたノートがプロジェクトのドキュメント基準（`policy.toml`で定義）を満たしていることを確認します。
+
+### book-forgeとの統合
+
+[book-forge](https://github.com/epicsagas/book-forge)は専用のAI書籍執筆ツールキットです。`obsidian-forge`は**vault側**を担当します — ノートの整理、リサーチのタグ付け、プロジェクト構造のスキャフォールド。`book-forge`は**執筆側**を担当します — チャプター初稿作成、編集パス、出版パッケージング。
+
+#### ワークフロー: vault → 書籍
+
+```bash
+# 1. vaultのリサーチノートにタグを追加
+#    関連ノートのfrontmatter tagsに "book/my-book" を追加
+
+# 2. 書籍プロジェクトを初期化
+of book init my-book --genre non-fiction --lang ja
+
+# 3. タグ付きノートをsources/に同期
+of book sync my-book
+
+# 4. book-forge互換ディレクトリにエクスポート
+of book export my-book --output ~/books/
+
+# 5. book-forgeに引き渡し
+cd ~/books/my-book
+book-forge draft        # sources/を基にAIチャプター初稿作成
+book-forge edit         # 多段階編集パイプライン
+book-forge publish      # EPUB / PDFパッケージング
+```
+
+エクスポートされたディレクトリには`PRD.md`（目標）、`STYLE.md`（スタイルガイド）、`drafts/`、`edits/`、`publish/`が含まれ、`book-forge`が期待する構造と完全に一致します。
 
 ---
 

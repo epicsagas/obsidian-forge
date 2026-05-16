@@ -72,6 +72,16 @@ Configured in `~/.obsidian-forge/config.toml` (`[[vaults]]` path). The vault is 
 
 Supplementary folders: `reports/`, `specs/`, `plans/`, `research/`, `archive/`, `strategy/`
 
+## Agent Navigation Path
+
+AI agents (Claude Code, collet, etc.) navigate the vault through a deterministic path:
+
+1. **Primary**: `index.md` (vault root) — static wikilink hierarchy, no Dataview
+2. **Traversal**: Follow wikilinks from `index.md` to Areas, Projects, ZK notes (3 hops max)
+3. **Fallback**: alcove BM25/vector search (`search_project_docs`) when the target is unknown
+
+Agents must NOT parse `Home.md` (Dataview-dependent). Use `index.md` as the entry point.
+
 ## Knowledge Governance
 
 The vault's health is maintained via automated policies.

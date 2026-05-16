@@ -236,6 +236,8 @@ pub struct ForgeConfig {
     pub ai: AiConfig,
     #[serde(default)]
     pub daemon: DaemonConfig,
+    #[serde(default)]
+    pub book: Option<BookConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -324,6 +326,16 @@ pub struct AiConfig {
     /// Maximum concurrent AI requests (for parallel processing)
     #[serde(default = "default_max_concurrent")]
     pub max_concurrent: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BookConfig {
+    #[serde(default = "default_book_dir")]
+    pub book_dir: String,
+}
+
+fn default_book_dir() -> String {
+    "01-Projects".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -580,6 +592,7 @@ impl ForgeConfig {
             sync: SyncConfig::default(),
             ai: AiConfig::default(),
             daemon: DaemonConfig::default(),
+            book: None,
         }
     }
 }

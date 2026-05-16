@@ -44,6 +44,7 @@ of daemon enable         # registra como item de login do macOS
 | 📄 | **PDF → Markdown** | Converte via `marker_single` com fallback para `pdftotext` |
 | 🍎 | **Item de login** | Instala como macOS LaunchAgent — inicia e reinicia automaticamente |
 | ♻️ | **Idempotente** | Qualquer operação é segura para executar múltiplas vezes; sem saída duplicada |
+| 📚 | **Projetos de livro** | Inicializar, acompanhar, exportar e sincronizar projetos de escrita integrados ao cofre |
 
 ---
 
@@ -202,6 +203,19 @@ obsidian-forge watch              # todos os cofres monitoráveis
 obsidian-forge watch --vault <name> --interval <seconds>
 ```
 
+### Projetos de livro
+
+Gerencie projetos de escrita de livros diretamente do cofre.
+
+```bash
+of book init <name> [--genre <genre>] [--lang <lang>]   # criar estrutura em 01-Projects/
+of book status [<name>]                                   # progresso: rascunho / edição / publicação
+of book export <name> [--output <dir>]                   # exportar para book-forge
+of book sync   <name>                                     # vincular notas marcadas → sources/
+```
+
+Notas do cofre com a tag `book/<name>` são automaticamente vinculadas em `sources/` pelo `book sync`.
+
 ---
 
 ## Configuração
@@ -322,6 +336,7 @@ obsidian-forge é o **projeto parceiro do [alcove](https://github.com/epicsagas/
 
 - **obsidian-forge** = **A Forja** (escrever/empurrar). Daemon em segundo plano que automatiza a manutenção do cofre, fortalece o grafo de conhecimento e sincroniza com o git.
 - **alcove** = **A Biblioteca** (ler/puxar). Servidor MCP que fornece aos agentes de IA acesso sob demanda e pesquisável à documentação sem sobrecarregar a janela de contexto.
+- **[book-forge](https://github.com/epicsagas/book-forge)** = **A Tipografia** (redigir/publicar). Toolkit de escrita de livros assistido por IA que consome o diretório exportado por `of book export` e conduz o pipeline completo de rascunho → edição → publicação.
 
 ```mermaid
 graph LR
@@ -330,6 +345,8 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|Ferramentas MCP| E[Agente de IA]
     E -.->|Refere-se a| D
+    B -->|of book export| F(book-forge)
+    F -->|rascunho / edição / pub.| G[Livro]
 ```
 
 ### Integração com o Alcove
@@ -342,6 +359,34 @@ Enquanto o `obsidian-forge` se concentra em construir e automatizar seu grafo de
 2.  **Promova para Documentos de Projeto**: Quando uma nota (ex: uma decisão arquitetural ou uma especificação de funcionalidade) estiver pronta para um projeto, execute `alcove promote --source caminho/para/nota.md`.
 3.  **Descoberta pelo Agente**: Seu agente de IA (usando o servidor MCP Alcove) agora pode "descobrir" essa nota via `search_project_docs` ou `get_doc_file` em vez de você ter que copiar e colar no chat.
 4.  **Conformidade com Políticas**: Use o `validate_docs` do Alcove para garantir que suas notas promovidas atendam aos padrões de documentação do projeto (definidos em `policy.toml`).
+
+### Integração com o book-forge
+
+[book-forge](https://github.com/epicsagas/book-forge) é o toolkit dedicado à escrita de livros com IA. O `obsidian-forge` gerencia o **lado do cofre** — organizar notas, etiquetar pesquisas, criar a estrutura do projeto. O `book-forge` gerencia o **lado da escrita** — rascunhos de capítulos, passes de edição, empacotamento para publicação.
+
+#### Fluxo de trabalho: Cofre → Livro
+
+```bash
+# 1. Etiquetar notas de pesquisa no cofre
+#    Adicionar "book/meu-livro" às tags do frontmatter das notas relevantes
+
+# 2. Inicializar o projeto de livro
+of book init meu-livro --genre non-fiction --lang pt
+
+# 3. Sincronizar notas etiquetadas em sources/
+of book sync meu-livro
+
+# 4. Exportar para diretório compatível com book-forge
+of book export meu-livro --output ~/books/
+
+# 5. Transferir para o book-forge
+cd ~/books/meu-livro
+book-forge draft        # rascunho de capítulos com IA a partir de sources/
+book-forge edit         # pipeline de edição em múltiplas passes
+book-forge publish      # empacotar EPUB / PDF
+```
+
+O diretório exportado contém `PRD.md` (objetivos), `STYLE.md` (guia de estilo), `drafts/`, `edits/` e `publish/` — exatamente a estrutura que o `book-forge` espera.
 
 ---
 
