@@ -306,6 +306,14 @@ fn link_global_templates(
         ("PROGRESS.md", include_str!("templates/PROGRESS.md")),
         ("DEBT.md", include_str!("templates/DEBT.md")),
         ("SECRETS_MAP.md", include_str!("templates/SECRETS_MAP.md")),
+        (
+            "Book-Project-MOC.md",
+            include_str!("templates/Book-Project-MOC.md"),
+        ),
+        (
+            "Book-Chapter-Draft.md",
+            include_str!("templates/Book-Chapter-Draft.md"),
+        ),
     ];
     for (name, content) in templates {
         let p = global_tpl.join(name);

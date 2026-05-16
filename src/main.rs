@@ -1,4 +1,5 @@
 mod ai;
+mod book;
 mod config;
 mod converter;
 mod git;
@@ -138,6 +139,14 @@ enum Commands {
         #[command(subcommand)]
         action: DaemonAction,
     },
+
+    /// Manage book writing projects within the vault
+    Book {
+        #[command(subcommand)]
+        action: BookAction,
+        #[arg(long)]
+        vault: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -234,6 +243,28 @@ enum SettingsAction {
     Status,
 }
 
+#[derive(Subcommand)]
+enum BookAction {
+    /// Initialize a new book project in 01-Projects/
+    Init {
+        name: String,
+        #[arg(long, default_value = "non-fiction")]
+        genre: String,
+        #[arg(long, default_value = "ko")]
+        lang: String,
+    },
+    /// Show all book projects status
+    Status { name: Option<String> },
+    /// Export book project to standalone directory (book-forge compatible)
+    Export {
+        name: String,
+        #[arg(long, default_value = ".")]
+        output: String,
+    },
+    /// Sync vault notes tagged for this book into sources/
+    Sync { name: String },
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load .env from home dir or CWD (whichever exists).
@@ -281,6 +312,20 @@ async fn main() -> Result<()> {
         Commands::Daemon { action } => {
             check_daemon_deprecated_args();
             return handle_daemon_action(action);
+        }
+        Commands::Book { action, vault } => {
+            let vault_path = if let Some(name) = vault {
+                let global = GlobalConfig::load()?;
+                global
+                    .find_vault(name)
+                    .map(|e| PathBuf::from(&e.path))
+                    .ok_or_else(|| anyhow::anyhow!("Vault '{}' not found in global config", name))?
+            } else {
+                config::resolve_vault(cli.vault_path.clone()).unwrap_or_else(|_| {
+                    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+                })
+            };
+            return handle_book_action(action, &vault_path);
         }
         _ => {}
     }
@@ -722,6 +767,29 @@ fn is_agent_loaded(label: &str) -> bool {
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
+}
+
+// ---------------------------------------------------------------------------
+// Book subcommand
+// ---------------------------------------------------------------------------
+
+fn handle_book_action(action: &BookAction, vault_path: &Path) -> Result<()> {
+    match action {
+        BookAction::Init { name, genre, lang } => {
+            book::init_book_project(name, vault_path, genre, lang)?;
+        }
+        BookAction::Status { name } => {
+            book::show_book_status(name.as_deref(), vault_path)?;
+        }
+        BookAction::Export { name, output } => {
+            let output_path = book::output_path_from(output, vault_path);
+            book::export_book(name, vault_path, &output_path)?;
+        }
+        BookAction::Sync { name } => {
+            book::sync_sources(name, vault_path)?;
+        }
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
