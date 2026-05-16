@@ -4,10 +4,18 @@
 
 **Obsidian vault generator, automation daemon, and graph strengthener**
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
-[![Crates.io](https://img.shields.io/crates/v/obsidian-forge.svg)](https://crates.io/crates/obsidian-forge)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/epicsaga)
+<p align="center">
+  <a href="https://github.com/epicsagas/obsidian-forge/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/epicsagas/obsidian-forge?style=for-the-badge&labelColor=0d1117&color=ffd700&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/obsidian-forge/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/epicsagas/obsidian-forge?style=for-the-badge&labelColor=0d1117&color=2ecc71&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/obsidian-forge/issues"><img alt="Issues" src="https://img.shields.io/github/issues/epicsagas/obsidian-forge?style=for-the-badge&labelColor=0d1117&color=ff6b6b&logo=github&logoColor=white" /></a>
+  <a href="https://github.com/epicsagas/obsidian-forge/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/epicsagas/obsidian-forge?style=for-the-badge&labelColor=0d1117&color=58a6ff&logo=git&logoColor=white" /></a>
+</p>
+<p align="center">
+  <a href="https://crates.io/crates/obsidian-forge"><img alt="Crates.io" src="https://img.shields.io/crates/v/obsidian-forge?style=for-the-badge&labelColor=0d1117&color=fc8d62&logo=rust&logoColor=white" /></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-3fb950?style=for-the-badge&labelColor=0d1117" /></a>
+  <img alt="Rust" src="https://img.shields.io/badge/rust-1.85+-d73a49?style=for-the-badge&labelColor=0d1117&logo=rust&logoColor=white" />
+  <a href="https://buymeacoffee.com/epicsaga"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/buy_me_a_coffee-FFDD00?style=for-the-badge&labelColor=0d1117&logo=buymeacoffee&logoColor=black" /></a>
+</p>
 
 **Single binary. Multi-vault. Zero config to get started.**
 
