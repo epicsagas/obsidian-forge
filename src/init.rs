@@ -59,6 +59,13 @@ pub fn init_vault(name: &str, target: &Path) -> Result<()> {
 
     register_and_print(&vault_root, name);
 
+    // Generate agent index.md if config is loadable
+    if let Ok(config) = ForgeConfig::load(&vault_root)
+        && let Err(e) = crate::index::generate_index(&vault_root, &config)
+    {
+        warn!("Failed to generate index.md: {:?}", e);
+    }
+
     // Report what happened
     if !created.is_empty() {
         println!("\n  Created:");
@@ -194,6 +201,20 @@ fn adopt_directory_verbose(
             created.push(".obsidian/templates.json (template folder configured)".into());
         }
         skipped.push(".obsidian/ (plugins, themes, settings preserved)".into());
+    }
+
+    // ── Obsidian Linter plugin config ────────────────────────────────────
+    if ensure_linter_config(vault_root)? {
+        created.push(".obsidian/plugins/obsidian-linter/data.json (linter config)".into());
+    } else {
+        skipped.push(".obsidian/plugins/obsidian-linter/data.json (preserved)".into());
+    }
+
+    // ── community-plugins.json ──────────────────────────────────────────
+    if ensure_community_plugin(vault_root)? {
+        created.push("community-plugins.json (obsidian-linter registered)".into());
+    } else {
+        skipped.push("community-plugins.json (obsidian-linter already present)".into());
     }
 
     // ── .gitignore (append missing entries, don't overwrite) ─────────────
@@ -370,6 +391,8 @@ pub fn apply_global_settings(target: &Path) -> Result<()> {
     fs::create_dir_all(&tgt_obs)?;
 
     copy_settings(&store, &tgt_obs, "global store")?;
+    ensure_linter_config(target)?;
+    ensure_community_plugin(target)?;
     println!("✅ Global settings applied → {}", target.display());
     Ok(())
 }
@@ -403,6 +426,8 @@ pub fn push_settings(target: &Path) -> Result<()> {
     fs::create_dir_all(&tgt_obs)?;
 
     copy_settings(&store, &tgt_obs, "global store")?;
+    ensure_linter_config(target)?;
+    ensure_community_plugin(target)?;
     println!("✅ Global settings pushed → {}", target.display());
     Ok(())
 }
@@ -488,6 +513,92 @@ fn create_symlink(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Ensure the Obsidian Linter plugin has a default `data.json` config file.
+/// Creates `.obsidian/plugins/obsidian-linter/data.json` only if it does not already exist,
+/// preserving any user customizations.
+pub fn ensure_linter_config(vault_root: &Path) -> Result<bool> {
+    let linter_dir = vault_root.join(".obsidian/plugins/obsidian-linter");
+    let data_json = linter_dir.join("data.json");
+
+    if data_json.exists() {
+        info!(
+            "Linter config already exists, preserving: {}",
+            data_json.display()
+        );
+        return Ok(false);
+    }
+
+    fs::create_dir_all(&linter_dir)?;
+
+    let config = serde_json::json!({
+        "ruleConfigs": {
+            "yaml-timestamp": {
+                "enabled": true,
+                "created_key": "created",
+                "format": "YYYY-MM-DD"
+            },
+            "yaml-tags-sort": {
+                "enabled": true
+            },
+            "tags-yaml": {
+                "enabled": true,
+                "defaultLintBookmarkTag": ""
+            },
+            "yaml-key-sort": {
+                "enabled": true,
+                "yaml-key-priority-sort-order": "project, type, tags, created, updated",
+                "priority-keys-at-start-of-yaml": true
+            },
+            "prepend-tags": {
+                "enabled": true
+            },
+            "convert-tags-to-yaml": {
+                "enabled": true
+            },
+            "move-tags-to-yaml": {
+                "enabled": true,
+                "how-to-handle-existing-tags": "Remove the hashtag"
+            }
+        },
+        "lintOnSave": true,
+        "displayModal": false,
+        "settingsOverrides": {}
+    });
+
+    let json_str = serde_json::to_string_pretty(&config)?;
+    fs::write(&data_json, json_str)?;
+    info!("Created linter config: {}", data_json.display());
+    Ok(true)
+}
+
+/// Ensure `community-plugins.json` includes `"obsidian-linter"`.
+/// Creates the file if missing; appends the linter ID if not already present.
+pub fn ensure_community_plugin(vault_root: &Path) -> Result<bool> {
+    let obsidian_dir = vault_root.join(".obsidian");
+    let plugins_json = obsidian_dir.join("community-plugins.json");
+    const LINTER_ID: &str = "obsidian-linter";
+
+    if plugins_json.exists() {
+        let content = fs::read_to_string(&plugins_json)?;
+        let mut plugins: Vec<String> = serde_json::from_str(&content).unwrap_or_default();
+        if plugins.iter().any(|p| p == LINTER_ID) {
+            return Ok(false);
+        }
+        plugins.push(LINTER_ID.to_string());
+        let json_str = serde_json::to_string_pretty(&plugins)?;
+        fs::write(&plugins_json, json_str)?;
+        info!("Appended '{}' to community-plugins.json", LINTER_ID);
+        Ok(true)
+    } else {
+        fs::create_dir_all(&obsidian_dir)?;
+        let plugins = vec![LINTER_ID.to_string()];
+        let json_str = serde_json::to_string_pretty(&plugins)?;
+        fs::write(&plugins_json, json_str)?;
+        info!("Created community-plugins.json with '{}'", LINTER_ID);
+        Ok(true)
+    }
+}
+
 fn register_and_print(vault_root: &Path, name: &str) {
     let mut global = GlobalConfig::load().unwrap_or_default();
     global.add_vault(name, &vault_root.to_string_lossy());
@@ -508,4 +619,146 @@ fn register_and_print(vault_root: &Path, name: &str) {
         vault_root.display()
     );
     println!("   Start daemon:     obsidian-forge watch");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn tmp_vault(name: &str) -> tempfile::TempDir {
+        tempfile::TempDir::with_prefix(name).expect("create temp dir")
+    }
+
+    #[test]
+    fn test_ensure_linter_config_creates_expected_json() {
+        let dir = tmp_vault("linter-create");
+        let vault_root = dir.path();
+
+        let created = ensure_linter_config(vault_root).expect("ensure_linter_config");
+        assert!(created, "should report that config was created");
+
+        let data_json = vault_root.join(".obsidian/plugins/obsidian-linter/data.json");
+        assert!(data_json.exists(), "data.json should exist");
+
+        let content: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&data_json).expect("read")).expect("parse");
+        let rules = &content["ruleConfigs"];
+
+        // Verify key rules are present and enabled
+        assert_eq!(rules["yaml-timestamp"]["enabled"], true);
+        assert_eq!(rules["yaml-timestamp"]["created_key"], "created");
+        assert_eq!(rules["yaml-timestamp"]["format"], "YYYY-MM-DD");
+        assert_eq!(rules["yaml-tags-sort"]["enabled"], true);
+        assert_eq!(rules["tags-yaml"]["enabled"], true);
+        assert_eq!(rules["yaml-key-sort"]["enabled"], true);
+        assert_eq!(
+            rules["yaml-key-sort"]["yaml-key-priority-sort-order"],
+            "project, type, tags, created, updated"
+        );
+        assert_eq!(
+            rules["yaml-key-sort"]["priority-keys-at-start-of-yaml"],
+            true
+        );
+        assert_eq!(rules["prepend-tags"]["enabled"], true);
+        assert_eq!(rules["convert-tags-to-yaml"]["enabled"], true);
+        assert_eq!(rules["move-tags-to-yaml"]["enabled"], true);
+        assert_eq!(
+            rules["move-tags-to-yaml"]["how-to-handle-existing-tags"],
+            "Remove the hashtag"
+        );
+        assert_eq!(content["lintOnSave"], true);
+        assert_eq!(content["displayModal"], false);
+    }
+
+    #[test]
+    fn test_ensure_linter_config_does_not_overwrite_existing() {
+        let dir = tmp_vault("linter-no-overwrite");
+        let vault_root = dir.path();
+
+        // Create an existing config with a custom value
+        let linter_dir = vault_root.join(".obsidian/plugins/obsidian-linter");
+        fs::create_dir_all(&linter_dir).expect("create dir");
+        let custom = serde_json::json!({"custom": true, "lintOnSave": false});
+        fs::write(
+            linter_dir.join("data.json"),
+            serde_json::to_string(&custom).unwrap(),
+        )
+        .expect("write");
+
+        let created = ensure_linter_config(vault_root).expect("ensure_linter_config");
+        assert!(!created, "should report that config was NOT created");
+
+        // Verify existing config is untouched
+        let content: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(linter_dir.join("data.json")).expect("read"))
+                .expect("parse");
+        assert_eq!(content["custom"], true);
+        assert_eq!(content["lintOnSave"], false);
+    }
+
+    #[test]
+    fn test_ensure_community_plugin_creates_when_missing() {
+        let dir = tmp_vault("community-create");
+        let vault_root = dir.path();
+
+        let created = ensure_community_plugin(vault_root).expect("ensure_community_plugin");
+        assert!(created, "should report that plugin was added");
+
+        let json_path = vault_root.join(".obsidian/community-plugins.json");
+        assert!(json_path.exists());
+
+        let plugins: Vec<String> =
+            serde_json::from_str(&fs::read_to_string(&json_path).expect("read")).expect("parse");
+        assert_eq!(plugins, vec!["obsidian-linter"]);
+    }
+
+    #[test]
+    fn test_ensure_community_plugin_appends_when_missing() {
+        let dir = tmp_vault("community-append");
+        let vault_root = dir.path();
+
+        let obsidian_dir = vault_root.join(".obsidian");
+        fs::create_dir_all(&obsidian_dir).expect("create dir");
+        let existing = serde_json::json!(["some-other-plugin"]);
+        fs::write(
+            obsidian_dir.join("community-plugins.json"),
+            serde_json::to_string(&existing).unwrap(),
+        )
+        .expect("write");
+
+        let created = ensure_community_plugin(vault_root).expect("ensure_community_plugin");
+        assert!(created, "should report that plugin was appended");
+
+        let plugins: Vec<String> = serde_json::from_str(
+            &fs::read_to_string(obsidian_dir.join("community-plugins.json")).expect("read"),
+        )
+        .expect("parse");
+        assert!(plugins.contains(&"some-other-plugin".to_string()));
+        assert!(plugins.contains(&"obsidian-linter".to_string()));
+    }
+
+    #[test]
+    fn test_ensure_community_plugin_skips_when_already_present() {
+        let dir = tmp_vault("community-skip");
+        let vault_root = dir.path();
+
+        let obsidian_dir = vault_root.join(".obsidian");
+        fs::create_dir_all(&obsidian_dir).expect("create dir");
+        let existing = serde_json::json!(["obsidian-linter", "another-plugin"]);
+        fs::write(
+            obsidian_dir.join("community-plugins.json"),
+            serde_json::to_string(&existing).unwrap(),
+        )
+        .expect("write");
+
+        let created = ensure_community_plugin(vault_root).expect("ensure_community_plugin");
+        assert!(!created, "should report no change needed");
+
+        let plugins: Vec<String> = serde_json::from_str(
+            &fs::read_to_string(obsidian_dir.join("community-plugins.json")).expect("read"),
+        )
+        .expect("parse");
+        assert_eq!(plugins.len(), 2, "should not duplicate");
+    }
 }
