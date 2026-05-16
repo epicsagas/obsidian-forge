@@ -44,9 +44,6 @@ tempfile = "3"
 # Build optimizations
 # ---------------------------------------------------------------------------
 
-[dev-dependencies]
-tempfile = "3"
-
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.xz"
 pkg-fmt = "txz"
