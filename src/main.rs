@@ -1258,6 +1258,94 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
     println!("Vault");
     println!("  Name:       {}", config.vault.name);
     println!("  Path:       {}", vault.display());
+
+    // Total note count (all .md files excluding .obsidian/ and system dirs)
+    let system_dirs = config.all_system_dirs();
+    let total_notes = count_markdown_notes(vault, &system_dirs);
+    println!("  Notes:      {}", total_notes);
+
+    // Last sync time (derived from most recent git commit timestamp)
+    let last_sync = std::process::Command::new("git")
+        .args(["log", "-1", "--format=%cs"])
+        .current_dir(vault)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .filter(|s| !s.is_empty());
+    match last_sync {
+        Some(ref ts) => println!("  Last sync:  {}", ts),
+        None => println!("  Last sync:  (no commits yet)"),
+    }
+
+    // LaunchAgent status (macOS only)
+    let label = daemon_label();
+    let plist_path = launch_agents_dir().join(format!("{}.plist", label));
+    if cfg!(target_os = "macos") {
+        if plist_path.exists() {
+            let running = std::process::Command::new("launchctl")
+                .args(["list", &label])
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .and_then(|o| {
+                    let s = String::from_utf8_lossy(&o.stdout);
+                    s.lines()
+                        .find(|l| l.trim().starts_with("\"PID\""))
+                        .and_then(|l| {
+                            extract_plist_int(l.trim().strip_prefix("\"PID\"").unwrap_or(""))
+                        })
+                });
+            if let Some(pid) = running {
+                println!("  LaunchAgent: running (PID {})", pid);
+            } else {
+                println!("  LaunchAgent: installed (stopped)");
+            }
+        } else {
+            println!("  LaunchAgent: not installed");
+        }
+    }
+
+    // Git working tree status
+    let git_branch = std::process::Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(vault)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+    match git_branch {
+        Some(ref branch) => {
+            let dirty = std::process::Command::new("git")
+                .args(["status", "--porcelain"])
+                .current_dir(vault)
+                .output()
+                .ok()
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                .filter(|s| !s.is_empty());
+            match dirty {
+                Some(ref changes) => {
+                    let count = changes.lines().count();
+                    println!(
+                        "  Git:        {} ({} uncommitted change{})",
+                        branch,
+                        count,
+                        if count == 1 { "" } else { "s" }
+                    );
+                }
+                None => println!("  Git:        {} (clean)", branch),
+            }
+        }
+        None => println!("  Git:        (not a git repo)"),
+    }
+
+    // Configuration file path
+    let config_path = vault.join(config::CONFIG_FILE);
+    println!(
+        "  Config:     {}",
+        config_path.display()
+    );
+
     let inbox = vault.join(&config.vault.inbox_dir);
     let inbox_count = if inbox.exists() {
         fs::read_dir(&inbox).map(|r| r.count()).unwrap_or(0)
@@ -1367,39 +1455,7 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
         }
     );
 
-    // Git branch & working tree status
-    let git_branch = std::process::Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .current_dir(vault)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
-
-    if let Some(branch) = git_branch {
-        println!("  Branch:     {}", branch);
-        let dirty = std::process::Command::new("git")
-            .args(["status", "--porcelain"])
-            .current_dir(vault)
-            .output()
-            .ok()
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-            .filter(|s| !s.is_empty());
-        if let Some(changes) = dirty {
-            let count = changes.lines().count();
-            println!(
-                "  Working:    {} uncommitted change{}",
-                count,
-                if count == 1 { "" } else { "s" }
-            );
-        } else {
-            println!("  Working:    clean");
-        }
-    } else {
-        println!("  Branch:     (not a git repo)");
-    }
-
-    // ── Daemon / Scheduling ──
+    // ── Scheduling ──
     println!();
     println!("Scheduling");
     let interval_secs = resolve_interval(config, None);
@@ -1408,30 +1464,6 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
         format_duration(interval_secs),
         interval_secs
     );
-
-    // Show daemon install status for this vault
-    let label = daemon_label();
-    let plist_path = launch_agents_dir().join(format!("{}.plist", label));
-    if plist_path.exists() {
-        let running = std::process::Command::new("launchctl")
-            .args(["list", &label])
-            .output()
-            .ok()
-            .filter(|o| o.status.success())
-            .and_then(|o| {
-                let s = String::from_utf8_lossy(&o.stdout);
-                s.lines()
-                    .find(|l| l.trim().starts_with("\"PID\""))
-                    .and_then(|l| extract_plist_int(l.trim().strip_prefix("\"PID\"").unwrap_or("")))
-            });
-        if let Some(pid) = running {
-            println!("  Daemon:         🟢 running (PID {})", pid);
-        } else {
-            println!("  Daemon:         🔴 installed but stopped");
-        }
-    } else {
-        println!("  Daemon:         ⚫ not installed");
-    }
 
     Ok(())
 }
@@ -1458,6 +1490,33 @@ fn resolve_vault_path(name_or_path: &str) -> Result<PathBuf> {
 
 fn no_vaults_hint() {
     eprintln!("No vaults registered. Run `of init <name>` to create your first vault.");
+}
+
+/// Count all `.md` files in the vault root, excluding system directories.
+fn count_markdown_notes(vault: &Path, system_dirs: &[String]) -> usize {
+    use walkdir::WalkDir;
+    let system_set: std::collections::HashSet<&str> =
+        system_dirs.iter().map(|s| s.as_str()).collect();
+    WalkDir::new(vault)
+        .into_iter()
+        .filter_entry(|entry| {
+            // Skip system directories at the top level
+            if entry.depth() == 1
+                && let Some(name) = entry.file_name().to_str()
+                && system_set.contains(name)
+            {
+                return false;
+            }
+            true
+        })
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.file_type().is_file()
+                && e.path()
+                    .extension()
+                    .is_some_and(|ext| ext == "md")
+        })
+        .count()
 }
 
 // ---------------------------------------------------------------------------
