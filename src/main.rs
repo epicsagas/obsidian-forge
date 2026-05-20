@@ -1341,10 +1341,7 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
 
     // Configuration file path
     let config_path = vault.join(config::CONFIG_FILE);
-    println!(
-        "  Config:     {}",
-        config_path.display()
-    );
+    println!("  Config:     {}", config_path.display());
 
     let inbox = vault.join(&config.vault.inbox_dir);
     let inbox_count = if inbox.exists() {
@@ -1510,12 +1507,7 @@ fn count_markdown_notes(vault: &Path, system_dirs: &[String]) -> usize {
             true
         })
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.file_type().is_file()
-                && e.path()
-                    .extension()
-                    .is_some_and(|ext| ext == "md")
-        })
+        .filter(|e| e.file_type().is_file() && e.path().extension().is_some_and(|ext| ext == "md"))
         .count()
 }
 
