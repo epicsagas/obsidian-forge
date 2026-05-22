@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -13,9 +12,9 @@ use walkdir::WalkDir;
 
 use crate::config::ForgeConfig;
 use crate::graph::wikilinks::build_vault_graph;
+use crate::vault_utils::is_vault_excluded;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub struct LinkCheckResult {
     pub total_links: usize,
     pub broken: Vec<BrokenLink>,
@@ -23,7 +22,6 @@ pub struct LinkCheckResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub struct BrokenLink {
     pub source: String,
     pub target: String,
@@ -57,9 +55,6 @@ impl std::fmt::Display for LinkCheckResult {
     }
 }
 
-/// Directories excluded from vault scanning.
-const EXCLUDED_DIRS: &[&str] = &[".obsidian", ".git", ".claude", ".alcove"];
-
 fn wikilink_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
@@ -79,13 +74,7 @@ fn collect_md_files(vault_root: &Path) -> BTreeMap<String, String> {
                     .and_then(|s| s.to_str())
                     .is_some_and(|ext| ext == "md")
         })
-        .filter(|e| {
-            let p = e.path();
-            !p.components().any(|c| {
-                let os = c.as_os_str();
-                EXCLUDED_DIRS.iter().any(|dir| os == *dir)
-            })
-        })
+        .filter(|e| !is_vault_excluded(e.path()))
         .filter_map(|e| {
             let rel = e.path().strip_prefix(vault_root).ok()?;
             let rel_str = rel.to_string_lossy().replace('\\', "/");
@@ -107,13 +96,7 @@ fn collect_txt_stems(vault_root: &Path) -> BTreeSet<String> {
                     .and_then(|s| s.to_str())
                     .is_some_and(|ext| ext == "txt")
         })
-        .filter(|e| {
-            let p = e.path();
-            !p.components().any(|c| {
-                let os = c.as_os_str();
-                EXCLUDED_DIRS.iter().any(|dir| os == *dir)
-            })
-        })
+        .filter(|e| !is_vault_excluded(e.path()))
         .filter_map(|e| {
             let rel = e.path().strip_prefix(vault_root).ok()?;
             let stem = rel.with_extension("").to_string_lossy().replace('\\', "/");

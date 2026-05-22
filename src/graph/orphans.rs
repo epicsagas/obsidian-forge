@@ -12,7 +12,7 @@ pub fn detect_orphans(
     vault_root: &Path,
     config: &ForgeConfig,
     exclude_seeded: bool,
-    min_importance: usize,
+    min_chars: usize,
 ) -> Result<Vec<String>> {
     let graph = build_vault_graph(vault_root, config)?;
     let orphans: Vec<String> = graph.orphans().into_iter().map(String::from).collect();
@@ -26,12 +26,12 @@ pub fn detect_orphans(
             true
         })
         .filter(|path| {
-            if min_importance > 0 {
+            if min_chars > 0 {
                 let full_path = vault_root.join(path);
                 match std::fs::read_to_string(&full_path) {
                     Ok(content) => {
                         let stripped = strip_frontmatter(&content);
-                        stripped.len() >= min_importance
+                        stripped.len() >= min_chars
                     }
                     Err(_) => false,
                 }

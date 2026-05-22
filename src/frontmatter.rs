@@ -6,6 +6,7 @@ use tracing::info;
 use walkdir::WalkDir;
 
 use crate::config::ForgeConfig;
+use crate::vault_utils::{doc_type_tag, frontmatter_re, is_vault_excluded};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FrontmatterResult {
@@ -46,11 +47,6 @@ impl std::fmt::Display for FrontmatterResult {
     }
 }
 
-fn fm_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").expect("valid frontmatter regex"))
-}
-
 fn closing_brace_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
@@ -61,24 +57,6 @@ fn closing_brace_re() -> &'static Regex {
 fn empty_tags_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"(?m)^tags:\s*\[\]\s*$").expect("valid empty tags regex"))
-}
-
-fn doc_type_for_filename(name: &str) -> Option<&'static str> {
-    match name {
-        "PRD.md" => Some("type/prd"),
-        "ARCHITECTURE.md" => Some("type/architecture"),
-        "CONVENTIONS.md" => Some("type/convention"),
-        "DECISIONS.md" => Some("type/decision"),
-        "PROGRESS.md" => Some("type/progress"),
-        "DEBT.md" => Some("type/debt"),
-        "SECRETS_MAP.md" => Some("type/reference"),
-        "CODE_INDEX.md" => Some("type/reference"),
-        _ => None,
-    }
-}
-
-fn skip_dirs() -> HashSet<&'static str> {
-    HashSet::from([".obsidian", ".git", ".claude", ".alcove", "_template"])
 }
 
 /// Detect closing brace malform: first line is `---project:...` instead of `---\nproject:...`.
@@ -128,8 +106,8 @@ fn fix_broken_yaml_list(content: &str) -> String {
         if line.trim() == "tags:" && i + 1 < lines.len() {
             let next = lines[i + 1].trim();
             if !next.starts_with("- ") && !next.starts_with('[') && !next.is_empty() {
-                // Keep the bare `tags:` and insert `tags: []` before the next line
-                new_lines.push(line.to_string());
+                // Replace bare `tags:` with `tags: []`
+                new_lines.push("tags: []".to_string());
                 i += 1;
                 continue;
             }
@@ -150,20 +128,10 @@ pub fn normalize_frontmatter(
     dry_run: bool,
 ) -> Result<FrontmatterResult> {
     let mut result = FrontmatterResult::default();
-    let skip = skip_dirs();
 
     for entry in WalkDir::new(vault_root)
         .into_iter()
-        .filter_entry(|e| {
-            if e.depth() > 0
-                && e.file_type().is_dir()
-                && let Some(name) = e.file_name().to_str()
-                && skip.contains(name)
-            {
-                return false;
-            }
-            true
-        })
+        .filter_entry(|e| !is_vault_excluded(e.path()))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file() && e.path().extension().is_some_and(|ext| ext == "md"))
     {
@@ -222,9 +190,9 @@ pub fn normalize_frontmatter(
         }
 
         // 4. Missing frontmatter in PRIMARY docs
-        if !fm_re().is_match(&modified)
+        if !frontmatter_re().is_match(&modified)
             && let Some(filename) = path.file_name().and_then(|n| n.to_str())
-            && let Some(doc_type) = doc_type_for_filename(filename)
+            && let Some(doc_type) = doc_type_tag(filename)
         {
             let parts: Vec<&str> = rel.split('/').collect();
             let is_project_doc = parts
@@ -323,6 +291,44 @@ mod tests {
         let result = normalize_frontmatter(vault, &make_config(), true).unwrap();
         assert_eq!(result.scanned, 1);
         assert!(result.issues.iter().any(|i| i.issue == "broken_yaml_list"));
+        // dry_run: should NOT modify the file
+        let content = fs::read_to_string(&file).unwrap();
+        assert!(content.contains("tags:\n"));
+        assert!(!content.contains("tags: []"));
+    }
+
+    #[test]
+    fn test_fix_broken_yaml_list() {
+        let dir = tempfile::tempdir().unwrap();
+        let vault = dir.path();
+        let file = vault.join("test.md");
+        fs::write(&file, "---\ntags:\ncreated: 2024-01-01\n---\nContent\n").unwrap();
+
+        let result = normalize_frontmatter(vault, &make_config(), false).unwrap();
+        assert_eq!(result.fixed, 1);
+
+        let fixed = fs::read_to_string(&file).unwrap();
+        assert!(
+            fixed.contains("tags: []"),
+            "expected 'tags: []' in output, got:\n{}",
+            fixed
+        );
+        assert!(
+            fixed.contains("created: 2024-01-01"),
+            "next line should be preserved, got:\n{}",
+            fixed
+        );
+        assert!(
+            fixed.contains("Content"),
+            "body should be preserved, got:\n{}",
+            fixed
+        );
+        // Bare `tags:` without [] should no longer appear
+        assert!(
+            !fixed.contains("tags:\n"),
+            "bare 'tags:' should be replaced with 'tags: []', got:\n{}",
+            fixed
+        );
     }
 
     #[test]

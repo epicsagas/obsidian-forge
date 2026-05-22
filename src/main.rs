@@ -12,6 +12,7 @@ mod init;
 mod moc;
 mod notes;
 mod prompts;
+mod vault_utils;
 mod watcher;
 
 use anyhow::Result;
@@ -118,7 +119,7 @@ enum Commands {
         fix: bool,
         /// Scope: "project" (project docs only) or "vault" (includes Resources)
         #[arg(long, default_value = "vault")]
-        scope: String,
+        scope: check_tags::TagScope,
         /// Specific vault name (from global config)
         #[arg(long)]
         vault: Option<String>,
@@ -248,9 +249,9 @@ enum GraphAction {
         /// Exclude files under */seeded/ directories
         #[arg(long)]
         exclude_seeded: bool,
-        /// Minimum file size in characters (excluding frontmatter) to be considered important
+        /// Minimum body length in characters (excluding frontmatter) to be included
         #[arg(long, default_value = "0")]
-        min_importance: usize,
+        min_chars: usize,
     },
     /// Extract wikilinks and (optionally) AI relationships
     Extract {
@@ -411,7 +412,7 @@ async fn main() -> Result<()> {
             vault: filter,
         } => {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
-            let result = check_tags::check_tags(&vault, &config, fix, &scope)?;
+            let result = check_tags::check_tags(&vault, &config, fix, scope)?;
             println!("{}", result);
         }
         Commands::CheckLinks { fix, vault: filter } => {
@@ -462,7 +463,7 @@ async fn handle_graph_action(
         GraphAction::Orphans {
             auto_link,
             exclude_seeded,
-            min_importance,
+            min_chars,
         } => {
             if *auto_link {
                 let g = graph::build_vault_graph(vault, config)?;
@@ -476,8 +477,7 @@ async fn handle_graph_action(
                     }
                 }
             } else {
-                let orphans =
-                    graph::detect_orphans(vault, config, *exclude_seeded, *min_importance)?;
+                let orphans = graph::detect_orphans(vault, config, *exclude_seeded, *min_chars)?;
                 if orphans.is_empty() {
                     println!("No orphan notes found.");
                 } else {

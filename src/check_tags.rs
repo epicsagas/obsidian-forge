@@ -6,6 +6,15 @@ use tracing::info;
 use walkdir::WalkDir;
 
 use crate::config::ForgeConfig;
+use crate::vault_utils::{
+    doc_type_tag, frontmatter_re, is_vault_excluded, supplementary_doc_type_tag,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum TagScope {
+    Project,
+    Vault,
+}
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -69,65 +78,9 @@ const PRIMARY_FILES: &[&str] = &[
 #[allow(dead_code)]
 const SUPPLEMENTARY_DIRS: &[&str] = &["reports", "specs", "plans", "research", "strategy"];
 
-fn doc_type_tag(file_name: &str) -> Option<&'static str> {
-    match file_name {
-        "PRD.md" => Some("type/prd"),
-        "ARCHITECTURE.md" => Some("type/architecture"),
-        "CONVENTIONS.md" => Some("type/convention"),
-        "DECISIONS.md" => Some("type/decision"),
-        "PROGRESS.md" => Some("type/progress"),
-        "DEBT.md" => Some("type/debt"),
-        "SECRETS_MAP.md" => Some("type/reference"),
-        "CODE_INDEX.md" => Some("type/reference"),
-        _ => None,
-    }
-}
-
-fn supplementary_doc_type_tag(dir_name: &str) -> Option<&'static str> {
-    match dir_name {
-        "reports" => Some("type/report"),
-        "specs" => Some("type/spec"),
-        "plans" => Some("type/plan"),
-        "research" => Some("type/research"),
-        "strategy" => Some("type/strategy"),
-        _ => None,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Excluded directories
-// ---------------------------------------------------------------------------
-
-const EXCLUDED_DIRS: &[&str] = &[
-    "_template",
-    "seeded",
-    "harness-engineering",
-    "01-Projects",
-    ".obsidian",
-    ".git",
-    ".claude",
-];
-
-fn is_excluded(path: &Path) -> bool {
-    for component in path.components() {
-        if let std::path::Component::Normal(os_str) = component
-            && let Some(name) = os_str.to_str()
-            && EXCLUDED_DIRS.contains(&name)
-        {
-            return true;
-        }
-    }
-    false
-}
-
 // ---------------------------------------------------------------------------
 // Frontmatter parsing
 // ---------------------------------------------------------------------------
-
-fn fm_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").expect("valid frontmatter regex"))
-}
 
 fn tags_array_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
@@ -242,10 +195,10 @@ pub fn check_tags(
     vault_root: &Path,
     _config: &ForgeConfig,
     fix: bool,
-    scope: &str,
+    scope: TagScope,
 ) -> Result<TagCheckResult> {
     let mut result = TagCheckResult::default();
-    let fm = fm_re();
+    let fm = frontmatter_re();
 
     // --- Scan project docs in 99-Archives/projects/{project}/ ---
     let projects_dir = vault_root.join("99-Archives").join("projects");
@@ -254,7 +207,7 @@ pub fn check_tags(
     }
 
     // --- Scan 03-Resources/Laws-Of-Software-Engineering/ (vault scope only) ---
-    if scope == "vault" {
+    if scope == TagScope::Vault {
         let laws_dir = vault_root
             .join("03-Resources")
             .join("Laws-Of-Software-Engineering");
@@ -283,7 +236,7 @@ fn scan_project_docs(
 ) -> Result<()> {
     for entry in WalkDir::new(projects_dir)
         .into_iter()
-        .filter_entry(|e| !is_excluded(e.path()))
+        .filter_entry(|e| !is_vault_excluded(e.path()))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
@@ -451,7 +404,7 @@ fn scan_resource_docs(
 ) -> Result<()> {
     for entry in WalkDir::new(laws_dir)
         .into_iter()
-        .filter_entry(|e| !is_excluded(e.path()))
+        .filter_entry(|e| !is_vault_excluded(e.path()))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
@@ -631,7 +584,7 @@ mod tests {
             "---\ntitle: Test\n---\n# PRD\n",
         );
 
-        let result = check_tags(vault.path(), &config, false, "project").expect("check");
+        let result = check_tags(vault.path(), &config, false, TagScope::Project).expect("check");
 
         assert_eq!(result.scanned, 1);
         assert!(
@@ -659,7 +612,7 @@ mod tests {
             "---\ntags: [layer/raw, type/prd]project: foo\ntitle: Test\n---\n# PRD\n",
         );
 
-        let result = check_tags(vault.path(), &config, false, "project").expect("check");
+        let result = check_tags(vault.path(), &config, false, TagScope::Project).expect("check");
 
         let malform_issues: Vec<&TagIssue> = result
             .issues
@@ -681,7 +634,7 @@ mod tests {
             "---\ntitle: Test\n---\n# PRD\n",
         );
 
-        let result = check_tags(vault.path(), &config, true, "project").expect("check");
+        let result = check_tags(vault.path(), &config, true, TagScope::Project).expect("check");
 
         assert!(result.fixed > 0, "Expected at least one fix");
 
@@ -713,7 +666,7 @@ mod tests {
             "---\ntags: [layer/raw, type/architecture]project: test-project\ntitle: Test\n---\n# Arch\n",
         );
 
-        let result = check_tags(vault.path(), &config, true, "project").expect("check");
+        let result = check_tags(vault.path(), &config, true, TagScope::Project).expect("check");
 
         let malform_fixed = result
             .issues
@@ -749,7 +702,7 @@ mod tests {
             "---\ntitle: Debt\n---\n# Debt\n",
         );
 
-        let result = check_tags(vault.path(), &config, false, "project").expect("check");
+        let result = check_tags(vault.path(), &config, false, TagScope::Project).expect("check");
 
         // Only project doc should be scanned
         assert_eq!(result.scanned, 1);
@@ -778,7 +731,7 @@ mod tests {
             "---\ntitle: Debt\n---\n# Debt\n",
         );
 
-        let result = check_tags(vault.path(), &config, false, "vault").expect("check");
+        let result = check_tags(vault.path(), &config, false, TagScope::Vault).expect("check");
 
         assert!(result.scanned >= 2, "Should scan at least 2 files");
         let resource_issues: Vec<&TagIssue> = result
@@ -803,7 +756,7 @@ mod tests {
             "---\ntags: [layer/raw, type/progress, test-project]\ntitle: Progress\n---\n# Progress\n",
         );
 
-        let result = check_tags(vault.path(), &config, false, "project").expect("check");
+        let result = check_tags(vault.path(), &config, false, TagScope::Project).expect("check");
 
         assert_eq!(result.scanned, 1);
         assert!(
@@ -829,7 +782,7 @@ mod tests {
             "---\ntitle: Weekly\n---\n# Weekly Report\n",
         );
 
-        let result = check_tags(vault.path(), &config, false, "project").expect("check");
+        let result = check_tags(vault.path(), &config, false, TagScope::Project).expect("check");
 
         assert_eq!(result.scanned, 1);
         let type_issues: Vec<&TagIssue> = result
@@ -867,7 +820,7 @@ mod tests {
             "---\ntitle: Seeded\n---\n# Seeded\n",
         );
 
-        let result = check_tags(vault.path(), &config, false, "project").expect("check");
+        let result = check_tags(vault.path(), &config, false, TagScope::Project).expect("check");
 
         assert_eq!(result.scanned, 0, "Excluded dirs should not be scanned");
     }
