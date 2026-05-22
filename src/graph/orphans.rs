@@ -20,8 +20,11 @@ pub fn detect_orphans(
     let filtered = orphans
         .into_iter()
         .filter(|path| {
-            if exclude_seeded && path.contains("/seeded/") {
-                return false;
+            if exclude_seeded {
+                let normalized = path.replace('\\', "/");
+                if normalized.contains("/seeded/") || normalized.starts_with("seeded/") {
+                    return false;
+                }
             }
             true
         })
@@ -189,11 +192,15 @@ mod tests {
             "notes/real-note.md".to_string(),
             "02-Areas/seeded/topic.md".to_string(),
             "10-Zettelkasten/concept.md".to_string(),
+            "seeded/root-level.md".to_string(),
         ];
 
         let filtered: Vec<String> = paths
             .into_iter()
-            .filter(|p| !p.contains("/seeded/"))
+            .filter(|p| {
+                let normalized = p.replace('\\', "/");
+                !normalized.contains("/seeded/") && !normalized.starts_with("seeded/")
+            })
             .collect();
 
         assert_eq!(

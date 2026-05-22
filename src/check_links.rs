@@ -79,7 +79,8 @@ fn collect_md_files(vault_root: &Path) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// Collect all `.txt` file stems (relative path without extension) as a lowercase-keyed set.
+/// Collect all `.txt` file stems (relative path without extension) as a lowercase-keyed map
+/// (lowercase stem → original-case stem).
 fn collect_txt_stems(vault_root: &Path) -> BTreeMap<String, String> {
     WalkDir::new(vault_root)
         .into_iter()
@@ -161,6 +162,7 @@ fn has_incoming_links(graph: &crate::graph::wikilinks::VaultGraph, file_path: &s
 
 /// Replace all occurrences of `[[old_target]]` and `[[old_target|...]]` with `[[new_target]]`
 /// (preserving aliases) in the source file content.
+/// Note: compiles a regex per call — acceptable since --fix is not a hot path for a CLI tool.
 fn replace_wikilink_in_file(
     vault_root: &Path,
     source_rel: &str,
@@ -223,7 +225,7 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
 
         for raw_target in raw_targets {
             // Strip .md suffix if user included it in the wikilink
-            let target_clean = raw_target.trim_end_matches(".md").to_string();
+            let target_clean = raw_target.strip_suffix(".md").unwrap_or(&raw_target).to_string();
 
             // Already resolves? Skip.
             if resolve_raw_target(&target_clean, &md_files, &stem_index).is_some() {
@@ -236,6 +238,20 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
                 if fix {
                     let old_path = vault_root.join(format!("{}.txt", txt_original));
                     let new_path = vault_root.join(format!("{}.md", txt_original));
+
+                    // Guard: skip if .md already exists to prevent silent overwrite
+                    if new_path.exists() {
+                        broken.push(BrokenLink {
+                            source: rel_path.clone(),
+                            target: raw_target.clone(),
+                            issue: "extension_mismatch".to_string(),
+                            fix_applied: format!(
+                                "Skipped: {}.md already exists",
+                                txt_original
+                            ),
+                        });
+                        continue;
+                    }
 
                     match fs::rename(&old_path, &new_path) {
                         Ok(()) => {
@@ -279,7 +295,7 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
                 find_normalized_match(&target_clean, &md_files, &stem_index)
             {
                 // Extract the actual stem from the matching file path
-                let matching_stem = matching_file.trim_end_matches(".md").to_string();
+                let matching_stem = matching_file.strip_suffix(".md").unwrap_or(matching_file).to_string();
 
                 if fix {
                     // Only rename the file if it has NO incoming links using its current name.
@@ -387,25 +403,10 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
-    fn create_test_vault(dir: &Path) -> ForgeConfig {
-        let _ = fs::remove_dir_all(dir);
-        fs::create_dir_all(dir).unwrap();
-
-        let vault_toml = r#"
-[vault]
-name = "test"
-layout = "para"
-inbox_dir = "00-Inbox"
-zettelkasten_dir = "10-Zettelkasten"
-archive_dir = "99-Archives"
-attachments_dir = "Attachments"
-templates_dir = "obsidian-templates"
-system_dirs = []
-"#;
-        fs::write(dir.join("vault.toml"), vault_toml).unwrap();
-
-        toml::from_str(vault_toml).unwrap()
+    fn make_config() -> ForgeConfig {
+        ForgeConfig::default_for("test-vault")
     }
 
     fn write_md(dir: &Path, name: &str, content: &str) {
@@ -414,84 +415,102 @@ system_dirs = []
 
     #[test]
     fn test_detect_broken_link() {
-        let tmp = std::env::temp_dir().join("of_check_links_broken");
-        let config = create_test_vault(&tmp);
+        let tmp = TempDir::new().unwrap();
+        let config = make_config();
 
-        write_md(&tmp, "source.md", "Link to [[Nonexistent]]");
-        write_md(&tmp, "other.md", "Hello world");
+        write_md(tmp.path(), "source.md", "Link to [[Nonexistent]]");
+        write_md(tmp.path(), "other.md", "Hello world");
 
-        let result = check_links(&tmp, &config, false).unwrap();
+        let result = check_links(tmp.path(), &config, false).unwrap();
 
         assert_eq!(result.broken.len(), 1);
         assert_eq!(result.broken[0].target, "Nonexistent");
         assert_eq!(result.broken[0].issue, "unresolved");
         assert!(result.broken[0].fix_applied.is_empty());
         assert!(result.fixed.is_empty());
-
-        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]
     fn test_fix_extension_mismatch() {
-        let tmp = std::env::temp_dir().join("of_check_links_ext");
-        let config = create_test_vault(&tmp);
+        let tmp = TempDir::new().unwrap();
+        let config = make_config();
 
-        write_md(&tmp, "source.md", "Link to [[Some Note]]");
-        // Create a .txt file that should match the wikilink target
-        fs::write(tmp.join("Some Note.txt"), "content").unwrap();
+        write_md(tmp.path(), "source.md", "Link to [[Some Note]]");
+        fs::write(tmp.path().join("Some Note.txt"), "content").unwrap();
 
-        let result = check_links(&tmp, &config, true).unwrap();
+        let result = check_links(tmp.path(), &config, true).unwrap();
 
         assert_eq!(result.fixed.len(), 1);
         assert_eq!(result.fixed[0].issue, "extension_mismatch");
         assert!(result.fixed[0].fix_applied.contains("Some Note.txt"));
-        assert!(tmp.join("Some Note.md").exists());
-        assert!(!tmp.join("Some Note.txt").exists());
+        assert!(tmp.path().join("Some Note.md").exists());
+        assert!(!tmp.path().join("Some Note.txt").exists());
+    }
 
-        let _ = fs::remove_dir_all(&tmp);
+    #[test]
+    fn test_rename_collision_guard() {
+        let tmp = TempDir::new().unwrap();
+        let config = make_config();
+
+        write_md(tmp.path(), "source.md", "Link to [[Note]]");
+        // Both .txt and .md exist — link resolves to .md, no fix needed
+        fs::write(tmp.path().join("Note.txt"), "txt content").unwrap();
+        write_md(tmp.path(), "Note.md", "md content");
+
+        let result = check_links(tmp.path(), &config, true).unwrap();
+
+        // Link resolves to existing Note.md — no broken, no fixed
+        assert!(result.broken.is_empty());
+        assert!(result.fixed.is_empty());
+        // Original .md should be preserved
+        assert_eq!(fs::read_to_string(tmp.path().join("Note.md")).unwrap(), "md content");
     }
 
     #[test]
     fn test_fix_filename_mismatch() {
-        let tmp = std::env::temp_dir().join("of_check_links_filename");
-        let config = create_test_vault(&tmp);
+        let tmp = TempDir::new().unwrap();
+        let config = make_config();
 
-        // Source references [[My-Note]] but file is "My Note.md"
-        write_md(&tmp, "source.md", "Link to [[My-Note]]");
-        write_md(&tmp, "My Note.md", "content here");
+        write_md(tmp.path(), "source.md", "Link to [[My-Note]]");
+        write_md(tmp.path(), "My Note.md", "content here");
 
-        let result = check_links(&tmp, &config, true).unwrap();
+        let result = check_links(tmp.path(), &config, true).unwrap();
 
         assert_eq!(result.fixed.len(), 1);
         assert_eq!(result.fixed[0].issue, "filename_mismatch");
-        // The file "My Note.md" has no incoming links (source links to "My-Note", not "My Note"),
-        // so it should be renamed to match the link target
         assert!(
             result.fixed[0].fix_applied.contains("My Note")
                 || result.fixed[0].fix_applied.contains("My-Note")
         );
-
-        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]
     fn test_no_fix_without_flag() {
-        let tmp = std::env::temp_dir().join("of_check_links_nofix");
-        let config = create_test_vault(&tmp);
+        let tmp = TempDir::new().unwrap();
+        let config = make_config();
 
-        write_md(&tmp, "source.md", "Link to [[Nonexistent]]");
-        write_md(&tmp, "other.md", "Link to [[Some Note]]");
-        // Extension mismatch: .txt instead of .md
-        fs::write(tmp.join("Some Note.txt"), "content").unwrap();
+        write_md(tmp.path(), "source.md", "Link to [[Nonexistent]]");
+        write_md(tmp.path(), "other.md", "Link to [[Some Note]]");
+        fs::write(tmp.path().join("Some Note.txt"), "content").unwrap();
 
-        let result = check_links(&tmp, &config, false).unwrap();
+        let result = check_links(tmp.path(), &config, false).unwrap();
 
         assert!(result.fixed.is_empty());
         assert_eq!(result.broken.len(), 2);
-        // No files should have been renamed
-        assert!(tmp.join("Some Note.txt").exists());
-        assert!(!tmp.join("Some Note.md").exists());
+        assert!(tmp.path().join("Some Note.txt").exists());
+        assert!(!tmp.path().join("Some Note.md").exists());
+    }
 
-        let _ = fs::remove_dir_all(&tmp);
+    #[test]
+    fn test_strip_suffix_not_trim_end_matches() {
+        // Verify that "README.md" is handled correctly with strip_suffix
+        let raw = "README.md".to_string();
+        let target_clean = raw.strip_suffix(".md").unwrap_or(&raw).to_string();
+        assert_eq!(target_clean, "README");
+
+        // And a case where .md is not at the end
+        let raw2 = "my.md.note".to_string();
+        let target_clean2 = raw2.strip_suffix(".md").unwrap_or(&raw2).to_string();
+        assert_eq!(target_clean2, "my.md.note");
     }
 }
