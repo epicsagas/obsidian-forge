@@ -137,9 +137,9 @@ enum Commands {
 
     /// Normalize YAML frontmatter malformations
     NormalizeFrontmatter {
-        /// Show issues without applying fixes
+        /// Auto-fix detected malformations
         #[arg(long)]
-        dry_run: bool,
+        fix: bool,
         /// Specific vault name (from global config)
         #[arg(long)]
         vault: Option<String>,
@@ -420,12 +420,9 @@ async fn main() -> Result<()> {
             let result = check_links::check_links(&vault, &config, fix)?;
             println!("{}", result);
         }
-        Commands::NormalizeFrontmatter {
-            dry_run,
-            vault: filter,
-        } => {
+        Commands::NormalizeFrontmatter { fix, vault: filter } => {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
-            let result = frontmatter::normalize_frontmatter(&vault, &config, dry_run)?;
+            let result = frontmatter::normalize_frontmatter(&vault, &config, fix)?;
             println!("{}", result);
         }
         Commands::Doctor {

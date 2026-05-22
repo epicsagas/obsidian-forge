@@ -125,7 +125,7 @@ fn fix_broken_yaml_list(content: &str) -> String {
 pub fn normalize_frontmatter(
     vault_root: &Path,
     _config: &ForgeConfig,
-    dry_run: bool,
+    fix: bool,
 ) -> Result<FrontmatterResult> {
     let mut result = FrontmatterResult::default();
 
@@ -157,9 +157,9 @@ pub fn normalize_frontmatter(
                 file: rel.clone(),
                 issue: "closing_brace_malform".into(),
                 detail: "Opening --- and project: on same line".into(),
-                fixed: !dry_run,
+                fixed: fix,
             });
-            if !dry_run {
+            if fix {
                 modified = fix_closing_brace_malform(&modified);
                 file_fixed = true;
             }
@@ -171,9 +171,9 @@ pub fn normalize_frontmatter(
                 file: rel.clone(),
                 issue: "broken_yaml_list".into(),
                 detail: "tags: followed by non-list value".into(),
-                fixed: !dry_run,
+                fixed: fix,
             });
-            if !dry_run {
+            if fix {
                 modified = fix_broken_yaml_list(&modified);
                 file_fixed = true;
             }
@@ -209,10 +209,10 @@ pub fn normalize_frontmatter(
                     file: rel.clone(),
                     issue: "missing_frontmatter".into(),
                     detail: format!("PRIMARY doc {} has no frontmatter", filename),
-                    fixed: !dry_run,
+                    fixed: fix,
                 });
 
-                if !dry_run {
+                if fix {
                     let fm = format!(
                         "---\nproject: {}\ntags: [{}, layer/raw, {}]\n---\n",
                         project_name, project_name, doc_type
@@ -223,7 +223,7 @@ pub fn normalize_frontmatter(
             }
         }
 
-        if file_fixed && !dry_run {
+        if file_fixed {
             fs::write(path, &modified)?;
             result.fixed += 1;
             info!("Fixed frontmatter issues in {}", rel);
@@ -271,7 +271,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = normalize_frontmatter(vault, &make_config(), true).unwrap();
+        let result = normalize_frontmatter(vault, &make_config(), false).unwrap();
         assert_eq!(result.scanned, 1);
         assert!(
             result
@@ -288,10 +288,10 @@ mod tests {
         let file = vault.join("test.md");
         fs::write(&file, "---\ntags:\ncreated: 2024-01-01\n---\nContent\n").unwrap();
 
-        let result = normalize_frontmatter(vault, &make_config(), true).unwrap();
+        let result = normalize_frontmatter(vault, &make_config(), false).unwrap();
         assert_eq!(result.scanned, 1);
         assert!(result.issues.iter().any(|i| i.issue == "broken_yaml_list"));
-        // dry_run: should NOT modify the file
+        // No --fix: should NOT modify the file
         let content = fs::read_to_string(&file).unwrap();
         assert!(content.contains("tags:\n"));
         assert!(!content.contains("tags: []"));
@@ -304,7 +304,7 @@ mod tests {
         let file = vault.join("test.md");
         fs::write(&file, "---\ntags:\ncreated: 2024-01-01\n---\nContent\n").unwrap();
 
-        let result = normalize_frontmatter(vault, &make_config(), false).unwrap();
+        let result = normalize_frontmatter(vault, &make_config(), true).unwrap();
         assert_eq!(result.fixed, 1);
 
         let fixed = fs::read_to_string(&file).unwrap();
@@ -338,7 +338,7 @@ mod tests {
         let file = vault.join("test.md");
         fs::write(&file, "---\nproject: my-project\ntags: []\n---\nContent\n").unwrap();
 
-        let result = normalize_frontmatter(vault, &make_config(), true).unwrap();
+        let result = normalize_frontmatter(vault, &make_config(), false).unwrap();
         assert_eq!(result.scanned, 1);
         assert!(result.issues.iter().any(|i| i.issue == "empty_tags"));
         // empty_tags should never be auto-fixed
@@ -366,7 +366,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = normalize_frontmatter(vault, &make_config(), true).unwrap();
+        let result = normalize_frontmatter(vault, &make_config(), false).unwrap();
         let missing = result
             .issues
             .iter()
@@ -378,7 +378,7 @@ mod tests {
         );
         let issue = missing.unwrap();
         assert!(issue.detail.contains("PRD.md"));
-        assert!(!issue.fixed); // dry run
+        assert!(!issue.fixed); // no --fix
     }
 
     #[test]
@@ -389,7 +389,7 @@ mod tests {
         let original = "---project: my-project\ntags: [my-project]\n---\nSome content\n";
         fs::write(&file, original).unwrap();
 
-        let result = normalize_frontmatter(vault, &make_config(), false).unwrap();
+        let result = normalize_frontmatter(vault, &make_config(), true).unwrap();
         assert_eq!(result.fixed, 1);
 
         let fixed = fs::read_to_string(&file).unwrap();
@@ -409,7 +409,7 @@ mod tests {
         let file = project_dir.join("ARCHITECTURE.md");
         fs::write(&file, "# Architecture\n\nSystem design.\n").unwrap();
 
-        let result = normalize_frontmatter(vault, &make_config(), false).unwrap();
+        let result = normalize_frontmatter(vault, &make_config(), true).unwrap();
         assert_eq!(result.fixed, 1);
 
         let fixed = fs::read_to_string(&file).unwrap();
@@ -433,20 +433,20 @@ mod tests {
         // Create a valid file at root
         fs::write(vault.join("good.md"), "---\nproject: ok\n---\nFine\n").unwrap();
 
-        let result = normalize_frontmatter(vault, &make_config(), true).unwrap();
+        let result = normalize_frontmatter(vault, &make_config(), false).unwrap();
         assert_eq!(result.scanned, 1); // only good.md
         assert!(result.issues.is_empty());
     }
 
     #[test]
-    fn test_dry_run_does_not_modify() {
+    fn test_no_fix_does_not_modify() {
         let dir = tempfile::tempdir().unwrap();
         let vault = dir.path();
         let file = vault.join("test.md");
         let original = "---project: my-project\ntags: [my-project]\n---\nContent\n";
         fs::write(&file, original).unwrap();
 
-        let result = normalize_frontmatter(vault, &make_config(), true).unwrap();
+        let result = normalize_frontmatter(vault, &make_config(), false).unwrap();
         assert_eq!(result.fixed, 0);
 
         let content = fs::read_to_string(&file).unwrap();

@@ -27,6 +27,8 @@ pub fn is_vault_excluded(path: &Path) -> bool {
 
 pub fn frontmatter_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
+    // `(?s)` makes `.` match newlines. `.*?` is lazy so it stops at the FIRST `---\n`,
+    // meaning body content containing `---` is safe. `(.*)` captures the rest.
     RE.get_or_init(|| Regex::new(r"(?s)^---\n(.*?)\n---\n(.*)$").expect("valid frontmatter regex"))
 }
 

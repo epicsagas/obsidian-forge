@@ -1,12 +1,7 @@
 use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fs,
-    path::Path,
-    sync::OnceLock,
-};
+use std::{collections::BTreeMap, fs, path::Path, sync::OnceLock};
 use tracing::info;
 use walkdir::WalkDir;
 
@@ -84,8 +79,8 @@ fn collect_md_files(vault_root: &Path) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// Collect all `.txt` file stems (relative path without extension).
-fn collect_txt_stems(vault_root: &Path) -> BTreeSet<String> {
+/// Collect all `.txt` file stems (relative path without extension) as a lowercase-keyed set.
+fn collect_txt_stems(vault_root: &Path) -> BTreeMap<String, String> {
     WalkDir::new(vault_root)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -100,34 +95,40 @@ fn collect_txt_stems(vault_root: &Path) -> BTreeSet<String> {
         .filter_map(|e| {
             let rel = e.path().strip_prefix(vault_root).ok()?;
             let stem = rel.with_extension("").to_string_lossy().replace('\\', "/");
-            Some(stem)
+            Some((stem.to_lowercase(), stem))
         })
         .collect()
 }
 
+/// Build a reverse index: lowercase(short_stem) → full relative path, for O(1) stem-only lookups.
+fn build_stem_index(md_files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+    let mut index = BTreeMap::new();
+    for (stem, full) in md_files {
+        let short = stem.split('/').next_back().unwrap_or(stem).to_lowercase();
+        index.entry(short).or_insert_with(|| full.clone());
+    }
+    index
+}
+
 /// Check if a raw wikilink target resolves to an existing .md file.
-fn resolve_raw_target(target: &str, md_files: &BTreeMap<String, String>) -> Option<String> {
+fn resolve_raw_target(
+    target: &str,
+    md_files: &BTreeMap<String, String>,
+    stem_index: &BTreeMap<String, String>,
+) -> Option<String> {
     let key = target.to_lowercase();
-    // Exact match
     if let Some(full) = md_files.get(&key) {
         return Some(full.clone());
     }
-    // Stem-only match (last path component)
     let short_key = key.split('/').next_back()?.to_string();
-    for (stem, full) in md_files {
-        if stem.to_lowercase().ends_with(&format!("/{short_key}"))
-            || stem.to_lowercase() == short_key
-        {
-            return Some(full.clone());
-        }
-    }
-    None
+    stem_index.get(&short_key).cloned()
 }
 
 /// Try to find an existing .md file that matches `target` with hyphens swapped to spaces or vice versa.
 fn find_normalized_match<'a>(
     target: &str,
     md_files: &'a BTreeMap<String, String>,
+    stem_index: &'a BTreeMap<String, String>,
 ) -> Option<&'a String> {
     let target_lower = target.to_lowercase();
 
@@ -136,13 +137,9 @@ fn find_normalized_match<'a>(
     if let Some(full) = md_files.get(&with_spaces) {
         return Some(full);
     }
-    // Stem-only match with spaces
     let short_spaces = with_spaces.split('/').next_back()?.to_string();
-    for (stem, full) in md_files {
-        let stem_lower = stem.to_lowercase();
-        if stem_lower.ends_with(&format!("/{short_spaces}")) || stem_lower == short_spaces {
-            return Some(full);
-        }
+    if let Some(full) = stem_index.get(&short_spaces) {
+        return Some(full);
     }
 
     // Try spaces → hyphens
@@ -150,16 +147,8 @@ fn find_normalized_match<'a>(
     if let Some(full) = md_files.get(&with_hyphens) {
         return Some(full);
     }
-    // Stem-only match with hyphens
     let short_hyphens = with_hyphens.split('/').next_back()?.to_string();
-    for (stem, full) in md_files {
-        let stem_lower = stem.to_lowercase();
-        if stem_lower.ends_with(&format!("/{short_hyphens}")) || stem_lower == short_hyphens {
-            return Some(full);
-        }
-    }
-
-    None
+    stem_index.get(&short_hyphens)
 }
 
 /// Check if a file has incoming links using its current name.
@@ -215,6 +204,7 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
     let graph = build_vault_graph(vault_root, config)?;
     let md_files = collect_md_files(vault_root);
     let txt_stems = collect_txt_stems(vault_root);
+    let stem_index = build_stem_index(&md_files);
 
     let mut total_links = 0usize;
     let mut broken: Vec<BrokenLink> = Vec::new();
@@ -236,39 +226,35 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
             let target_clean = raw_target.trim_end_matches(".md").to_string();
 
             // Already resolves? Skip.
-            if resolve_raw_target(&target_clean, &md_files).is_some() {
+            if resolve_raw_target(&target_clean, &md_files, &stem_index).is_some() {
                 continue;
             }
 
             // Check extension mismatch: target exists as .txt
-            if txt_stems
-                .iter()
-                .any(|s| s.to_lowercase() == target_clean.to_lowercase())
-            {
-                let txt_stem = txt_stems
-                    .iter()
-                    .find(|s| s.to_lowercase() == target_clean.to_lowercase())
-                    .unwrap();
-
+            let target_lower = target_clean.to_lowercase();
+            if let Some(txt_original) = txt_stems.get(&target_lower) {
                 if fix {
-                    let old_path = vault_root.join(format!("{}.txt", txt_stem));
-                    let new_path = vault_root.join(format!("{}.md", txt_stem));
+                    let old_path = vault_root.join(format!("{}.txt", txt_original));
+                    let new_path = vault_root.join(format!("{}.md", txt_original));
 
                     match fs::rename(&old_path, &new_path) {
                         Ok(()) => {
                             info!(
                                 "Renamed {}.txt → {}.md (extension mismatch fix)",
-                                txt_stem, txt_stem
+                                txt_original, txt_original
                             );
                             fixed.push(BrokenLink {
                                 source: rel_path.clone(),
                                 target: raw_target.clone(),
                                 issue: "extension_mismatch".to_string(),
-                                fix_applied: format!("Renamed {}.txt → {}.md", txt_stem, txt_stem),
+                                fix_applied: format!(
+                                    "Renamed {}.txt → {}.md",
+                                    txt_original, txt_original
+                                ),
                             });
                         }
                         Err(e) => {
-                            info!("Failed to rename {}.txt: {}", txt_stem, e);
+                            info!("Failed to rename {}.txt: {}", txt_original, e);
                             broken.push(BrokenLink {
                                 source: rel_path.clone(),
                                 target: raw_target.clone(),
@@ -289,7 +275,9 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
             }
 
             // Check filename mismatch: hyphens ↔ spaces
-            if let Some(matching_file) = find_normalized_match(&target_clean, &md_files) {
+            if let Some(matching_file) =
+                find_normalized_match(&target_clean, &md_files, &stem_index)
+            {
                 // Extract the actual stem from the matching file path
                 let matching_stem = matching_file.trim_end_matches(".md").to_string();
 

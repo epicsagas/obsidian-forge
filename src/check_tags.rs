@@ -60,25 +60,6 @@ impl std::fmt::Display for TagCheckResult {
 }
 
 // ---------------------------------------------------------------------------
-// Doc type mapping
-// ---------------------------------------------------------------------------
-
-#[allow(dead_code)]
-const PRIMARY_FILES: &[&str] = &[
-    "PRD.md",
-    "ARCHITECTURE.md",
-    "CONVENTIONS.md",
-    "DECISIONS.md",
-    "PROGRESS.md",
-    "DEBT.md",
-    "SECRETS_MAP.md",
-    "CODE_INDEX.md",
-];
-
-#[allow(dead_code)]
-const SUPPLEMENTARY_DIRS: &[&str] = &["reports", "specs", "plans", "research", "strategy"];
-
-// ---------------------------------------------------------------------------
 // Frontmatter parsing
 // ---------------------------------------------------------------------------
 
@@ -316,6 +297,7 @@ fn scan_project_docs(
         let tags_set: HashSet<&str> = tags.iter().map(|s| s.as_str()).collect();
 
         let mut missing_tags: Vec<String> = Vec::new();
+        let first_issue_idx = result.issues.len();
 
         // Check layer/raw
         if !tags_set.contains("layer/raw") {
@@ -355,7 +337,8 @@ fn scan_project_docs(
         }
 
         // Check YAML malform
-        if let Some(malformed_line) = detect_yaml_malform(&yaml) {
+        let has_malform = detect_yaml_malform(&yaml);
+        if let Some(malformed_line) = &has_malform {
             result.issues.push(TagIssue {
                 file: relative.clone(),
                 issue: "yaml_malform".to_string(),
@@ -365,11 +348,11 @@ fn scan_project_docs(
         }
 
         // Apply fixes
-        if fix && (!missing_tags.is_empty() || detect_yaml_malform(&yaml).is_some()) {
+        if fix && (!missing_tags.is_empty() || has_malform.is_some()) {
             let mut fixed_yaml = yaml.clone();
 
             // Fix malform first
-            if detect_yaml_malform(&fixed_yaml).is_some() {
+            if has_malform.is_some() {
                 fixed_yaml = fix_yaml_malform(&fixed_yaml);
             }
 
@@ -382,11 +365,9 @@ fn scan_project_docs(
             if new_content != content {
                 fs::write(path, &new_content)?;
 
-                // Mark matching issues as fixed
-                for issue in result.issues.iter_mut().rev() {
-                    if issue.file == relative && !issue.fixed {
-                        issue.fixed = true;
-                    }
+                // Mark only this file's issues as fixed
+                for issue in result.issues.iter_mut().skip(first_issue_idx) {
+                    issue.fixed = true;
                 }
             }
         }
@@ -426,6 +407,7 @@ fn scan_resource_docs(
         let Some(caps) = fm.captures(&content) else {
             // No frontmatter
             let mut missing_tags: Vec<String> = Vec::new();
+            let first_issue_idx = result.issues.len();
             for tag in ["layer/raw", "type/reference"] {
                 result.issues.push(TagIssue {
                     file: relative.clone(),
@@ -445,10 +427,8 @@ fn scan_resource_docs(
                 let yaml = format!("tags: [{}]\n", missing_tags.join(", "));
                 let new_content = format!("---\n{}---\n{}", yaml, content);
                 fs::write(path, &new_content)?;
-                for issue in result.issues.iter_mut().rev() {
-                    if issue.file == relative && !issue.fixed {
-                        issue.fixed = true;
-                    }
+                for issue in result.issues.iter_mut().skip(first_issue_idx) {
+                    issue.fixed = true;
                 }
             }
             continue;
@@ -460,6 +440,7 @@ fn scan_resource_docs(
         let tags_set: HashSet<&str> = tags.iter().map(|s| s.as_str()).collect();
 
         let mut missing_tags: Vec<String> = Vec::new();
+        let first_issue_idx = result.issues.len();
 
         if !tags_set.contains("layer/raw") {
             result.issues.push(TagIssue {
@@ -486,10 +467,8 @@ fn scan_resource_docs(
             let new_content = format!("---\n{}---\n{}", fixed_yaml, body);
             if new_content != content {
                 fs::write(path, &new_content)?;
-                for issue in result.issues.iter_mut().rev() {
-                    if issue.file == relative && !issue.fixed {
-                        issue.fixed = true;
-                    }
+                for issue in result.issues.iter_mut().skip(first_issue_idx) {
+                    issue.fixed = true;
                 }
             }
         }

@@ -46,7 +46,7 @@ pub fn detect_orphans(
 
 fn strip_frontmatter(content: &str) -> String {
     static RE: OnceLock<Regex> = OnceLock::new();
-    let re = RE.get_or_init(|| Regex::new(r"(?s)^---[\s\S]*?---\n?").unwrap());
+    let re = RE.get_or_init(|| Regex::new(r"(?s)^---.*?---\n?").unwrap());
     re.replace(content, "").to_string()
 }
 
