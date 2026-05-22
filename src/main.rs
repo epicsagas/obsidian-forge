@@ -1,7 +1,10 @@
 mod ai;
 mod book;
+mod check_links;
+mod check_tags;
 mod config;
 mod converter;
+mod frontmatter;
 mod git;
 mod graph;
 mod index;
@@ -108,6 +111,39 @@ enum Commands {
         vault: Option<String>,
     },
 
+    /// Check tag health for PRIMARY docs (missing layer, type, project tags)
+    CheckTags {
+        /// Auto-fix missing tags
+        #[arg(long)]
+        fix: bool,
+        /// Scope: "project" (project docs only) or "vault" (includes Resources)
+        #[arg(long, default_value = "vault")]
+        scope: String,
+        /// Specific vault name (from global config)
+        #[arg(long)]
+        vault: Option<String>,
+    },
+
+    /// Check for broken wikilinks and fix filename/extension mismatches
+    CheckLinks {
+        /// Auto-fix filename and extension mismatches
+        #[arg(long)]
+        fix: bool,
+        /// Specific vault name (from global config)
+        #[arg(long)]
+        vault: Option<String>,
+    },
+
+    /// Normalize YAML frontmatter malformations
+    NormalizeFrontmatter {
+        /// Show issues without applying fixes
+        #[arg(long)]
+        dry_run: bool,
+        /// Specific vault name (from global config)
+        #[arg(long)]
+        vault: Option<String>,
+    },
+
     /// Run full sync cycle: MOC → Graph → Git
     Sync {
         /// Sync only this vault (omit for all enabled vaults)
@@ -209,6 +245,12 @@ enum GraphAction {
         /// Attempt to auto-link orphans to relevant MOCs using AI
         #[arg(long)]
         auto_link: bool,
+        /// Exclude files under */seeded/ directories
+        #[arg(long)]
+        exclude_seeded: bool,
+        /// Minimum file size in characters (excluding frontmatter) to be considered important
+        #[arg(long, default_value = "0")]
+        min_importance: usize,
     },
     /// Extract wikilinks and (optionally) AI relationships
     Extract {
@@ -363,6 +405,28 @@ async fn main() -> Result<()> {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
             handle_graph_action(action, &vault, &config).await?;
         }
+        Commands::CheckTags {
+            fix,
+            scope,
+            vault: filter,
+        } => {
+            let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
+            let result = check_tags::check_tags(&vault, &config, fix, &scope)?;
+            println!("{}", result);
+        }
+        Commands::CheckLinks { fix, vault: filter } => {
+            let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
+            let result = check_links::check_links(&vault, &config, fix)?;
+            println!("{}", result);
+        }
+        Commands::NormalizeFrontmatter {
+            dry_run,
+            vault: filter,
+        } => {
+            let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
+            let result = frontmatter::normalize_frontmatter(&vault, &config, dry_run)?;
+            println!("{}", result);
+        }
         Commands::Doctor {
             vault: filter,
             no_ping,
@@ -395,7 +459,11 @@ async fn handle_graph_action(
             let health = graph::graph_health(vault, config)?;
             println!("{}", health);
         }
-        GraphAction::Orphans { auto_link } => {
+        GraphAction::Orphans {
+            auto_link,
+            exclude_seeded,
+            min_importance,
+        } => {
             if *auto_link {
                 let g = graph::build_vault_graph(vault, config)?;
                 let linked = graph::auto_link_orphans(vault, config, &g).await?;
@@ -408,7 +476,8 @@ async fn handle_graph_action(
                     }
                 }
             } else {
-                let orphans = graph::detect_orphans(vault, config)?;
+                let orphans =
+                    graph::detect_orphans(vault, config, *exclude_seeded, *min_importance)?;
                 if orphans.is_empty() {
                     println!("No orphan notes found.");
                 } else {
