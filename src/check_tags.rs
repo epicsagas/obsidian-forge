@@ -235,6 +235,89 @@ fn apply_tag_fixes(
 }
 
 // ---------------------------------------------------------------------------
+// Shared tag-check logic for files WITH frontmatter
+// ---------------------------------------------------------------------------
+
+/// A required tag to check: `(tag_value, issue_type)`.
+type RequiredTag<'a> = (&'a str, &'a str);
+
+/// Check a list of required tags against parsed frontmatter and apply fixes.
+///
+/// This encapsulates the common pattern shared by both `scan_project_docs` and
+/// `scan_resource_docs` for files that already have YAML frontmatter:
+/// 1. Parse tags from YAML, build HashSet
+/// 2. Check each required tag via `check_missing_tag`
+/// 3. Apply fixes via `apply_tag_fixes`
+///
+/// `first_issue_idx` should be the index of the first issue recorded for this
+/// file (before calling this function), so that `apply_tag_fixes` can mark all
+/// issues — including any pre-existing ones like yaml_malform — as fixed.
+#[allow(clippy::too_many_arguments)]
+fn check_and_fix_tags(
+    yaml: &str,
+    body: &str,
+    path: &Path,
+    relative: &str,
+    content: &str,
+    required_tags: &[RequiredTag<'_>],
+    fix: bool,
+    malform_line: Option<&str>,
+    first_issue_idx: usize,
+    result: &mut TagCheckResult,
+) -> Result<()> {
+    let tags = parse_tags_from_yaml(yaml);
+    let tags_set: HashSet<&str> = tags.iter().map(|s| s.as_str()).collect();
+
+    let mut missing_tags: Vec<String> = Vec::new();
+
+    for (tag, issue_type) in required_tags {
+        if let Some(t) = check_missing_tag(&tags_set, tag, issue_type, relative, &mut result.issues)
+        {
+            missing_tags.push(t);
+        }
+    }
+
+    apply_tag_fixes(
+        path,
+        content,
+        yaml,
+        body,
+        fix,
+        &missing_tags,
+        malform_line,
+        result,
+        first_issue_idx,
+    )?;
+
+    Ok(())
+}
+
+/// Fix a file that has NO frontmatter by injecting tags into a new frontmatter block.
+fn apply_no_frontmatter_fixes(
+    path: &Path,
+    original_content: &str,
+    fix: bool,
+    missing_tags: &[String],
+    result: &mut TagCheckResult,
+    first_issue_idx: usize,
+) -> Result<bool> {
+    if !fix || missing_tags.is_empty() {
+        return Ok(false);
+    }
+
+    let yaml = format!("tags: [{}]\n", missing_tags.join(", "));
+    let new_content = format!("---\n{}---\n{}", yaml, original_content);
+    if new_content != *original_content {
+        fs::write(path, &new_content)?;
+        for issue in result.issues.iter_mut().skip(first_issue_idx) {
+            issue.fixed = true;
+        }
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+// ---------------------------------------------------------------------------
 // Main check function
 // ---------------------------------------------------------------------------
 
@@ -359,45 +442,22 @@ fn scan_project_docs(
             continue;
         };
 
-        let tags = parse_tags_from_yaml(&yaml);
-        let tags_set: HashSet<&str> = tags.iter().map(|s| s.as_str()).collect();
+        // Build required tag list for the common checker
+        let mut required_tags: Vec<RequiredTag<'_>> = vec![
+            ("layer/raw", "missing_layer"),
+        ];
+        if let Some(ref tt) = type_tag {
+            required_tags.push((tt.as_str(), "missing_type"));
+        }
+        if let Some(ref pn) = project_name {
+            required_tags.push((pn.as_str(), "missing_project"));
+        }
 
-        let mut missing_tags: Vec<String> = Vec::new();
+        // Record first_issue_idx BEFORE any issues for this file, so that
+        // apply_tag_fixes can mark all of them (malform + missing tags) as fixed.
         let first_issue_idx = result.issues.len();
 
-        // Check layer/raw
-        if let Some(tag) = check_missing_tag(
-            &tags_set,
-            "layer/raw",
-            "missing_layer",
-            &relative,
-            &mut result.issues,
-        ) {
-            missing_tags.push(tag);
-        }
-
-        // Check type tag
-        if let Some(ref tt) = type_tag
-            && let Some(tag) =
-                check_missing_tag(&tags_set, tt, "missing_type", &relative, &mut result.issues)
-        {
-            missing_tags.push(tag);
-        }
-
-        // Check project tag
-        if let Some(ref pn) = project_name
-            && let Some(tag) = check_missing_tag(
-                &tags_set,
-                pn,
-                "missing_project",
-                &relative,
-                &mut result.issues,
-            )
-        {
-            missing_tags.push(tag);
-        }
-
-        // Check YAML malform
+        // Check YAML malform (project-docs specific)
         let has_malform = detect_yaml_malform(&yaml);
         if let Some(malformed_line) = &has_malform {
             result.issues.push(TagIssue {
@@ -408,17 +468,18 @@ fn scan_project_docs(
             });
         }
 
-        // Apply fixes
-        apply_tag_fixes(
-            path,
-            &content,
+        // Shared tag-check + fix
+        check_and_fix_tags(
             &yaml,
             &body,
+            path,
+            &relative,
+            &content,
+            &required_tags,
             fix,
-            &missing_tags,
             has_malform.as_deref(),
-            result,
             first_issue_idx,
+            result,
         )?;
     }
 
@@ -454,19 +515,14 @@ fn scan_resource_docs(
         };
 
         let Some(caps) = fm.captures(&content) else {
-            // No frontmatter
+            // No frontmatter — report and fix missing tags
             let mut missing_tags: Vec<String> = Vec::new();
             let first_issue_idx = result.issues.len();
-            for tag in ["layer/raw", "type/reference"] {
-                let issue_type = if tag == "layer/raw" {
-                    "missing_layer"
-                } else {
-                    "missing_type"
-                };
+            for tag in [("layer/raw", "missing_layer"), ("type/reference", "missing_type")] {
                 if let Some(t) = check_missing_tag(
                     &HashSet::new(),
-                    tag,
-                    issue_type,
+                    tag.0,
+                    tag.1,
                     &relative,
                     &mut result.issues,
                 ) {
@@ -474,57 +530,31 @@ fn scan_resource_docs(
                 }
             }
 
-            if fix && !missing_tags.is_empty() {
-                let yaml = format!("tags: [{}]\n", missing_tags.join(", "));
-                let new_content = format!("---\n{}---\n{}", yaml, content);
-                if new_content != content {
-                    fs::write(path, &new_content)?;
-                    for issue in result.issues.iter_mut().skip(first_issue_idx) {
-                        issue.fixed = true;
-                    }
-                }
-            }
+            apply_no_frontmatter_fixes(path, &content, fix, &missing_tags, result, first_issue_idx)?;
             continue;
         };
 
         let yaml = caps.get(1).unwrap().as_str().to_string();
         let body = caps.get(2).unwrap().as_str().to_string();
-        let tags = parse_tags_from_yaml(&yaml);
-        let tags_set: HashSet<&str> = tags.iter().map(|s| s.as_str()).collect();
 
-        let mut missing_tags: Vec<String> = Vec::new();
+        let required_tags: &[RequiredTag<'_>] = &[
+            ("layer/raw", "missing_layer"),
+            ("type/reference", "missing_type"),
+        ];
+
         let first_issue_idx = result.issues.len();
 
-        if let Some(tag) = check_missing_tag(
-            &tags_set,
-            "layer/raw",
-            "missing_layer",
-            &relative,
-            &mut result.issues,
-        ) {
-            missing_tags.push(tag);
-        }
-
-        if let Some(tag) = check_missing_tag(
-            &tags_set,
-            "type/reference",
-            "missing_type",
-            &relative,
-            &mut result.issues,
-        ) {
-            missing_tags.push(tag);
-        }
-
-        apply_tag_fixes(
-            path,
-            &content,
+        check_and_fix_tags(
             &yaml,
             &body,
+            path,
+            &relative,
+            &content,
+            required_tags,
             fix,
-            &missing_tags,
             None,
-            result,
             first_issue_idx,
+            result,
         )?;
     }
 

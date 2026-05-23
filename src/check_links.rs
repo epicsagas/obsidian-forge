@@ -374,6 +374,66 @@ fn handle_filename_mismatch(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn check_file_links(
+    vault_root: &Path,
+    graph: &crate::graph::wikilinks::VaultGraph,
+    rel_path: &str,
+    content: &str,
+    md_files: &BTreeMap<String, String>,
+    txt_stems: &BTreeMap<String, String>,
+    stem_index: &BTreeMap<String, String>,
+    fix: bool,
+    broken: &mut Vec<BrokenLink>,
+    fixed: &mut Vec<BrokenLink>,
+) -> usize {
+    let raw_targets = parse_raw_targets(content);
+    let link_count = raw_targets.len();
+
+    for raw_target in raw_targets {
+        let target_clean = raw_target
+            .strip_suffix(".md")
+            .unwrap_or(&raw_target)
+            .to_string();
+
+        if resolve_raw_target(&target_clean, md_files, stem_index).is_some() {
+            continue;
+        }
+
+        let target_lower = target_clean.to_lowercase();
+        if let Some(txt_original) = txt_stems.get(&target_lower) {
+            handle_extension_mismatch(
+                vault_root, rel_path, &raw_target, txt_original, fix, broken, fixed,
+            );
+            continue;
+        }
+
+        if let Some(matching_file) = find_normalized_match(&target_clean, md_files, stem_index) {
+            handle_filename_mismatch(
+                vault_root,
+                graph,
+                rel_path,
+                &raw_target,
+                &target_clean,
+                matching_file,
+                fix,
+                broken,
+                fixed,
+            );
+            continue;
+        }
+
+        broken.push(BrokenLink {
+            source: rel_path.to_string(),
+            target: raw_target.clone(),
+            issue: LinkIssue::Unresolved,
+            fix_applied: String::new(),
+        });
+    }
+
+    link_count
+}
+
 pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result<LinkCheckResult> {
     let graph = build_vault_graph(vault_root, config)?;
     let md_files = collect_md_files(vault_root);
@@ -391,60 +451,18 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
             Err(_) => continue,
         };
 
-        let raw_targets = parse_raw_targets(&content);
-        total_links += raw_targets.len();
-
-        for raw_target in raw_targets {
-            let target_clean = raw_target
-                .strip_suffix(".md")
-                .unwrap_or(&raw_target)
-                .to_string();
-
-            if resolve_raw_target(&target_clean, &md_files, &stem_index).is_some() {
-                continue;
-            }
-
-            // Extension mismatch: target exists as .txt
-            let target_lower = target_clean.to_lowercase();
-            if let Some(txt_original) = txt_stems.get(&target_lower) {
-                handle_extension_mismatch(
-                    vault_root,
-                    rel_path,
-                    &raw_target,
-                    txt_original,
-                    fix,
-                    &mut broken,
-                    &mut fixed,
-                );
-                continue;
-            }
-
-            // Filename mismatch: hyphens ↔ spaces
-            if let Some(matching_file) =
-                find_normalized_match(&target_clean, &md_files, &stem_index)
-            {
-                handle_filename_mismatch(
-                    vault_root,
-                    &graph,
-                    rel_path,
-                    &raw_target,
-                    &target_clean,
-                    matching_file,
-                    fix,
-                    &mut broken,
-                    &mut fixed,
-                );
-                continue;
-            }
-
-            // Truly unresolved
-            broken.push(BrokenLink {
-                source: rel_path.clone(),
-                target: raw_target.clone(),
-                issue: LinkIssue::Unresolved,
-                fix_applied: String::new(),
-            });
-        }
+        total_links += check_file_links(
+            vault_root,
+            &graph,
+            rel_path,
+            &content,
+            &md_files,
+            &txt_stems,
+            &stem_index,
+            fix,
+            &mut broken,
+            &mut fixed,
+        );
     }
 
     info!(
