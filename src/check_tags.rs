@@ -414,31 +414,38 @@ fn scan_project_docs(
                 caps.get(2).unwrap().as_str().to_string(),
             )
         } else {
-            // No frontmatter — report missing tags
+            // No frontmatter — report and fix missing tags (shared pattern)
+            let mut missing_tags: Vec<String> = Vec::new();
+            let first_issue_idx = result.issues.len();
+
+            let mut required: Vec<(&str, &str)> = vec![("layer/raw", "missing_layer")];
             if let Some(ref tt) = type_tag {
-                for missing in [
-                    "layer/raw",
-                    tt.as_str(),
-                    project_name.as_deref().unwrap_or(""),
-                ]
-                .iter()
-                .filter(|m| !m.is_empty())
-                {
-                    let issue_type = if *missing == "layer/raw" {
-                        "missing_layer"
-                    } else if missing.starts_with("type/") {
-                        "missing_type"
-                    } else {
-                        "missing_project"
-                    };
-                    result.issues.push(TagIssue {
-                        file: relative.clone(),
-                        issue: issue_type.to_string(),
-                        detail: format!("Expected tag: {}", missing),
-                        fixed: false,
-                    });
+                required.push((tt.as_str(), "missing_type"));
+            }
+            if let Some(ref pn) = project_name {
+                required.push((pn.as_str(), "missing_project"));
+            }
+
+            for (tag, issue_type) in &required {
+                if let Some(t) = check_missing_tag(
+                    &HashSet::new(),
+                    tag,
+                    issue_type,
+                    &relative,
+                    &mut result.issues,
+                ) {
+                    missing_tags.push(t);
                 }
             }
+
+            apply_no_frontmatter_fixes(
+                path,
+                &content,
+                fix,
+                &missing_tags,
+                result,
+                first_issue_idx,
+            )?;
             continue;
         };
 
@@ -911,5 +918,41 @@ mod tests {
         let yaml = "title: Test\n";
         let tags = parse_tags_from_yaml(yaml);
         assert!(tags.is_empty());
+    }
+
+    #[test]
+    fn test_fix_project_doc_no_frontmatter() {
+        let vault = create_test_vault();
+        let config = make_config();
+
+        // Project doc with NO frontmatter at all
+        write_file(
+            vault.path(),
+            "99-Archives/projects/test-project/PRD.md",
+            "# Product Requirements\n\nSome content.\n",
+        );
+
+        // --fix should inject frontmatter with tags
+        let result = check_tags(vault.path(), &config, true, TagScope::Project).expect("check");
+
+        assert!(result.fixed > 0, "Should fix at least one file");
+
+        let fixed_content = read_file(vault.path(), "99-Archives/projects/test-project/PRD.md");
+        assert!(
+            fixed_content.contains("layer/raw"),
+            "Should contain layer/raw tag"
+        );
+        assert!(
+            fixed_content.contains("type/prd"),
+            "Should contain type/prd tag"
+        );
+        assert!(
+            fixed_content.contains("test-project"),
+            "Should contain project tag"
+        );
+        assert!(
+            fixed_content.contains("# Product Requirements"),
+            "Body should be preserved"
+        );
     }
 }

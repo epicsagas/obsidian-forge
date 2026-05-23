@@ -277,7 +277,7 @@ fn handle_extension_mismatch(
             });
         }
         Err(e) => {
-            info!("Failed to rename {}.txt: {}", txt_original, e);
+            warn!("Failed to rename {}.txt: {}", txt_original, e);
             broken.push(BrokenLink {
                 source: rel_path.to_string(),
                 target: raw_target.to_string(),
@@ -321,27 +321,40 @@ fn handle_filename_mismatch(
         let new_file = format!("{}.md", target_clean);
         let new_path = vault_root.join(&new_file);
 
-        match fs::rename(&old_path, &new_path) {
-            Ok(()) => {
-                info!(
-                    "Renamed {} → {} (filename mismatch fix)",
-                    matching_file, new_file
-                );
-                fixed.push(BrokenLink {
-                    source: rel_path.to_string(),
-                    target: raw_target.to_string(),
-                    issue: LinkIssue::FilenameMismatch,
-                    fix_applied: format!("Renamed {} → {}", matching_file, new_file),
-                });
-            }
-            Err(e) => {
-                info!("Failed to rename {}: {}", matching_file, e);
-                broken.push(BrokenLink {
-                    source: rel_path.to_string(),
-                    target: raw_target.to_string(),
-                    issue: LinkIssue::FilenameMismatch,
-                    fix_applied: String::new(),
-                });
+        if new_path.exists() {
+            warn!(
+                "Skip rename {} → {}: target already exists",
+                matching_file, new_file
+            );
+            broken.push(BrokenLink {
+                source: rel_path.to_string(),
+                target: raw_target.to_string(),
+                issue: LinkIssue::FilenameMismatch,
+                fix_applied: format!("Skipped: {} already exists", new_file),
+            });
+        } else {
+            match fs::rename(&old_path, &new_path) {
+                Ok(()) => {
+                    info!(
+                        "Renamed {} → {} (filename mismatch fix)",
+                        matching_file, new_file
+                    );
+                    fixed.push(BrokenLink {
+                        source: rel_path.to_string(),
+                        target: raw_target.to_string(),
+                        issue: LinkIssue::FilenameMismatch,
+                        fix_applied: format!("Renamed {} → {}", matching_file, new_file),
+                    });
+                }
+                Err(e) => {
+                    warn!("Failed to rename {}: {}", matching_file, e);
+                    broken.push(BrokenLink {
+                        source: rel_path.to_string(),
+                        target: raw_target.to_string(),
+                        issue: LinkIssue::FilenameMismatch,
+                        fix_applied: String::new(),
+                    });
+                }
             }
         }
     } else {
@@ -362,7 +375,7 @@ fn handle_filename_mismatch(
                 });
             }
             Err(e) => {
-                info!("Failed to update wikilink in {}: {}", rel_path, e);
+                warn!("Failed to update wikilink in {}: {}", rel_path, e);
                 broken.push(BrokenLink {
                     source: rel_path.to_string(),
                     target: raw_target.to_string(),
@@ -600,5 +613,30 @@ mod tests {
         let raw2 = "my.md.note".to_string();
         let target_clean2 = raw2.strip_suffix(".md").unwrap_or(&raw2).to_string();
         assert_eq!(target_clean2, "my.md.note");
+    }
+
+    #[test]
+    fn test_rename_preserves_existing_target() {
+        let tmp = TempDir::new().unwrap();
+        let config = make_config();
+
+        // [[My-Note]] → normalized match is "My Note.md", rename target is "My-Note.md"
+        // Since "My-Note.md" doesn't exist, rename proceeds and must preserve body
+        write_md(tmp.path(), "source.md", "Link to [[My-Note]]");
+        write_md(tmp.path(), "My Note.md", "original body");
+
+        let result = check_links(tmp.path(), &config, true).unwrap();
+
+        assert_eq!(result.fixed.len(), 1);
+        // Verify the renamed file preserved its content
+        assert!(
+            tmp.path().join("My-Note.md").exists(),
+            "Renamed file should exist"
+        );
+        assert!(!tmp.path().join("My Note.md").exists(), "Old name removed");
+        assert_eq!(
+            fs::read_to_string(tmp.path().join("My-Note.md")).unwrap(),
+            "original body"
+        );
     }
 }
