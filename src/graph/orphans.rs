@@ -31,12 +31,17 @@ pub fn detect_orphans(
         .filter(|path| {
             if min_chars > 0 {
                 let full_path = vault_root.join(path);
-                match std::fs::read_to_string(&full_path) {
-                    Ok(content) => {
-                        let stripped = strip_frontmatter(&content);
-                        stripped.len() >= min_chars
+                match std::fs::metadata(&full_path) {
+                    Ok(meta) if (meta.len() as usize) >= min_chars => {
+                        match std::fs::read_to_string(&full_path) {
+                            Ok(content) => {
+                                let stripped = strip_frontmatter(&content);
+                                stripped.len() >= min_chars
+                            }
+                            Err(_) => false,
+                        }
                     }
-                    Err(_) => false,
+                    _ => false,
                 }
             } else {
                 true

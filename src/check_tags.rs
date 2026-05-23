@@ -169,6 +169,72 @@ fn inject_tags_into_yaml(yaml: &str, tags_to_add: &[String]) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+/// Check if `tag` is present in `tags_set`. If not, push a TagIssue and return
+/// the tag as `Some(String)` (for adding to a missing_tags vec).
+fn check_missing_tag(
+    tags_set: &HashSet<&str>,
+    tag: &str,
+    issue_type: &str,
+    file: &str,
+    issues: &mut Vec<TagIssue>,
+) -> Option<String> {
+    if tags_set.contains(tag) {
+        return None;
+    }
+    issues.push(TagIssue {
+        file: file.to_string(),
+        issue: issue_type.to_string(),
+        detail: format!("Expected tag: {}", tag),
+        fixed: false,
+    });
+    Some(tag.to_string())
+}
+
+/// Apply tag injection and optional YAML malform fix, then write the file and
+/// mark the relevant issues as fixed.
+#[allow(clippy::too_many_arguments)]
+fn apply_tag_fixes(
+    path: &Path,
+    original_content: &str,
+    yaml: &str,
+    body: &str,
+    fix: bool,
+    missing_tags: &[String],
+    malform_line: Option<&str>,
+    result: &mut TagCheckResult,
+    first_issue_idx: usize,
+) -> Result<bool> {
+    if !fix || (missing_tags.is_empty() && malform_line.is_none()) {
+        return Ok(false);
+    }
+
+    let mut fixed_yaml = yaml.to_string();
+
+    // Fix malform first
+    if malform_line.is_some() {
+        fixed_yaml = fix_yaml_malform(&fixed_yaml);
+    }
+
+    // Inject missing tags
+    if !missing_tags.is_empty() {
+        fixed_yaml = inject_tags_into_yaml(&fixed_yaml, missing_tags);
+    }
+
+    let new_content = format!("---\n{}---\n{}", fixed_yaml, body);
+    if new_content != original_content {
+        fs::write(path, &new_content)?;
+        for issue in result.issues.iter_mut().skip(first_issue_idx) {
+            issue.fixed = true;
+        }
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+// ---------------------------------------------------------------------------
 // Main check function
 // ---------------------------------------------------------------------------
 
@@ -300,40 +366,35 @@ fn scan_project_docs(
         let first_issue_idx = result.issues.len();
 
         // Check layer/raw
-        if !tags_set.contains("layer/raw") {
-            result.issues.push(TagIssue {
-                file: relative.clone(),
-                issue: "missing_layer".to_string(),
-                detail: "Expected tag: layer/raw".to_string(),
-                fixed: false,
-            });
-            missing_tags.push("layer/raw".to_string());
+        if let Some(tag) = check_missing_tag(
+            &tags_set,
+            "layer/raw",
+            "missing_layer",
+            &relative,
+            &mut result.issues,
+        ) {
+            missing_tags.push(tag);
         }
 
         // Check type tag
         if let Some(ref tt) = type_tag
-            && !tags_set.contains(tt.as_str())
+            && let Some(tag) =
+                check_missing_tag(&tags_set, tt, "missing_type", &relative, &mut result.issues)
         {
-            result.issues.push(TagIssue {
-                file: relative.clone(),
-                issue: "missing_type".to_string(),
-                detail: format!("Expected tag: {}", tt),
-                fixed: false,
-            });
-            missing_tags.push(tt.clone());
+            missing_tags.push(tag);
         }
 
         // Check project tag
         if let Some(ref pn) = project_name
-            && !tags_set.contains(pn.as_str())
+            && let Some(tag) = check_missing_tag(
+                &tags_set,
+                pn,
+                "missing_project",
+                &relative,
+                &mut result.issues,
+            )
         {
-            result.issues.push(TagIssue {
-                file: relative.clone(),
-                issue: "missing_project".to_string(),
-                detail: format!("Expected tag: {}", pn),
-                fixed: false,
-            });
-            missing_tags.push(pn.clone());
+            missing_tags.push(tag);
         }
 
         // Check YAML malform
@@ -348,29 +409,17 @@ fn scan_project_docs(
         }
 
         // Apply fixes
-        if fix && (!missing_tags.is_empty() || has_malform.is_some()) {
-            let mut fixed_yaml = yaml.clone();
-
-            // Fix malform first
-            if has_malform.is_some() {
-                fixed_yaml = fix_yaml_malform(&fixed_yaml);
-            }
-
-            // Inject missing tags
-            if !missing_tags.is_empty() {
-                fixed_yaml = inject_tags_into_yaml(&fixed_yaml, &missing_tags);
-            }
-
-            let new_content = format!("---\n{}---\n{}", fixed_yaml, body);
-            if new_content != content {
-                fs::write(path, &new_content)?;
-
-                // Mark only this file's issues as fixed
-                for issue in result.issues.iter_mut().skip(first_issue_idx) {
-                    issue.fixed = true;
-                }
-            }
-        }
+        apply_tag_fixes(
+            path,
+            &content,
+            &yaml,
+            &body,
+            fix,
+            &missing_tags,
+            has_malform.as_deref(),
+            result,
+            first_issue_idx,
+        )?;
     }
 
     Ok(())
@@ -409,26 +458,30 @@ fn scan_resource_docs(
             let mut missing_tags: Vec<String> = Vec::new();
             let first_issue_idx = result.issues.len();
             for tag in ["layer/raw", "type/reference"] {
-                result.issues.push(TagIssue {
-                    file: relative.clone(),
-                    issue: if tag == "layer/raw" {
-                        "missing_layer"
-                    } else {
-                        "missing_type"
-                    }
-                    .to_string(),
-                    detail: format!("Expected tag: {}", tag),
-                    fixed: false,
-                });
-                missing_tags.push(tag.to_string());
+                let issue_type = if tag == "layer/raw" {
+                    "missing_layer"
+                } else {
+                    "missing_type"
+                };
+                if let Some(t) = check_missing_tag(
+                    &HashSet::new(),
+                    tag,
+                    issue_type,
+                    &relative,
+                    &mut result.issues,
+                ) {
+                    missing_tags.push(t);
+                }
             }
 
-            if fix {
+            if fix && !missing_tags.is_empty() {
                 let yaml = format!("tags: [{}]\n", missing_tags.join(", "));
                 let new_content = format!("---\n{}---\n{}", yaml, content);
-                fs::write(path, &new_content)?;
-                for issue in result.issues.iter_mut().skip(first_issue_idx) {
-                    issue.fixed = true;
+                if new_content != content {
+                    fs::write(path, &new_content)?;
+                    for issue in result.issues.iter_mut().skip(first_issue_idx) {
+                        issue.fixed = true;
+                    }
                 }
             }
             continue;
@@ -442,36 +495,37 @@ fn scan_resource_docs(
         let mut missing_tags: Vec<String> = Vec::new();
         let first_issue_idx = result.issues.len();
 
-        if !tags_set.contains("layer/raw") {
-            result.issues.push(TagIssue {
-                file: relative.clone(),
-                issue: "missing_layer".to_string(),
-                detail: "Expected tag: layer/raw".to_string(),
-                fixed: false,
-            });
-            missing_tags.push("layer/raw".to_string());
+        if let Some(tag) = check_missing_tag(
+            &tags_set,
+            "layer/raw",
+            "missing_layer",
+            &relative,
+            &mut result.issues,
+        ) {
+            missing_tags.push(tag);
         }
 
-        if !tags_set.contains("type/reference") {
-            result.issues.push(TagIssue {
-                file: relative.clone(),
-                issue: "missing_type".to_string(),
-                detail: "Expected tag: type/reference".to_string(),
-                fixed: false,
-            });
-            missing_tags.push("type/reference".to_string());
+        if let Some(tag) = check_missing_tag(
+            &tags_set,
+            "type/reference",
+            "missing_type",
+            &relative,
+            &mut result.issues,
+        ) {
+            missing_tags.push(tag);
         }
 
-        if fix && !missing_tags.is_empty() {
-            let fixed_yaml = inject_tags_into_yaml(&yaml, &missing_tags);
-            let new_content = format!("---\n{}---\n{}", fixed_yaml, body);
-            if new_content != content {
-                fs::write(path, &new_content)?;
-                for issue in result.issues.iter_mut().skip(first_issue_idx) {
-                    issue.fixed = true;
-                }
-            }
-        }
+        apply_tag_fixes(
+            path,
+            &content,
+            &yaml,
+            &body,
+            fix,
+            &missing_tags,
+            None,
+            result,
+            first_issue_idx,
+        )?;
     }
 
     Ok(())

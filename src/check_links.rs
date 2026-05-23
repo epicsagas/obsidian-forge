@@ -2,7 +2,7 @@ use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::Path, sync::OnceLock};
-use tracing::info;
+use tracing::{info, warn};
 use walkdir::WalkDir;
 
 use crate::config::ForgeConfig;
@@ -16,12 +16,29 @@ pub struct LinkCheckResult {
     pub fixed: Vec<BrokenLink>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LinkIssue {
+    Unresolved,
+    FilenameMismatch,
+    ExtensionMismatch,
+}
+
+impl std::fmt::Display for LinkIssue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LinkIssue::Unresolved => write!(f, "unresolved"),
+            LinkIssue::FilenameMismatch => write!(f, "filename_mismatch"),
+            LinkIssue::ExtensionMismatch => write!(f, "extension_mismatch"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrokenLink {
     pub source: String,
     pub target: String,
-    pub issue: String, // "unresolved", "filename_mismatch", "extension_mismatch"
-    pub fix_applied: String, // description of fix, empty if not fixed
+    pub issue: LinkIssue,
+    pub fix_applied: String,
 }
 
 impl std::fmt::Display for LinkCheckResult {
@@ -106,7 +123,19 @@ fn build_stem_index(md_files: &BTreeMap<String, String>) -> BTreeMap<String, Str
     let mut index = BTreeMap::new();
     for (stem, full) in md_files {
         let short = stem.split('/').next_back().unwrap_or(stem).to_lowercase();
-        index.entry(short).or_insert_with(|| full.clone());
+        match index.entry(short) {
+            std::collections::btree_map::Entry::Vacant(e) => {
+                e.insert(full.clone());
+            }
+            std::collections::btree_map::Entry::Occupied(e) => {
+                warn!(
+                    "Stem collision: '{}' and '{}' both resolve to '{}'; keeping first",
+                    full,
+                    e.get(),
+                    e.key()
+                );
+            }
+        }
     }
     index
 }
@@ -202,6 +231,149 @@ fn parse_raw_targets(content: &str) -> Vec<String> {
         .collect()
 }
 
+fn handle_extension_mismatch(
+    vault_root: &Path,
+    rel_path: &str,
+    raw_target: &str,
+    txt_original: &str,
+    fix: bool,
+    broken: &mut Vec<BrokenLink>,
+    fixed: &mut Vec<BrokenLink>,
+) {
+    if !fix {
+        broken.push(BrokenLink {
+            source: rel_path.to_string(),
+            target: raw_target.to_string(),
+            issue: LinkIssue::ExtensionMismatch,
+            fix_applied: String::new(),
+        });
+        return;
+    }
+
+    let old_path = vault_root.join(format!("{}.txt", txt_original));
+    let new_path = vault_root.join(format!("{}.md", txt_original));
+
+    if new_path.exists() {
+        broken.push(BrokenLink {
+            source: rel_path.to_string(),
+            target: raw_target.to_string(),
+            issue: LinkIssue::ExtensionMismatch,
+            fix_applied: format!("Skipped: {}.md already exists", txt_original),
+        });
+        return;
+    }
+
+    match fs::rename(&old_path, &new_path) {
+        Ok(()) => {
+            info!(
+                "Renamed {}.txt → {}.md (extension mismatch fix)",
+                txt_original, txt_original
+            );
+            fixed.push(BrokenLink {
+                source: rel_path.to_string(),
+                target: raw_target.to_string(),
+                issue: LinkIssue::ExtensionMismatch,
+                fix_applied: format!("Renamed {}.txt → {}.md", txt_original, txt_original),
+            });
+        }
+        Err(e) => {
+            info!("Failed to rename {}.txt: {}", txt_original, e);
+            broken.push(BrokenLink {
+                source: rel_path.to_string(),
+                target: raw_target.to_string(),
+                issue: LinkIssue::ExtensionMismatch,
+                fix_applied: String::new(),
+            });
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn handle_filename_mismatch(
+    vault_root: &Path,
+    graph: &crate::graph::wikilinks::VaultGraph,
+    rel_path: &str,
+    raw_target: &str,
+    target_clean: &str,
+    matching_file: &str,
+    fix: bool,
+    broken: &mut Vec<BrokenLink>,
+    fixed: &mut Vec<BrokenLink>,
+) {
+    let matching_stem = matching_file
+        .strip_suffix(".md")
+        .unwrap_or(matching_file)
+        .to_string();
+
+    if !fix {
+        broken.push(BrokenLink {
+            source: rel_path.to_string(),
+            target: raw_target.to_string(),
+            issue: LinkIssue::FilenameMismatch,
+            fix_applied: String::new(),
+        });
+        return;
+    }
+
+    // Only rename if no incoming links use the current name; otherwise fix the link in source
+    if !has_incoming_links(graph, matching_file) {
+        let old_path = vault_root.join(matching_file);
+        let new_file = format!("{}.md", target_clean);
+        let new_path = vault_root.join(&new_file);
+
+        match fs::rename(&old_path, &new_path) {
+            Ok(()) => {
+                info!(
+                    "Renamed {} → {} (filename mismatch fix)",
+                    matching_file, new_file
+                );
+                fixed.push(BrokenLink {
+                    source: rel_path.to_string(),
+                    target: raw_target.to_string(),
+                    issue: LinkIssue::FilenameMismatch,
+                    fix_applied: format!("Renamed {} → {}", matching_file, new_file),
+                });
+            }
+            Err(e) => {
+                info!("Failed to rename {}: {}", matching_file, e);
+                broken.push(BrokenLink {
+                    source: rel_path.to_string(),
+                    target: raw_target.to_string(),
+                    issue: LinkIssue::FilenameMismatch,
+                    fix_applied: String::new(),
+                });
+            }
+        }
+    } else {
+        match replace_wikilink_in_file(vault_root, rel_path, target_clean, &matching_stem) {
+            Ok(()) => {
+                info!(
+                    "Fixed wikilink in {} : [[{}]] → [[{}]]",
+                    rel_path, target_clean, matching_stem
+                );
+                fixed.push(BrokenLink {
+                    source: rel_path.to_string(),
+                    target: raw_target.to_string(),
+                    issue: LinkIssue::FilenameMismatch,
+                    fix_applied: format!(
+                        "Updated [[{}]] → [[{}]] in {}",
+                        target_clean, matching_stem, rel_path
+                    ),
+                });
+            }
+            Err(e) => {
+                info!("Failed to update wikilink in {}: {}", rel_path, e);
+                broken.push(BrokenLink {
+                    source: rel_path.to_string(),
+                    target: raw_target.to_string(),
+                    issue: LinkIssue::FilenameMismatch,
+                    fix_applied: String::new(),
+                });
+            }
+        }
+    }
+}
+
 pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result<LinkCheckResult> {
     let graph = build_vault_graph(vault_root, config)?;
     let md_files = collect_md_files(vault_root);
@@ -212,7 +384,6 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
     let mut broken: Vec<BrokenLink> = Vec::new();
     let mut fixed: Vec<BrokenLink> = Vec::new();
 
-    // Scan all .md files for wikilinks and check each raw target
     for rel_path in md_files.values() {
         let full_path = vault_root.join(rel_path);
         let content = match fs::read_to_string(&full_path) {
@@ -224,163 +395,53 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
         total_links += raw_targets.len();
 
         for raw_target in raw_targets {
-            // Strip .md suffix if user included it in the wikilink
-            let target_clean = raw_target.strip_suffix(".md").unwrap_or(&raw_target).to_string();
+            let target_clean = raw_target
+                .strip_suffix(".md")
+                .unwrap_or(&raw_target)
+                .to_string();
 
-            // Already resolves? Skip.
             if resolve_raw_target(&target_clean, &md_files, &stem_index).is_some() {
                 continue;
             }
 
-            // Check extension mismatch: target exists as .txt
+            // Extension mismatch: target exists as .txt
             let target_lower = target_clean.to_lowercase();
             if let Some(txt_original) = txt_stems.get(&target_lower) {
-                if fix {
-                    let old_path = vault_root.join(format!("{}.txt", txt_original));
-                    let new_path = vault_root.join(format!("{}.md", txt_original));
-
-                    // Guard: skip if .md already exists to prevent silent overwrite
-                    if new_path.exists() {
-                        broken.push(BrokenLink {
-                            source: rel_path.clone(),
-                            target: raw_target.clone(),
-                            issue: "extension_mismatch".to_string(),
-                            fix_applied: format!(
-                                "Skipped: {}.md already exists",
-                                txt_original
-                            ),
-                        });
-                        continue;
-                    }
-
-                    match fs::rename(&old_path, &new_path) {
-                        Ok(()) => {
-                            info!(
-                                "Renamed {}.txt → {}.md (extension mismatch fix)",
-                                txt_original, txt_original
-                            );
-                            fixed.push(BrokenLink {
-                                source: rel_path.clone(),
-                                target: raw_target.clone(),
-                                issue: "extension_mismatch".to_string(),
-                                fix_applied: format!(
-                                    "Renamed {}.txt → {}.md",
-                                    txt_original, txt_original
-                                ),
-                            });
-                        }
-                        Err(e) => {
-                            info!("Failed to rename {}.txt: {}", txt_original, e);
-                            broken.push(BrokenLink {
-                                source: rel_path.clone(),
-                                target: raw_target.clone(),
-                                issue: "extension_mismatch".to_string(),
-                                fix_applied: String::new(),
-                            });
-                        }
-                    }
-                } else {
-                    broken.push(BrokenLink {
-                        source: rel_path.clone(),
-                        target: raw_target.clone(),
-                        issue: "extension_mismatch".to_string(),
-                        fix_applied: String::new(),
-                    });
-                }
+                handle_extension_mismatch(
+                    vault_root,
+                    rel_path,
+                    &raw_target,
+                    txt_original,
+                    fix,
+                    &mut broken,
+                    &mut fixed,
+                );
                 continue;
             }
 
-            // Check filename mismatch: hyphens ↔ spaces
+            // Filename mismatch: hyphens ↔ spaces
             if let Some(matching_file) =
                 find_normalized_match(&target_clean, &md_files, &stem_index)
             {
-                // Extract the actual stem from the matching file path
-                let matching_stem = matching_file.strip_suffix(".md").unwrap_or(matching_file).to_string();
-
-                if fix {
-                    // Only rename the file if it has NO incoming links using its current name.
-                    // Otherwise, fix the broken link in the source file.
-                    if !has_incoming_links(&graph, matching_file) {
-                        let old_path = vault_root.join(matching_file);
-                        let new_file = format!("{}.md", target_clean);
-                        let new_path = vault_root.join(&new_file);
-
-                        match fs::rename(&old_path, &new_path) {
-                            Ok(()) => {
-                                info!(
-                                    "Renamed {} → {} (filename mismatch fix)",
-                                    matching_file, new_file
-                                );
-                                fixed.push(BrokenLink {
-                                    source: rel_path.clone(),
-                                    target: raw_target.clone(),
-                                    issue: "filename_mismatch".to_string(),
-                                    fix_applied: format!(
-                                        "Renamed {} → {}",
-                                        matching_file, new_file
-                                    ),
-                                });
-                            }
-                            Err(e) => {
-                                info!("Failed to rename {}: {}", matching_file, e);
-                                broken.push(BrokenLink {
-                                    source: rel_path.clone(),
-                                    target: raw_target.clone(),
-                                    issue: "filename_mismatch".to_string(),
-                                    fix_applied: String::new(),
-                                });
-                            }
-                        }
-                    } else {
-                        // File has incoming links — fix the broken link in the source instead
-                        match replace_wikilink_in_file(
-                            vault_root,
-                            rel_path,
-                            &target_clean,
-                            &matching_stem,
-                        ) {
-                            Ok(()) => {
-                                info!(
-                                    "Fixed wikilink in {} : [[{}]] → [[{}]]",
-                                    rel_path, target_clean, matching_stem
-                                );
-                                fixed.push(BrokenLink {
-                                    source: rel_path.clone(),
-                                    target: raw_target.clone(),
-                                    issue: "filename_mismatch".to_string(),
-                                    fix_applied: format!(
-                                        "Updated [[{}]] → [[{}]] in {}",
-                                        target_clean, matching_stem, rel_path
-                                    ),
-                                });
-                            }
-                            Err(e) => {
-                                info!("Failed to update wikilink in {}: {}", rel_path, e);
-                                broken.push(BrokenLink {
-                                    source: rel_path.clone(),
-                                    target: raw_target.clone(),
-                                    issue: "filename_mismatch".to_string(),
-                                    fix_applied: String::new(),
-                                });
-                            }
-                        }
-                    }
-                } else {
-                    broken.push(BrokenLink {
-                        source: rel_path.clone(),
-                        target: raw_target.clone(),
-                        issue: "filename_mismatch".to_string(),
-                        fix_applied: String::new(),
-                    });
-                }
+                handle_filename_mismatch(
+                    vault_root,
+                    &graph,
+                    rel_path,
+                    &raw_target,
+                    &target_clean,
+                    matching_file,
+                    fix,
+                    &mut broken,
+                    &mut fixed,
+                );
                 continue;
             }
 
-            // Truly unresolved link — no .md match, no .txt match, no normalization match
+            // Truly unresolved
             broken.push(BrokenLink {
                 source: rel_path.clone(),
                 target: raw_target.clone(),
-                issue: "unresolved".to_string(),
+                issue: LinkIssue::Unresolved,
                 fix_applied: String::new(),
             });
         }
@@ -425,7 +486,7 @@ mod tests {
 
         assert_eq!(result.broken.len(), 1);
         assert_eq!(result.broken[0].target, "Nonexistent");
-        assert_eq!(result.broken[0].issue, "unresolved");
+        assert_eq!(result.broken[0].issue, LinkIssue::Unresolved);
         assert!(result.broken[0].fix_applied.is_empty());
         assert!(result.fixed.is_empty());
     }
@@ -441,7 +502,7 @@ mod tests {
         let result = check_links(tmp.path(), &config, true).unwrap();
 
         assert_eq!(result.fixed.len(), 1);
-        assert_eq!(result.fixed[0].issue, "extension_mismatch");
+        assert_eq!(result.fixed[0].issue, LinkIssue::ExtensionMismatch);
         assert!(result.fixed[0].fix_applied.contains("Some Note.txt"));
         assert!(tmp.path().join("Some Note.md").exists());
         assert!(!tmp.path().join("Some Note.txt").exists());
@@ -463,7 +524,10 @@ mod tests {
         assert!(result.broken.is_empty());
         assert!(result.fixed.is_empty());
         // Original .md should be preserved
-        assert_eq!(fs::read_to_string(tmp.path().join("Note.md")).unwrap(), "md content");
+        assert_eq!(
+            fs::read_to_string(tmp.path().join("Note.md")).unwrap(),
+            "md content"
+        );
     }
 
     #[test]
@@ -477,7 +541,7 @@ mod tests {
         let result = check_links(tmp.path(), &config, true).unwrap();
 
         assert_eq!(result.fixed.len(), 1);
-        assert_eq!(result.fixed[0].issue, "filename_mismatch");
+        assert_eq!(result.fixed[0].issue, LinkIssue::FilenameMismatch);
         assert!(
             result.fixed[0].fix_applied.contains("My Note")
                 || result.fixed[0].fix_applied.contains("My-Note")
