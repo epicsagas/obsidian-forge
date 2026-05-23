@@ -403,7 +403,13 @@ fn check_file_links(
         let target_lower = target_clean.to_lowercase();
         if let Some(txt_original) = txt_stems.get(&target_lower) {
             handle_extension_mismatch(
-                vault_root, rel_path, &raw_target, txt_original, fix, broken, fixed,
+                vault_root,
+                rel_path,
+                &raw_target,
+                txt_original,
+                fix,
+                broken,
+                fixed,
             );
             continue;
         }

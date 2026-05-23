@@ -443,9 +443,7 @@ fn scan_project_docs(
         };
 
         // Build required tag list for the common checker
-        let mut required_tags: Vec<RequiredTag<'_>> = vec![
-            ("layer/raw", "missing_layer"),
-        ];
+        let mut required_tags: Vec<RequiredTag<'_>> = vec![("layer/raw", "missing_layer")];
         if let Some(ref tt) = type_tag {
             required_tags.push((tt.as_str(), "missing_type"));
         }
@@ -518,19 +516,25 @@ fn scan_resource_docs(
             // No frontmatter — report and fix missing tags
             let mut missing_tags: Vec<String> = Vec::new();
             let first_issue_idx = result.issues.len();
-            for tag in [("layer/raw", "missing_layer"), ("type/reference", "missing_type")] {
-                if let Some(t) = check_missing_tag(
-                    &HashSet::new(),
-                    tag.0,
-                    tag.1,
-                    &relative,
-                    &mut result.issues,
-                ) {
+            for tag in [
+                ("layer/raw", "missing_layer"),
+                ("type/reference", "missing_type"),
+            ] {
+                if let Some(t) =
+                    check_missing_tag(&HashSet::new(), tag.0, tag.1, &relative, &mut result.issues)
+                {
                     missing_tags.push(t);
                 }
             }
 
-            apply_no_frontmatter_fixes(path, &content, fix, &missing_tags, result, first_issue_idx)?;
+            apply_no_frontmatter_fixes(
+                path,
+                &content,
+                fix,
+                &missing_tags,
+                result,
+                first_issue_idx,
+            )?;
             continue;
         };
 
