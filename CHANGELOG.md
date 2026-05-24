@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-05-25
+
+### Added
+
+- **Vault maintenance automation** (`of vault doctor`, `of vault maintenance`): new subcommands for vault health diagnostics and automated cleanup/repair.
+
+## [0.2.3] - 2026-05-24
+
+### Changed
+
+- Bump `serde_json` from 1.0.149 to 1.0.150.
+
+## [0.2.2] - 2026-05-24
+
+### Added
+
+- Shell and PowerShell one-line installers with SHA-256 verification.
+- `cargo-binstall` metadata for pre-built binary support.
+- Homebrew formula auto-publish via `publish-homebrew-formula` CI job.
+
+### Fixed
+
+- Removed `aarch64-linux-musl` target due to ports.ubuntu.com outage.
+- Homebrew publish job no longer blocks releases.
+
+## [0.2.1] - 2026-05-23
+
+### Changed
+
+- Collapsed nested conditionals and enhanced `status` output readability.
+
+### Fixed
+
+- CI: added `publish-homebrew-formula` job to release workflow.
+- Bumped `actions/checkout` from 4 to 6, `actions/upload-artifact` from 4 to 7, `actions/download-artifact` from 7 to 8.
+
 ## [0.2.0] - 2026-05-16
 
 ### Added
@@ -76,6 +112,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Conventional Commits for all auto-generated vault commits
 - Apache-2.0 license
 
-[Unreleased]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/epicsagas/obsidian-forge/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/epicsagas/obsidian-forge/releases/tag/v0.1.0
