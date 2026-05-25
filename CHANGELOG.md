@@ -65,6 +65,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated base templates (`MOC.md`, `ZK-Note.md`, `Project-Note.md`) with mandatory Karpathy 3-Layer metadata and hierarchical tags.
 - Enabled `ai_relationships`, `tag_hierarchy`, and `orphan_detection` by default in new vaults.
 
+## [0.1.10] - 2026-05-12
+
+### Added
+
+- One-line installer scripts (shell + PowerShell) with SHA-256 verification.
+
+### Fixed
+
+- Correct archive filename and extraction path in installer.
+- Remove unsupported `extra-artifacts` from dist-workspace.toml.
+
+## [0.1.9] - 2026-05-12
+
+### Fixed
+
+- Make daemon `enable` and `start` idempotent for already-loaded LaunchAgents.
+- Remove invalid crate `publish-job` value from dist config.
+
+### Changed
+
+- Sync all README translations with current English source.
+- Add crate publish job for crates.io.
+
+## [0.1.8] - 2026-05-11
+
+### Added
+
+- `cargo-binstall` metadata for pre-built binary support.
+
+### Changed
+
+- Restructure and standardize README installation section per OSS standards.
+
+## [0.1.7] - 2026-05-11
+
+### Added
+
+- Migrate to cargo-dist v0.31.0 for cross-platform distribution.
+- macOS code signing and notarization setup.
+
+### Fixed
+
+- Unify CI workflow: check/test/audit/SBOM jobs, fix cyclonedx flags.
+- Change rust-toolchain channel from 1.88 to stable.
+- Homebrew publish made non-blocking (`HOMEBREW_TAP_TOKEN` optional).
+
+## [0.1.6] - 2026-05-10
+
+### Added
+
+- **AI suggest-then-move intake pipeline** with policy layer and type mapping validation (#9).
+- Ontology seeding and template distribution automation during vault init.
+- `daemon restart` and `doctor` commands.
+- Enhanced README with settings management and graph operations sections.
+
+### Changed
+
+- CLI: `daemon install/uninstall` renamed to `enable/disable` (old names work as aliases).
+
+### Fixed
+
+- Use `GLOBAL_DIR` constant for `.env` and log paths.
+
+## [0.1.5] - 2026-04-30
+
+### Changed
+
+- Bump `softprops/action-gh-release` from 2 to 3 (#6).
+
 ## [0.1.0] - 2026-03-25
 
 ### Added
@@ -117,5 +186,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.2.3]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/epicsagas/obsidian-forge/compare/v0.1.0...v0.2.0
+[0.2.0]: https://github.com/epicsagas/obsidian-forge/compare/v0.1.10...v0.2.0
+[0.1.10]: https://github.com/epicsagas/obsidian-forge/compare/v0.1.9...v0.1.10
+[0.1.9]: https://github.com/epicsagas/obsidian-forge/compare/v0.1.8...v0.1.9
+[0.1.8]: https://github.com/epicsagas/obsidian-forge/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/epicsagas/obsidian-forge/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/epicsagas/obsidian-forge/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/epicsagas/obsidian-forge/compare/v0.1.4...v0.1.5
 [0.1.0]: https://github.com/epicsagas/obsidian-forge/releases/tag/v0.1.0
