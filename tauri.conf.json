@@ -1,0 +1,24 @@
+{
+  "productName": "Obsidian Forge Dashboard",
+  "version": "0.1.0",
+  "identifier": "com.obsidian-forge.dashboard",
+  "build": {
+    "frontendDist": "./ui/dist",
+    "beforeBuildCommand": "npm run build --prefix ui"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Vault Dashboard",
+        "width": 1200,
+        "height": 800,
+        "url": "index.html",
+        "incognito": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:"
+    }
+  }
+}
