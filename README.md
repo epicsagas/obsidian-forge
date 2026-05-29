@@ -13,7 +13,7 @@
 <p align="center">
   <a href="https://crates.io/crates/obsidian-forge"><img alt="Crates.io" src="https://img.shields.io/crates/v/obsidian-forge?style=for-the-badge&labelColor=0d1117&color=fc8d62&logo=rust&logoColor=white" /></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-3fb950?style=for-the-badge&labelColor=0d1117" /></a>
-  <img alt="Rust" src="https://img.shields.io/badge/rust-1.85+-d73a49?style=for-the-badge&labelColor=0d1117&logo=rust&logoColor=white" />
+  <a href="https://blog.rust-lang.org/"><img alt="Rust" src="https://img.shields.io/badge/rust-1.85+-d73a49?style=for-the-badge&labelColor=0d1117&logo=rust&logoColor=white" /></a>
   <a href="https://buymeacoffee.com/epicsaga"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/buy_me_a_coffee-FFDD00?style=for-the-badge&labelColor=0d1117&logo=buymeacoffee&logoColor=black" /></a>
 </p>
 
