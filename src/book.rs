@@ -115,7 +115,7 @@ pub fn show_book_status(name: Option<&str>, vault_path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Export a book project to a standalone directory compatible with book-forge.
+/// Export a book project to a standalone directory compatible with Velith.
 pub fn export_book(name: &str, vault_path: &Path, output_path: &Path) -> Result<()> {
     let book_root = vault_path.join("01-Projects").join(name);
     if !book_root.exists() {

@@ -210,7 +210,7 @@ Gestiona proyectos de escritura de libros directamente desde la bóveda.
 ```bash
 of book init <name> [--genre <genre>] [--lang <lang>]   # crear estructura en 01-Projects/
 of book status [<name>]                                   # progreso: borrador / edición / publicación
-of book export <name> [--output <dir>]                   # exportar para book-forge
+of book export <name> [--output <dir>]                   # exportar para Velith
 of book sync   <name>                                     # enlazar notas etiquetadas → sources/
 ```
 
@@ -336,7 +336,7 @@ obsidian-forge es el **proyecto compañero de [alcove](https://github.com/epicsa
 
 - **obsidian-forge** = **La Forja** (escribir/empujar). Demonio en segundo plano que automatiza el mantenimiento de la bóveda, fortalece el grafo de conocimiento y sincroniza con git.
 - **alcove** = **La Biblioteca** (leer/tirar). Servidor MCP que proporciona a los agentes IA acceso bajo demanda y con capacidad de búsqueda a la documentación sin inflar la ventana de contexto.
-- **[book-forge](https://github.com/epicsagas/book-forge)** = **La Imprenta** (redactar/publicar). Toolkit de escritura de libros asistido por IA que consume el directorio exportado por `of book export` y gestiona el pipeline completo de borrador → edición → publicación.
+- **[Velith](https://github.com/epicsagas/Velith)** = **La Imprenta** (redactar/publicar). Toolkit de escritura de libros asistido por IA que consume el directorio exportado por `of book export` y gestiona el pipeline completo de borrador → edición → publicación.
 
 ```mermaid
 graph LR
@@ -345,7 +345,7 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Tools| E[AI Agent]
     E -.->|Refers to| D
-    B -->|of book export| F(book-forge)
+    B -->|of book export| F(Velith)
     F -->|borrador / edición / pub.| G[Libro]
 ```
 
@@ -360,9 +360,9 @@ Mientras `obsidian-forge` se centra en construir y automatizar tu grafo de conoc
 3.  **Descubrimiento por el Agente**: Tu agente IA (usando el servidor MCP Alcove) ahora puede "descubrir" esa nota vía `search_project_docs` o `get_doc_file` en lugar de que tú tengas que copiar y pegar en el chat.
 4.  **Cumplimiento de Políticas**: Usa `validate_docs` de Alcove para asegurar que tus notas promocionadas cumplan con los estándares de documentación del proyecto (definidos en `policy.toml`).
 
-### Integración con book-forge
+### Integración con Velith
 
-[book-forge](https://github.com/epicsagas/book-forge) es el toolkit dedicado de escritura de libros con IA. `obsidian-forge` gestiona el **lado de la bóveda** — organizar notas, etiquetar investigaciones, crear la estructura del proyecto. `book-forge` gestiona el **lado de la escritura** — borradores de capítulos, pasadas de edición, empaquetado para publicación.
+[Velith](https://github.com/epicsagas/Velith) es el toolkit dedicado de escritura de libros con IA. `obsidian-forge` gestiona el **lado de la bóveda** — organizar notas, etiquetar investigaciones, crear la estructura del proyecto. `Velith` gestiona el **lado de la escritura** — borradores de capítulos, pasadas de edición, empaquetado para publicación.
 
 #### Flujo de trabajo: Bóveda → Libro
 
@@ -376,17 +376,17 @@ of book init mi-libro --genre non-fiction --lang es
 # 3. Sincronizar notas etiquetadas en sources/
 of book sync mi-libro
 
-# 4. Exportar a directorio compatible con book-forge
+# 4. Exportar a directorio compatible con Velith
 of book export mi-libro --output ~/books/
 
-# 5. Transferir a book-forge
+# 5. Transferir a Velith
 cd ~/books/mi-libro
-book-forge draft        # borrador de capítulos con IA desde sources/
-book-forge edit         # pipeline de edición en múltiples pasadas
-book-forge publish      # empaquetar EPUB / PDF
+Velith draft        # borrador de capítulos con IA desde sources/
+Velith edit         # pipeline de edición en múltiples pasadas
+Velith publish      # empaquetar EPUB / PDF
 ```
 
-El directorio exportado contiene `PRD.md` (objetivos), `STYLE.md` (guía de estilo), `drafts/`, `edits/` y `publish/` — exactamente la estructura que `book-forge` espera.
+El directorio exportado contiene `PRD.md` (objetivos), `STYLE.md` (guía de estilo), `drafts/`, `edits/` y `publish/` — exactamente la estructura que `Velith` espera.
 
 ---
 

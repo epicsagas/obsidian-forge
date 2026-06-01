@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Book project management** (`of book`): new subcommand group for vault-integrated writing projects.
   - `of book init <name> [--genre <genre>] [--lang <lang>]` — scaffold a book project under `01-Projects/<name>/` with `drafts/`, `edits/`, `publish/cover/`, `PRD.md`, `STYLE.md`, and a `sources/` symlink to `03-Resources/`.
   - `of book status [<name>]` — tabular view of draft / edit / publish phase completion across all book projects (or one specific project).
-  - `of book export <name> [--output <dir>]` — copy a book project to a standalone directory compatible with `book-forge`.
+  - `of book export <name> [--output <dir>]` — copy a book project to a standalone directory compatible with `Velith`.
   - `of book sync <name>` — walk the vault and link notes tagged `book/<name>` into `sources/` as symlinks.
 - `BookConfig` struct with `book_dir` option (default: `01-Projects`).
 - Two new bundled templates: `Book-Project-MOC.md` and `Book-Chapter-Draft.md`.

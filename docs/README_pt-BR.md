@@ -210,7 +210,7 @@ Gerencie projetos de escrita de livros diretamente do cofre.
 ```bash
 of book init <name> [--genre <genre>] [--lang <lang>]   # criar estrutura em 01-Projects/
 of book status [<name>]                                   # progresso: rascunho / edição / publicação
-of book export <name> [--output <dir>]                   # exportar para book-forge
+of book export <name> [--output <dir>]                   # exportar para Velith
 of book sync   <name>                                     # vincular notas marcadas → sources/
 ```
 
@@ -336,7 +336,7 @@ obsidian-forge é o **projeto parceiro do [alcove](https://github.com/epicsagas/
 
 - **obsidian-forge** = **A Forja** (escrever/empurrar). Daemon em segundo plano que automatiza a manutenção do cofre, fortalece o grafo de conhecimento e sincroniza com o git.
 - **alcove** = **A Biblioteca** (ler/puxar). Servidor MCP que fornece aos agentes de IA acesso sob demanda e pesquisável à documentação sem sobrecarregar a janela de contexto.
-- **[book-forge](https://github.com/epicsagas/book-forge)** = **A Tipografia** (redigir/publicar). Toolkit de escrita de livros assistido por IA que consome o diretório exportado por `of book export` e conduz o pipeline completo de rascunho → edição → publicação.
+- **[Velith](https://github.com/epicsagas/Velith)** = **A Tipografia** (redigir/publicar). Toolkit de escrita de livros assistido por IA que consome o diretório exportado por `of book export` e conduz o pipeline completo de rascunho → edição → publicação.
 
 ```mermaid
 graph LR
@@ -345,7 +345,7 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|Ferramentas MCP| E[Agente de IA]
     E -.->|Refere-se a| D
-    B -->|of book export| F(book-forge)
+    B -->|of book export| F(Velith)
     F -->|rascunho / edição / pub.| G[Livro]
 ```
 
@@ -360,9 +360,9 @@ Enquanto o `obsidian-forge` se concentra em construir e automatizar seu grafo de
 3.  **Descoberta pelo Agente**: Seu agente de IA (usando o servidor MCP Alcove) agora pode "descobrir" essa nota via `search_project_docs` ou `get_doc_file` em vez de você ter que copiar e colar no chat.
 4.  **Conformidade com Políticas**: Use o `validate_docs` do Alcove para garantir que suas notas promovidas atendam aos padrões de documentação do projeto (definidos em `policy.toml`).
 
-### Integração com o book-forge
+### Integração com o Velith
 
-[book-forge](https://github.com/epicsagas/book-forge) é o toolkit dedicado à escrita de livros com IA. O `obsidian-forge` gerencia o **lado do cofre** — organizar notas, etiquetar pesquisas, criar a estrutura do projeto. O `book-forge` gerencia o **lado da escrita** — rascunhos de capítulos, passes de edição, empacotamento para publicação.
+[Velith](https://github.com/epicsagas/Velith) é o toolkit dedicado à escrita de livros com IA. O `obsidian-forge` gerencia o **lado do cofre** — organizar notas, etiquetar pesquisas, criar a estrutura do projeto. O `Velith` gerencia o **lado da escrita** — rascunhos de capítulos, passes de edição, empacotamento para publicação.
 
 #### Fluxo de trabalho: Cofre → Livro
 
@@ -376,17 +376,17 @@ of book init meu-livro --genre non-fiction --lang pt
 # 3. Sincronizar notas etiquetadas em sources/
 of book sync meu-livro
 
-# 4. Exportar para diretório compatível com book-forge
+# 4. Exportar para diretório compatível com Velith
 of book export meu-livro --output ~/books/
 
-# 5. Transferir para o book-forge
+# 5. Transferir para o Velith
 cd ~/books/meu-livro
-book-forge draft        # rascunho de capítulos com IA a partir de sources/
-book-forge edit         # pipeline de edição em múltiplas passes
-book-forge publish      # empacotar EPUB / PDF
+Velith draft        # rascunho de capítulos com IA a partir de sources/
+Velith edit         # pipeline de edição em múltiplas passes
+Velith publish      # empacotar EPUB / PDF
 ```
 
-O diretório exportado contém `PRD.md` (objetivos), `STYLE.md` (guia de estilo), `drafts/`, `edits/` e `publish/` — exatamente a estrutura que o `book-forge` espera.
+O diretório exportado contém `PRD.md` (objetivos), `STYLE.md` (guia de estilo), `drafts/`, `edits/` e `publish/` — exatamente a estrutura que o `Velith` espera.
 
 ---
 

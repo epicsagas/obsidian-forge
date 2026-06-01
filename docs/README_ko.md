@@ -210,7 +210,7 @@ obsidian-forge watch --vault <name> --interval <seconds>
 ```bash
 of book init <name> [--genre <genre>] [--lang <lang>]   # 01-Projects/ 아래 스캐폴딩
 of book status [<name>]                                   # 초고 / 편집 / 출판 진행 현황
-of book export <name> [--output <dir>]                   # book-forge 호환 디렉토리로 내보내기
+of book export <name> [--output <dir>]                   # Velith 호환 디렉토리로 내보내기
 of book sync   <name>                                     # 태그 노트 → sources/ 심볼릭 링크
 ```
 
@@ -336,7 +336,7 @@ obsidian-forge/
 
 - **obsidian-forge** = **대장간 (The Forge)** (쓰기/푸시). 볼트 유지 관리를 자동화하고, 지식 그래프를 강화하며, git에 동기화하는 백그라운드 데몬입니다.
 - **alcove** = **도서관 (The Library)** (읽기/가져오기). 컨텍스트 창을 비대하게 만들지 않으면서 AI 에이전트에게 온디맨드 검색이 가능한 문서 접근 권한을 제공하는 MCP 서버입니다.
-- **[book-forge](https://github.com/epicsagas/book-forge)** = **인쇄소 (The Press)** (집필/출판). `of book export`로 내보낸 디렉토리를 입력받아 초고 → 편집 → 출판 전체 파이프라인을 구동하는 AI 기반 도서 집필 툴킷입니다.
+- **[Velith](https://github.com/epicsagas/Velith)** = **인쇄소 (The Press)** (집필/출판). `of book export`로 내보낸 디렉토리를 입력받아 초고 → 편집 → 출판 전체 파이프라인을 구동하는 AI 기반 도서 집필 툴킷입니다.
 
 ```mermaid
 graph LR
@@ -345,7 +345,7 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP 도구| E[AI 에이전트]
     E -.->|참조| D
-    B -->|of book export| F(book-forge)
+    B -->|of book export| F(Velith)
     F -->|초고 / 편집 / 출판| G[도서]
 ```
 
@@ -360,9 +360,9 @@ graph LR
 3.  **에이전트 발견**: 이제 AI 에이전트(Alcove MCP 서버 사용)는 채팅에 일일이 복사-붙여넣기 할 필요 없이 `search_project_docs` 또는 `get_doc_file`을 통해 해당 노트를 "발견"할 수 있습니다.
 4.  **정책 준수**: Alcove의 `validate_docs`를 사용하여 승급된 노트가 프로젝트의 문서 표준(`policy.toml`에 정의됨)을 충족하는지 확인합니다.
 
-### book-forge 연동
+### Velith 연동
 
-[book-forge](https://github.com/epicsagas/book-forge)는 AI 기반 도서 집필 전용 툴킷입니다. `obsidian-forge`는 **볼트 측**을 담당합니다 — 노트 정리, 리서치 태깅, 프로젝트 구조 스캐폴딩. `book-forge`는 **집필 측**을 담당합니다 — 챕터 초안 작성, 편집 패스, 출판용 패키징.
+[Velith](https://github.com/epicsagas/Velith)는 AI 기반 도서 집필 전용 툴킷입니다. `obsidian-forge`는 **볼트 측**을 담당합니다 — 노트 정리, 리서치 태깅, 프로젝트 구조 스캐폴딩. `Velith`는 **집필 측**을 담당합니다 — 챕터 초안 작성, 편집 패스, 출판용 패키징.
 
 #### 워크플로우: 볼트 → 도서
 
@@ -376,17 +376,17 @@ of book init my-novel --genre fiction --lang ko
 # 3. 태그된 노트를 sources/로 가져오기
 of book sync my-novel
 
-# 4. book-forge 호환 디렉토리로 내보내기
+# 4. Velith 호환 디렉토리로 내보내기
 of book export my-novel --output ~/books/
 
-# 5. book-forge에 인계
+# 5. Velith에 인계
 cd ~/books/my-novel
-book-forge draft        # sources/를 기반으로 AI 챕터 초안 작성
-book-forge edit         # 다단계 편집 파이프라인
-book-forge publish      # EPUB / PDF 패키징
+Velith draft        # sources/를 기반으로 AI 챕터 초안 작성
+Velith edit         # 다단계 편집 파이프라인
+Velith publish      # EPUB / PDF 패키징
 ```
 
-내보낸 디렉토리에는 `PRD.md`(목표), `STYLE.md`(어조 가이드), `drafts/`, `edits/`, `publish/`가 포함되며, 이는 `book-forge`가 기대하는 구조와 정확히 일치합니다.
+내보낸 디렉토리에는 `PRD.md`(목표), `STYLE.md`(어조 가이드), `drafts/`, `edits/`, `publish/`가 포함되며, 이는 `Velith`가 기대하는 구조와 정확히 일치합니다.
 
 ---
 

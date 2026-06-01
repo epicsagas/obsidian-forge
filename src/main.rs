@@ -301,7 +301,7 @@ enum BookAction {
     },
     /// Show all book projects status
     Status { name: Option<String> },
-    /// Export book project to standalone directory (book-forge compatible)
+    /// Export book project to standalone directory (Velith compatible)
     Export {
         name: String,
         #[arg(long, default_value = ".")]

@@ -229,7 +229,7 @@ Manage book writing projects from within the vault.
 ```bash
 of book init <name> [--genre <genre>] [--lang <lang>]   # scaffold in 01-Projects/
 of book status [<name>]                                   # draft / edit / publish progress
-of book export <name> [--output <dir>]                   # export for book-forge
+of book export <name> [--output <dir>]                   # export for Velith
 of book sync   <name>                                     # link tagged notes → sources/
 ```
 
@@ -356,7 +356,7 @@ obsidian-forge is the **companion project to [alcove](https://github.com/epicsag
 
 - **obsidian-forge** = **The Forge** (write/push). Background daemon that automates vault maintenance, strengthens the knowledge graph, and syncs to git.
 - **alcove** = **The Library** (read/pull). MCP server that provides AI agents with on-demand, searchable access to documentation without bloating the context window.
-- **[book-forge](https://github.com/epicsagas/book-forge)** = **The Press** (compose/publish). AI-assisted book writing toolkit that consumes the exported directory from `of book export` and drives the full drafting → editing → publishing pipeline.
+- **[Velith](https://github.com/epicsagas/Velith)** = **The Press** (compose/publish). AI-assisted book writing toolkit that consumes the exported directory from `of book export` and drives the full drafting → editing → publishing pipeline.
 
 ```mermaid
 graph LR
@@ -365,7 +365,7 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Tools| E[AI Agent]
     E -.->|Refers to| D
-    B -->|of book export| F(book-forge)
+    B -->|of book export| F(Velith)
     F -->|draft / edit / publish| G[Book]
 ```
 
@@ -380,9 +380,9 @@ While `obsidian-forge` focuses on building and automating your knowledge graph, 
 3.  **Agent Discovery**: Your AI agent (using the Alcove MCP server) can now "discover" that note via `search_project_docs` or `get_doc_file` instead of you having to copy-paste it into the chat.
 4.  **Policy Compliance**: Use Alcove's `validate_docs` to ensure your promoted notes meet the project's documentation standards (defined in `policy.toml`).
 
-### Integration with book-forge
+### Integration with Velith
 
-[book-forge](https://github.com/epicsagas/book-forge) is the dedicated AI book writing toolkit. `obsidian-forge` handles the **vault side** — organizing notes, tagging research, and scaffolding the project structure. `book-forge` handles the **writing side** — drafting chapters, editing passes, and packaging for publishing.
+[Velith](https://github.com/epicsagas/Velith) is the dedicated AI book writing toolkit. `obsidian-forge` handles the **vault side** — organizing notes, tagging research, and scaffolding the project structure. `Velith` handles the **writing side** — drafting chapters, editing passes, and packaging for publishing.
 
 #### Workflow: Vault → Book
 
@@ -396,17 +396,17 @@ of book init my-novel --genre fiction --lang en
 # 3. Pull tagged notes into sources/
 of book sync my-novel
 
-# 4. Export to a book-forge-compatible directory
+# 4. Export to a Velith-compatible directory
 of book export my-novel --output ~/books/
 
-# 5. Hand off to book-forge
+# 5. Hand off to Velith
 cd ~/books/my-novel
-book-forge draft        # AI-assisted chapter drafting from sources/
-book-forge edit         # multi-pass editing pipeline
-book-forge publish      # package EPUB / PDF
+Velith draft        # AI-assisted chapter drafting from sources/
+Velith edit         # multi-pass editing pipeline
+Velith publish      # package EPUB / PDF
 ```
 
-The exported directory contains `PRD.md` (goals), `STYLE.md` (voice & tone guide), `drafts/`, `edits/`, and `publish/` — exactly the structure `book-forge` expects.
+The exported directory contains `PRD.md` (goals), `STYLE.md` (voice & tone guide), `drafts/`, `edits/`, and `publish/` — exactly the structure `Velith` expects.
 
 ---
 
