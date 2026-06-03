@@ -1,0 +1,22 @@
+{
+  "name": "obsidian-forge",
+  "version": "0.2.4",
+  "description": "Obsidian vault lifecycle management — inbox AI classification, graph strengthening, MOC regeneration, and multi-vault sync.",
+  "author": {
+    "name": "epicsagas",
+    "url": "https://github.com/epicsagas"
+  },
+  "homepage": "https://github.com/epicsagas/obsidian-forge",
+  "repository": "https://github.com/epicsagas/obsidian-forge",
+  "license": "Apache-2.0",
+  "keywords": [
+    "obsidian",
+    "vault",
+    "pkm",
+    "zettelkasten",
+    "graph",
+    "moc",
+    "para"
+  ],
+  "skills": "./skills/"
+}
