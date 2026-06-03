@@ -91,6 +91,39 @@ Yukarıdaki tüm yöntemlerle hem `obsidian-forge` hem de `of` (kısa takma ad) 
 | Linux | ARM64 (aarch64) | ✅ Tam desteklenir |
 | Windows | x86_64 (MSVC) | ⚠️ Kısmen desteklenir (LaunchAgent yok) |
 
+### AI Ajan Eklentileri
+
+obsidian-forge, AI asistanlarına bağlam duyarlı kasa işlemleri sunan 5 yerleşik ajan yeteneğiyle birlikte gelir:
+
+| Yetenek | Tetikleyici |
+|-------|---------|
+| `vault-health` | Kasa sağlık kontrolü, kasa teşhisi, kasa durumu |
+| `vault-sync` | Kasayı senkronize et, MOC'leri ve grafiği güncelle, kasa değişikliklerini commit et |
+| `graph-strengthen` | Grafiği güçlendir, grafik sağlığı, yetimleri düzelt |
+| `inbox-process` | Gelen kutusunu işle, notları sınıflandır, PARA yönlendirme |
+| `vault-fix` | Kasayı düzelt, etiketleri onar, bağlantıları düzelt, frontmatter'ı düzelt |
+
+#### Claude Code
+
+```bash
+claude plugin marketplace add epicsagas/plugins
+claude plugin install obsidian-forge@epicsagas
+```
+
+#### Codex CLI
+
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+#### Antigravity
+
+```bash
+agy plugin install https://github.com/epicsagas/obsidian-forge
+```
+
+Kurulduktan sonra, kasa yönetimi, PARA yönlendirme, grafik işlemleri veya daemon sorunları hakkında sorular sorduğunuzda AI ajanınız otomatik olarak doğru yeteneği tetikler.
+
 ### Ön koşullar
 
 | Araç | Gerekli | Amaç |

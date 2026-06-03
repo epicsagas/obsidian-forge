@@ -91,6 +91,39 @@ cargo install obsidian-forge    # 从源码编译
 | Linux | ARM64 (aarch64) | ✅ 完全支持 |
 | Windows | x86_64 (MSVC) | ⚠️ 部分支持（无 LaunchAgent） |
 
+### AI 代理插件
+
+obsidian-forge 内置了 5 个代理技能，为 AI 助手提供上下文感知的知识库操作：
+
+| 技能 | 触发方式 |
+|-------|---------|
+| `vault-health` | 知识库健康检查、诊断知识库、知识库状态 |
+| `vault-sync` | 同步知识库、更新 MOC 和图谱、提交知识库变更 |
+| `graph-strengthen` | 增强图谱、图谱健康、修复孤立笔记 |
+| `inbox-process` | 处理收件箱、分类笔记、PARA 路由 |
+| `vault-fix` | 修复知识库、修复标签、修复链接、修复 frontmatter |
+
+#### Claude Code
+
+```bash
+claude plugin marketplace add epicsagas/plugins
+claude plugin install obsidian-forge@epicsagas
+```
+
+#### Codex CLI
+
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+#### Antigravity
+
+```bash
+agy plugin install https://github.com/epicsagas/obsidian-forge
+```
+
+安装后，当你询问知识库管理、PARA 路由、图谱操作或守护进程相关问题时，AI 代理会自动触发相应的技能。
+
 ### 前置条件
 
 | 工具 | 是否必需 | 用途 |

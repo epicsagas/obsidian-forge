@@ -91,6 +91,39 @@ cargo install obsidian-forge    # ソースからビルド
 | Linux | ARM64 (aarch64) | ✅ 完全サポート |
 | Windows | x86_64 (MSVC) | ⚠️ 部分サポート（LaunchAgentなし） |
 
+### AIエージェントプラグイン
+
+obsidian-forgeには、AIアシスタントにコンテキスト認識のボールト操作を提供する5つの組み込みエージェントスキルが含まれています:
+
+| スキル | トリガー |
+|-------|---------|
+| `vault-health` | ボールトヘルスチェック、ボールト診断、ボールトステータス |
+| `vault-sync` | ボールト同期、MOCとグラフの更新、ボールト変更のコミット |
+| `graph-strengthen` | グラフ強化、グラフヘルス、孤立ノートの修正 |
+| `inbox-process` | インボックス処理、ノート分類、PARAルーティング |
+| `vault-fix` | ボールト修正、タグ修復、リンク修正、フロントマター修正 |
+
+#### Claude Code
+
+```bash
+claude plugin marketplace add epicsagas/plugins
+claude plugin install obsidian-forge@epicsagas
+```
+
+#### Codex CLI
+
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+#### Antigravity
+
+```bash
+agy plugin install https://github.com/epicsagas/obsidian-forge
+```
+
+インストール後、ボールト管理、PARAルーティング、グラフ操作、またはデーモンの問題について尋ねると、AIエージェントが自動的に適切なスキルをトリガーします。
+
 ### 前提条件
 
 | ツール | 必須 | 目的 |

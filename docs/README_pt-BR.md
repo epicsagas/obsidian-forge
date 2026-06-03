@@ -91,6 +91,39 @@ Tanto `obsidian-forge` quanto `of` (alias curto) são instalados por todos os m�
 | Linux | ARM64 (aarch64) | ✅ Completamente suportado |
 | Windows | x86_64 (MSVC) | ⚠️ Parcialmente suportado (sem LaunchAgent) |
 
+### Plugins de Agente IA
+
+O obsidian-forge vem com 5 habilidades de agente integradas que fornecem aos assistentes de IA operações de cofre com contexto:
+
+| Habilidade | Gatilho |
+|-------|---------|
+| `vault-health` | Verificação de saúde do cofre, diagnosticar cofre, status do cofre |
+| `vault-sync` | Sincronizar cofre, atualizar MOCs e grafo, commit de alterações do cofre |
+| `graph-strengthen` | Fortalecer grafo, saúde do grafo, corrigir órfãos |
+| `inbox-process` | Processar caixa de entrada, classificar notas, roteamento PARA |
+| `vault-fix` | Corrigir cofre, reparar tags, corrigir links, corrigir frontmatter |
+
+#### Claude Code
+
+```bash
+claude plugin marketplace add epicsagas/plugins
+claude plugin install obsidian-forge@epicsagas
+```
+
+#### Codex CLI
+
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+#### Antigravity
+
+```bash
+agy plugin install https://github.com/epicsagas/obsidian-forge
+```
+
+Uma vez instalado, seu agente de IA aciona automaticamente a habilidade certa quando você pergunta sobre gerenciamento de cofre, roteamento PARA, operações de grafo ou problemas do daemon.
+
 ### Pré-requisitos
 
 | Ferramenta | Necessário | Finalidade |

@@ -99,16 +99,38 @@ Both `obsidian-forge` and `of` (short alias) are installed by all methods above.
 | Linux | ARM64 (aarch64) | ✅ Fully supported |
 | Windows | x86_64 (MSVC) | ⚠️ Partially supported (no LaunchAgent) |
 
-### Claude Code Skill
+### AI Agent Plugins
 
-If you use [Claude Code](https://claude.ai/code), install the obsidian-forge skill to get context-aware AI assistance for `of` commands:
+obsidian-forge ships with 5 built-in agent skills that give AI assistants context-aware vault operations:
+
+| Skill | Trigger |
+|-------|---------|
+| `vault-health` | Vault health check, diagnose vault, vault status |
+| `vault-sync` | Sync vault, update mocs and graph, commit vault changes |
+| `graph-strengthen` | Strengthen graph, graph health, fix orphans |
+| `inbox-process` | Process inbox, classify notes, PARA routing |
+| `vault-fix` | Fix vault, repair tags, fix links, fix frontmatter |
+
+#### Claude Code
 
 ```bash
-mkdir -p ~/.claude/skills/obsidian-forge
-cp "$(of --skill-path 2>/dev/null || echo ./SKILL.md)" ~/.claude/skills/obsidian-forge/SKILL.md
+claude plugin marketplace add epicsagas/plugins
+claude plugin install obsidian-forge@epicsagas
 ```
 
-Or copy `SKILL.md` from this repo root manually. Once installed, Claude automatically triggers the skill when you ask about vault management, PARA routing, graph operations, or daemon issues.
+#### Codex CLI
+
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+#### Antigravity
+
+```bash
+agy plugin install https://github.com/epicsagas/obsidian-forge
+```
+
+Once installed, your AI agent automatically triggers the right skill when you ask about vault management, PARA routing, graph operations, or daemon issues.
 
 ### Prerequisites
 

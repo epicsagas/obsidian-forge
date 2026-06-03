@@ -91,6 +91,39 @@ cargo install obsidian-forge    # 소스에서 빌드
 | Linux | ARM64 (aarch64) | ✅ 완전 지원 |
 | Windows | x86_64 (MSVC) | ⚠️ 부분 지원 (LaunchAgent 없음) |
 
+### AI 에이전트 플러그인
+
+obsidian-forge에는 AI 어시스턴트에게 컨텍스트 인식 볼트 작업을 제공하는 5개의 내장 에이전트 스킬이 포함되어 있습니다:
+
+| 스킬 | 트리거 |
+|-------|---------|
+| `vault-health` | 볼트 상태 확인, 볼트 진단, 볼트 상태 |
+| `vault-sync` | 볼트 동기화, MOC 및 그래프 업데이트, 볼트 변경사항 커밋 |
+| `graph-strengthen` | 그래프 강화, 그래프 상태, 고립 노트 수정 |
+| `inbox-process` | 인박스 처리, 노트 분류, PARA 라우팅 |
+| `vault-fix` | 볼트 수정, 태그 복구, 링크 수정, 프론트매터 수정 |
+
+#### Claude Code
+
+```bash
+claude plugin marketplace add epicsagas/plugins
+claude plugin install obsidian-forge@epicsagas
+```
+
+#### Codex CLI
+
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+#### Antigravity
+
+```bash
+agy plugin install https://github.com/epicsagas/obsidian-forge
+```
+
+설치하면, 볼트 관리, PARA 라우팅, 그래프 작업 또는 데몬 문제에 대해 질문할 때 AI 에이전트가 자동으로 적절한 스킬을 트리거합니다.
+
 ### 사전 요구사항
 
 | 도구 | 필수 여부 | 목적 |

@@ -91,6 +91,39 @@ Sowohl `obsidian-forge` als auch `of` (Kurzalias) werden von allen oben genannte
 | Linux | ARM64 (aarch64) | ✅ Vollständig unterstützt |
 | Windows | x86_64 (MSVC) | ⚠️ Teilweise unterstützt (kein LaunchAgent) |
 
+### KI-Agenten-Plugins
+
+obsidian-forge wird mit 5 eingebauten Agenten-Skills geliefert, die KI-Assistenten kontextbewusste Tresor-Operationen bieten:
+
+| Skill | Auslöser |
+|-------|---------|
+| `vault-health` | Tresor-Gesundheitsprüfung, Tresor diagnostizieren, Tresor-Status |
+| `vault-sync` | Tresor synchronisieren, MOCs und Graph aktualisieren, Tresor-Änderungen committen |
+| `graph-strengthen` | Graph verstärken, Graph-Gesundheit, Verwaiste reparieren |
+| `inbox-process` | Posteingang verarbeiten, Notizen klassifizieren, PARA-Routing |
+| `vault-fix` | Tresor reparieren, Tags reparieren, Links korrigieren, Frontmatter korrigieren |
+
+#### Claude Code
+
+```bash
+claude plugin marketplace add epicsagas/plugins
+claude plugin install obsidian-forge@epicsagas
+```
+
+#### Codex CLI
+
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+#### Antigravity
+
+```bash
+agy plugin install https://github.com/epicsagas/obsidian-forge
+```
+
+Nach der Installation löst Ihr KI-Agent automatisch den richtigen Skill aus, wenn Sie nach Tresor-Verwaltung, PARA-Routing, Graph-Operationen oder Daemon-Problemen fragen.
+
 ### Voraussetzungen
 
 | Werkzeug | Erforderlich | Zweck |

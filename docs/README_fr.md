@@ -91,6 +91,39 @@ Les deux commandes `obsidian-forge` et `of` (alias court) sont installées par t
 | Linux | ARM64 (aarch64) | ✅ Entièrement supporté |
 | Windows | x86_64 (MSVC) | ⚠️ Partiellement supporté (pas de LaunchAgent) |
 
+### Plugins d'Agent IA
+
+obsidian-forge est livré avec 5 compétences d'agent intégrées qui offrent aux assistants IA des opérations de coffre adaptées au contexte :
+
+| Compétence | Déclencheur |
+|-------|---------|
+| `vault-health` | Vérification de santé du coffre, diagnostiquer le coffre, statut du coffre |
+| `vault-sync` | Synchroniser le coffre, mettre à jour les MOCs et le graphe, commiter les modifications du coffre |
+| `graph-strengthen` | Renforcer le graphe, santé du graphe, corriger les orphelins |
+| `inbox-process` | Traiter la boîte de réception, classer les notes, routage PARA |
+| `vault-fix` | Réparer le coffre, réparer les tags, corriger les liens, corriger le frontmatter |
+
+#### Claude Code
+
+```bash
+claude plugin marketplace add epicsagas/plugins
+claude plugin install obsidian-forge@epicsagas
+```
+
+#### Codex CLI
+
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+#### Antigravity
+
+```bash
+agy plugin install https://github.com/epicsagas/obsidian-forge
+```
+
+Une fois installé, votre agent IA déclenche automatiquement la bonne compétence lorsque vous posez des questions sur la gestion du coffre, le routage PARA, les opérations de graphe ou les problèmes du daemon.
+
 ### Prérequis
 
 | Outil | Requis | Objectif |

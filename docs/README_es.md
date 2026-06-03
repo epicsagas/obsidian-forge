@@ -91,6 +91,39 @@ Todos los métodos anteriores instalan tanto `obsidian-forge` como `of` (alias c
 | Linux | ARM64 (aarch64) | ✅ Completamente soportado |
 | Windows | x86_64 (MSVC) | ⚠️ Parcialmente soportado (sin LaunchAgent) |
 
+### Plugins de Agente IA
+
+obsidian-forge incluye 5 habilidades de agente integradas que proporcionan a los asistentes de IA operaciones de bóveda con contexto:
+
+| Habilidad | Activador |
+|-------|---------|
+| `vault-health` | Comprobar salud de bóveda, diagnosticar bóveda, estado de bóveda |
+| `vault-sync` | Sincronizar bóveda, actualizar MOCs y grafo, confirmar cambios de bóveda |
+| `graph-strengthen` | Fortalecer grafo, salud del grafo, corregir huérfanos |
+| `inbox-process` | Procesar bandeja, clasificar notas, enrutamiento PARA |
+| `vault-fix` | Reparar bóveda, reparar etiquetas, corregir enlaces, corregir frontmatter |
+
+#### Claude Code
+
+```bash
+claude plugin marketplace add epicsagas/plugins
+claude plugin install obsidian-forge@epicsagas
+```
+
+#### Codex CLI
+
+```bash
+codex plugin marketplace add epicsagas/plugins
+```
+
+#### Antigravity
+
+```bash
+agy plugin install https://github.com/epicsagas/obsidian-forge
+```
+
+Una vez instalado, tu agente de IA activa automáticamente la habilidad adecuada cuando preguntas sobre gestión de bóvedas, enrutamiento PARA, operaciones de grafo o problemas del demonio.
+
 ### Requisitos previos
 
 | Herramienta | Requerida | Propósito |
