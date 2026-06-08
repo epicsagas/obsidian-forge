@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Claude Code and Codex plugin manifests with skills directory (`.claude-plugin/`, `.codex-plugin/`)
+- Agent KB: `index.md` generation and Obsidian Linter config for inbox classification
+
+### Fixed
+
+- Inbox processor: handle CRLF line endings and improve subcategory classification
+
+### Changed
+
+- All `book-forge` references renamed to `Velith`
+- README: replaced skill install with plugin install, added Antigravity section, synced all translations
+- Bump `reqwest` from 0.13.3 to 0.13.4
+- Bump `chrono` from 0.4.44 to 0.4.45
+
 ## [0.2.4] - 2026-05-25
 
 ### Added
