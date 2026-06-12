@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.5] - 2026-06-12
 
 ### Added
 
@@ -15,10 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Inbox processor: handle CRLF line endings and improve subcategory classification
+- All `book-forge` references renamed to `Velith`
+- README: missing links in static badges
 
 ### Changed
 
-- All `book-forge` references renamed to `Velith`
 - README: replaced skill install with plugin install, added Antigravity section, synced all translations
 - Bump `reqwest` from 0.13.3 to 0.13.4
 - Bump `chrono` from 0.4.44 to 0.4.45
@@ -197,7 +198,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Conventional Commits for all auto-generated vault commits
 - Apache-2.0 license
 
-[Unreleased]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/epicsagas/obsidian-forge/compare/v0.2.1...v0.2.2
