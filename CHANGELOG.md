@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-06-13
+
 ### Fixed
 
 - `doctor`: inbox item count now ignores dotfiles (e.g. `.DS_Store`) and system dirs, consistent with the MOC/index scanners
