@@ -74,9 +74,10 @@ irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidia
 ```bash
 cargo binstall obsidian-forge   # binario preconstruido (rápido)
 cargo install obsidian-forge    # compilar desde el código fuente
+cargo install obsidian-forge --features dashboard-ui  # incluye la GUI de `of dashboard`
 ```
 
-Todos los métodos anteriores instalan tanto `obsidian-forge` como `of` (alias corto).
+Todos los métodos anteriores instalan tanto `obsidian-forge` como `of` (alias corto). El panel de control de escritorio solo se incluye en compilaciones desde el código fuente con `--features dashboard-ui`.
 
 > Ejecuta `of --version` para verificar. Actualiza con `brew upgrade obsidian-forge` o vuelve a ejecutar el script de instalación.
 
@@ -215,6 +216,23 @@ of book sync   <name>                                     # enlazar notas etique
 ```
 
 Las notas etiquetadas con `book/<name>` en la bóveda se enlazan automáticamente en `sources/` mediante `book sync`.
+
+### Panel de control
+
+Explora tu bóveda visualmente con el panel de control de escritorio (app Tauri 2 + Svelte 5).
+
+```bash
+of dashboard                    # abrir la GUI del panel de control
+of dashboard --vault <name>     # abrir una bóveda específica
+```
+
+Cada nota se muestra con una **puntuación de vitalidad**, clasificación de **zona PARA** y conectividad del grafo. Busca por título, ruta o etiquetas; filtra por zona o etiqueta; y luego expande una nota para:
+
+- **ABRIR** — abrirla en Obsidian
+- **BUSCAR RELACIONADAS** — notas relacionadas basadas en el grafo (backlinks + etiquetas compartidas, top 5)
+- **PREGUNTAR A LA IA** — genera un resumen de una línea, preguntas clave y sugerencias de enlaces (requiere configuración de IA)
+
+> El panel de control es una característica opcional `dashboard-ui`, excluida de los binarios preconstruidos. Compílalo desde el código fuente con `--features dashboard-ui` (ver Instalación). Se requiere al menos una bóveda registrada.
 
 ---
 

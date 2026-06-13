@@ -74,9 +74,10 @@ irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidia
 ```bash
 cargo binstall obsidian-forge   # önceden derlenmiş binary (hızlı)
 cargo install obsidian-forge    # kaynaktan derle
+cargo install obsidian-forge --features dashboard-ui  # `of dashboard` GUI'sini de içer
 ```
 
-Yukarıdaki tüm yöntemlerle hem `obsidian-forge` hem de `of` (kısa takma ad) kurulur.
+Yukarıdaki tüm yöntemlerle hem `obsidian-forge` hem de `of` (kısa takma ad) kurulur. Panel yalnızca `--features dashboard-ui` ile kaynaktan derlenen sürümlerde bulunur; önceden derlenmiş binary'lere dahil değildir.
 
 > Doğrulamak için `of --version` komutunu çalıştırın. Güncellemek için `brew upgrade obsidian-forge` veya kurulum betiğini yeniden çalıştırın.
 
@@ -215,6 +216,23 @@ of book sync   <name>                                     # etiketli notları so
 ```
 
 Kasada `book/<name>` etiketiyle işaretlenmiş notlar, `book sync` komutuyla `sources/` klasörüne otomatik olarak sembolik bağlantı olarak eklenir.
+
+### Panel (Dashboard)
+
+Kasanızı masaüstü paneliyle görsel olarak gezin (Tauri 2 + Svelte 5 uygulaması).
+
+```bash
+of dashboard                    # panel GUI'sini aç
+of dashboard --vault <name>     # belirli bir kasayı aç
+```
+
+Her not bir **canlılık skoru (vitality score)**, **PARA bölgesi** sınıflandırması ve grafik bağlantısıyla gösterilir. Başlığa, yola veya etiketlere göre arayın; bölgeye veya etikete göre filtreleyin; ardından bir notu genişleterek:
+
+- **AÇ (OPEN)** — Obsidian'da aç
+- **İLİŞKİLİLERİ BUL (FIND RELATED)** — grafik tabanlı ilgili notlar (geri bağlantılar + paylaşılan etiketler, ilk 5)
+- **AI'YA SOR (ASK AI)** — tek satırlık bir özet, temel sorular ve bağlantı önerileri üretir (AI yapılandırması gerekir)
+
+> Panel, isteğe bağlı bir `dashboard-ui` özelliğidir ve önceden derlenmiş binary'lere dahil değildir. Kaynaktan `--features dashboard-ui` ile derleyin (bkz. Kurulum). En az bir kayıtlı kasa gerekir.
 
 ---
 
