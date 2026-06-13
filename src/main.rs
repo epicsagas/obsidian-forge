@@ -1410,8 +1410,21 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
     println!("  Config:     {}", config_path.display());
 
     let inbox = vault.join(&config.vault.inbox_dir);
+    let system_dirs = config.all_system_dirs();
     let inbox_count = if inbox.exists() {
-        fs::read_dir(&inbox).map(|r| r.count()).unwrap_or(0)
+        fs::read_dir(&inbox)
+            .map(|r| {
+                r.filter(|e| match e {
+                    Ok(entry) => entry
+                        .file_name()
+                        .to_str()
+                        .map(|n| !(n.starts_with('.') || system_dirs.iter().any(|d| d == n)))
+                        .unwrap_or(false),
+                    Err(_) => false,
+                })
+                .count()
+            })
+            .unwrap_or(0)
     } else {
         0
     };
