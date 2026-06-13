@@ -74,9 +74,10 @@ irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidia
 ```bash
 cargo binstall obsidian-forge   # binaire précompilé (rapide)
 cargo install obsidian-forge    # compiler depuis les sources
+cargo install obsidian-forge --features dashboard-ui  # inclure l'interface graphique `of dashboard`
 ```
 
-Les deux commandes `obsidian-forge` et `of` (alias court) sont installées par toutes les méthodes ci-dessus.
+Les deux commandes `obsidian-forge` et `of` (alias court) sont installées par toutes les méthodes ci-dessus. Le tableau de bord de bureau n'est livré que dans les builds depuis les sources avec `--features dashboard-ui`.
 
 > `of --version` pour vérifier. Mettre à jour avec `brew upgrade obsidian-forge` ou relancer le script d'installation.
 
@@ -248,6 +249,23 @@ of book sync   <name>                                     # lier les notes étiq
 ```
 
 Les notes du coffre portant le tag `book/<name>` sont automatiquement liées dans `sources/` par `book sync`.
+
+### Tableau de bord
+
+Parcourez votre coffre visuellement avec le tableau de bord de bureau (application Tauri 2 + Svelte 5).
+
+```bash
+of dashboard                    # ouvrir l'interface graphique du tableau de bord
+of dashboard --vault <name>     # ouvrir un coffre spécifique
+```
+
+Chaque note est affichée avec un **score de vitalité**, une classification **zone PARA** et la connectivité du graphe. Recherchez par titre, chemin ou tags ; filtrez par zone ou par tag ; puis déployez une note pour :
+
+- **OUVRIR** — l'ouvrir dans Obsidian
+- **TROUVER DES NOTES CONNEXES** — notes connexes basées sur le graphe (rétroliens + tags partagés, top 5)
+- **DEMANDER À L'IA** — génère un résumé d'une ligne, des questions clés et des suggestions de liens (nécessite une config IA)
+
+> Le tableau de bord est une fonctionnalité optionnelle `dashboard-ui`, exclue des binaires précompilés. Compilez depuis les sources avec `--features dashboard-ui` (voir Installation). Au moins un coffre enregistré est requis.
 
 ---
 

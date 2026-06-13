@@ -210,3 +210,6 @@ temp/
 
 # AI tool configs (local only)
 GEMINI.md
+ui/node_modules/
+ui/dist/
+gen/

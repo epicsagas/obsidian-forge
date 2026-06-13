@@ -74,9 +74,10 @@ irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidia
 ```bash
 cargo binstall obsidian-forge   # 미리 컴파일된 바이너리 (빠름)
 cargo install obsidian-forge    # 소스에서 빌드
+cargo install obsidian-forge --features dashboard-ui  # `of dashboard` GUI 포함
 ```
 
-위의 모든 방법으로 `obsidian-forge`와 `of`(단축 별칭)가 함께 설치됩니다.
+위의 모든 방법으로 `obsidian-forge`와 `of`(단축 별칭)가 함께 설치됩니다. 대시보드는 `--features dashboard-ui` 소스 빌드에만 포함됩니다.
 
 > `of --version`으로 확인. 업데이트는 `brew upgrade obsidian-forge` 또는 설치 스크립트 재실행.
 
@@ -248,6 +249,23 @@ of book sync   <name>                                     # 태그 노트 → so
 ```
 
 볼트에서 `book/<name>` 태그가 붙은 노트는 `book sync`를 통해 `sources/`에 자동으로 링크됩니다.
+
+### 대시보드
+
+데스크톱 대시보드(Tauri 2 + Svelte 5 앱)로 볼트를 시각적으로 탐색하세요.
+
+```bash
+of dashboard                    # 대시보드 GUI 열기
+of dashboard --vault <name>     # 특정 볼트 열기
+```
+
+모든 노트에는 **활력도 점수(vitality score)**, **PARA 존** 분류, 그리고 그래프 연결성이 함께 표시됩니다. 제목, 경로 또는 태그로 검색하고, 존이나 태그로 필터링한 뒤 노트를 펼쳐서:
+
+- **OPEN** — Obsidian에서 열기
+- **FIND RELATED** — 그래프 기반 관련 노트 (백링크 + 공유 태그, 상위 5개)
+- **ASK AI** — 한 줄 요약, 핵심 질문, 링크 제안 생성 (AI 설정 필요)
+
+> 대시보드는 선택적 `dashboard-ui` 기능이며, 미리 컴파일된 바이너리에는 포함되지 않습니다. 설치 항목을 참고하여 `--features dashboard-ui`로 소스에서 빌드하세요. 최소 하나 이상의 등록된 볼트가 필요합니다.
 
 ---
 

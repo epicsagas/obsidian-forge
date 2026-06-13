@@ -74,9 +74,10 @@ irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidia
 ```bash
 cargo binstall obsidian-forge   # binário pré-compilado (rápido)
 cargo install obsidian-forge    # compilar a partir do código-fonte
+cargo install obsidian-forge --features dashboard-ui  # incluir a interface do `of dashboard`
 ```
 
-Tanto `obsidian-forge` quanto `of` (alias curto) são instalados por todos os métodos acima.
+O dashboard só é incluído em compilações a partir do código-fonte com `--features dashboard-ui` (os binários pré-compilados não o trazem). Tanto `obsidian-forge` quanto `of` (alias curto) são instalados por todos os métodos acima.
 
 > Use `of --version` para verificar. Atualize com `brew upgrade obsidian-forge` ou execute novamente o script de instalação.
 
@@ -248,6 +249,23 @@ of book sync   <name>                                     # vincular notas marca
 ```
 
 Notas do cofre com a tag `book/<name>` são automaticamente vinculadas em `sources/` pelo `book sync`.
+
+### Dashboard
+
+Navegue pelo seu cofre visualmente com o dashboard de desktop (app Tauri 2 + Svelte 5).
+
+```bash
+of dashboard                    # abrir a interface do dashboard
+of dashboard --vault <name>     # abrir um cofre específico
+```
+
+Cada nota é exibida com uma **pontuação de vitalidade**, classificação de **zona PARA** e conectividade do grafo. Pesquise por título, caminho ou tags; filtre por zona ou tag; e então expanda uma nota para:
+
+- **ABRIR** — abri-la no Obsidian
+- **ENCONTRAR RELACIONADAS** — notas relacionadas baseadas no grafo (backlinks + tags compartilhadas, top 5)
+- **PERGUNTAR À IA** — gera um resumo de uma linha, perguntas-chave e sugestões de links (requer configuração de IA)
+
+> O dashboard é uma funcionalidade opcional do `dashboard-ui`, excluída dos binários pré-compilados. Compile a partir do código-fonte com `--features dashboard-ui` (veja Instalação). É necessário pelo menos um cofre registrado.
 
 ---
 

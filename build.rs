@@ -1,0 +1,30 @@
+fn main() {
+    #[cfg(feature = "dashboard-ui")]
+    {
+        let manifest_dir =
+            std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set by cargo");
+        let ui_dir = std::path::Path::new(&manifest_dir).join("ui");
+        let dist_dir = ui_dir.join("dist");
+
+        if !dist_dir.join("assets").exists() && ui_dir.join("package.json").exists() {
+            let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
+
+            let status = std::process::Command::new(npm)
+                .arg("ci")
+                .current_dir(&ui_dir)
+                .status()
+                .expect("failed to run npm ci");
+            assert!(status.success(), "npm ci failed for vault dashboard");
+
+            let status = std::process::Command::new(npm)
+                .arg("run")
+                .arg("build")
+                .current_dir(&ui_dir)
+                .status()
+                .expect("failed to run npm build");
+            assert!(status.success(), "npm build failed for vault dashboard");
+        }
+
+        tauri_build::build();
+    }
+}

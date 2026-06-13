@@ -15,6 +15,9 @@ mod prompts;
 mod vault_utils;
 mod watcher;
 
+#[cfg(feature = "dashboard-ui")]
+mod dashboard;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::{
@@ -182,6 +185,14 @@ enum Commands {
     Book {
         #[command(subcommand)]
         action: BookAction,
+        #[arg(long)]
+        vault: Option<String>,
+    },
+
+    /// Launch the vault dashboard (Tauri desktop app)
+    #[cfg(feature = "dashboard-ui")]
+    Dashboard {
+        /// Vault name to display (defaults to first enabled vault)
         #[arg(long)]
         vault: Option<String>,
     },
@@ -372,6 +383,10 @@ async fn main() -> Result<()> {
                 })
             };
             return handle_book_action(action, &vault_path);
+        }
+        #[cfg(feature = "dashboard-ui")]
+        Commands::Dashboard { vault: _ } => {
+            return dashboard::launch_dashboard();
         }
         _ => {}
     }

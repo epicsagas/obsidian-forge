@@ -74,9 +74,10 @@ irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidia
 ```bash
 cargo binstall obsidian-forge   # vorkompilierte Binärdatei (schnell)
 cargo install obsidian-forge    # aus dem Quellcode kompilieren
+cargo install obsidian-forge --features dashboard-ui  # inkl. GUI für `of dashboard`
 ```
 
-Sowohl `obsidian-forge` als auch `of` (Kurzalias) werden von allen oben genannten Methoden installiert.
+Sowohl `obsidian-forge` als auch `of` (Kurzalias) werden von allen oben genannten Methoden installiert. Das Dashboard wird ausschließlich in Quellcode-Builds mit `--features dashboard-ui` ausgeliefert.
 
 > `of --version` zur Überprüfung. Aktualisieren mit `brew upgrade obsidian-forge` oder durch erneutes Ausführen des Installationsskripts.
 
@@ -248,6 +249,23 @@ of book sync   <name>                                     # getaggte Notizen →
 ```
 
 Notizen im Tresor mit dem Tag `book/<name>` werden durch `book sync` automatisch als Symlinks in `sources/` eingetragen.
+
+### Dashboard
+
+Durchstöbern Sie Ihren Tresor visuell mit dem Desktop-Dashboard (Tauri-2- + Svelte-5-App).
+
+```bash
+of dashboard                    # das Dashboard-GUI öffnen
+of dashboard --vault <name>     # einen bestimmten Tresor öffnen
+```
+
+Jede Notiz wird mit einem **Vitalitätswert**, der **PARA-Zonen**-Klassifizierung und der Graph-Vernetzung angezeigt. Suchen Sie nach Titel, Pfad oder Tags; filtern Sie nach Zone oder Tag; und klappen Sie dann eine Notiz auf, um:
+
+- **ÖFFNEN** — in Obsidian zu öffnen
+- **VERWANDTE FINDEN** — graphbasierte verwandte Notizen (Rückverweise + gemeinsame Tags, Top 5)
+- **KI FRAGEN** — generiert eine einzeilige Zusammenfassung, Schlüsselfragen und Link-Vorschläge (erfordert KI-Konfiguration)
+
+> Das Dashboard ist ein optionales `dashboard-ui`-Feature, das nicht in den vorkompilierten Binärdateien enthalten ist. Aus dem Quellcode mit `--features dashboard-ui` kompilieren (siehe Installation). Mindestens ein registrierter Tresor ist erforderlich.
 
 ---
 

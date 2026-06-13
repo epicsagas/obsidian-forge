@@ -8,6 +8,11 @@ repository = "https://github.com/epicsagas/obsidian-forge"
 homepage = "https://github.com/epicsagas/obsidian-forge"
 keywords = ["obsidian", "vault", "pkm", "zettelkasten", "automation"]
 categories = ["command-line-utilities"]
+exclude = ["ui/node_modules/", "ui/dist/"]
+
+[features]
+default = []
+dashboard-ui = ["tauri", "tauri-build"]
 
 [[bin]]
 name = "obsidian-forge"
@@ -36,6 +41,10 @@ reqwest = { version = "0.13", features = ["json", "rustls"], default-features = 
 futures = "0.3"
 rayon = "1.8"
 tokio-stream = "0.1"
+tauri = { version = "2", optional = true }
+
+[build-dependencies]
+tauri-build = { version = "2", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

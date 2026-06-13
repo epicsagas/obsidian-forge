@@ -82,9 +82,10 @@ irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/install
 ```bash
 cargo binstall obsidian-forge   # pre-built binary (fast)
 cargo install obsidian-forge    # build from source
+cargo install obsidian-forge --features dashboard-ui  # include the `of dashboard` GUI
 ```
 
-Both `obsidian-forge` and `of` (short alias) are installed by all methods above.
+Both `obsidian-forge` and `of` (short alias) are installed by all methods above. The desktop dashboard ships only in source builds with `--features dashboard-ui`.
 
 > `of --version` to verify. Update with `brew upgrade obsidian-forge` or re-run the installer script.
 
@@ -256,6 +257,23 @@ of book sync   <name>                                     # link tagged notes �
 ```
 
 Notes tagged `book/<name>` in the vault are auto-linked into `sources/` by `book sync`.
+
+### Dashboard
+
+Browse your vault visually with the desktop dashboard (Tauri 2 + Svelte 5 app).
+
+```bash
+of dashboard                    # open the dashboard GUI
+of dashboard --vault <name>     # open a specific vault
+```
+
+Every note is shown with a **vitality score**, **PARA zone** classification, and graph connectivity. Search by title, path, or tags; filter by zone or tag; then expand a note to:
+
+- **OPEN** — open it in Obsidian
+- **FIND RELATED** — graph-based related notes (backlinks + shared tags, top 5)
+- **ASK AI** — generates a one-line summary, key questions, and link suggestions (needs AI config)
+
+> The dashboard is an optional `dashboard-ui` feature, excluded from prebuilt binaries. Build from source with `--features dashboard-ui` (see [Installation](#via-rust-toolchain)). At least one registered vault is required.
 
 ---
 
