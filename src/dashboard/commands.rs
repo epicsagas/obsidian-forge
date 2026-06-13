@@ -8,6 +8,7 @@ use anyhow::Result;
 use tauri::State;
 use walkdir::WalkDir;
 
+use crate::ai::AiClient;
 use crate::config::{ForgeConfig, GlobalConfig};
 use crate::dashboard::models::*;
 use crate::dashboard::scoring::compute_vitality;
@@ -87,6 +88,108 @@ pub fn open_in_obsidian(path: String) -> Result<(), String> {
     open_url(&url).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn find_related(state: State<'_, AppState>, path: String) -> Result<Vec<NoteCard>, String> {
+    eprintln!("[dashboard] find_related: {}", path);
+
+    // 캐시에서 대상 vault/태그/노트 목록을 복사한 뒤 락 해제 — 그래프 빌드 중 긴 락 방지
+    let (vault_name, target_tags, notes): (String, Vec<String>, Vec<NoteCard>) = {
+        let cache = state.cache.read().map_err(|e| format!("cache: {}", e))?;
+        let dashboard = cache
+            .as_ref()
+            .ok_or_else(|| "Dashboard not loaded yet".to_string())?;
+        let target_tags = dashboard
+            .notes
+            .iter()
+            .find(|n| n.path == path)
+            .map(|n| n.tags.clone())
+            .unwrap_or_default();
+        (
+            dashboard.vault_name.clone(),
+            target_tags,
+            dashboard.notes.clone(),
+        )
+    };
+
+    let global = GlobalConfig::load().map_err(|e| e.to_string())?;
+    let entry = global
+        .find_vault(&vault_name)
+        .ok_or_else(|| format!("Vault '{}' not found", vault_name))?;
+    let vault_path = PathBuf::from(&entry.path);
+    let config = ForgeConfig::load(&vault_path).map_err(|e| format!("vault config: {}", e))?;
+    let graph = build_vault_graph(&vault_path, &config).map_err(|e| format!("graph: {}", e))?;
+
+    let target_set: std::collections::HashSet<&str> =
+        target_tags.iter().map(|s| s.as_str()).collect();
+
+    // 점수: 직접 링크(백링크/순방향) +2, 공유 태그당 +1
+    let mut scores: HashMap<String, u32> = HashMap::new();
+    for set in [graph.incoming.get(&path), graph.outgoing.get(&path)].into_iter().flatten() {
+        for n in set {
+            *scores.entry(n.clone()).or_insert(0) += 2;
+        }
+    }
+    for n in &notes {
+        if n.path == path {
+            continue;
+        }
+        let shared = n
+            .tags
+            .iter()
+            .filter(|t| target_set.contains(t.as_str()))
+            .count() as u32;
+        if shared > 0 {
+            *scores.entry(n.path.clone()).or_insert(0) += shared;
+        }
+    }
+
+    let mut ranked: Vec<(String, u32)> = scores.into_iter().collect();
+    ranked.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let by_path: HashMap<String, NoteCard> = notes.into_iter().map(|n| (n.path.clone(), n)).collect();
+    let related = ranked
+        .iter()
+        .take(5)
+        .filter_map(|(p, _)| by_path.get(p).cloned())
+        .collect();
+
+    Ok(related)
+}
+
+#[tauri::command]
+pub async fn ask_ai(state: State<'_, AppState>, path: String) -> Result<String, String> {
+    eprintln!("[dashboard] ask_ai: {}", path);
+
+    let (vault_name, title): (String, String) = {
+        let cache = state.cache.read().map_err(|e| format!("cache: {}", e))?;
+        let dashboard = cache
+            .as_ref()
+            .ok_or_else(|| "Dashboard not loaded yet".to_string())?;
+        let note = dashboard
+            .notes
+            .iter()
+            .find(|n| n.path == path)
+            .ok_or_else(|| format!("Note '{}' not found", path))?;
+        (dashboard.vault_name.clone(), note.title.clone())
+    };
+
+    let global = GlobalConfig::load().map_err(|e| e.to_string())?;
+    let entry = global
+        .find_vault(&vault_name)
+        .ok_or_else(|| format!("Vault '{}' not found", vault_name))?;
+    let vault_path = PathBuf::from(&entry.path);
+    let config = ForgeConfig::load(&vault_path).map_err(|e| format!("vault config: {}", e))?;
+
+    let body = fs::read_to_string(vault_path.join(&path))
+        .map_err(|e| format!("read note '{}': {}", path, e))?;
+
+    let client = AiClient::from_config(&config.ai);
+    client
+        .insights(&title, &body)
+        .await
+        .map_err(|e| format!("AI: {}", e))
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard builder
 // ---------------------------------------------------------------------------
@@ -95,10 +198,13 @@ fn build_dashboard(
     vault: &Path,
     config: &ForgeConfig,
 ) -> Result<DashboardState> {
-    let system_dirs = config.all_system_dirs();
+    // 대시보드는 PARA 전체 영역을 스캔해야 zone 통계가 의미 있다.
+    // all_system_dirs()는 MOC/프로젝트 스캔용이라 inbox/areas/resources/zk/archive 본체까지
+    // 제외해 버리므로, 여기서는 메타 디렉토리만 제외한다.
+    let scan_excludes = dashboard_scan_excludes(config);
 
     // Scan all notes
-    let raw_notes = scan_notes(vault, &system_dirs)?;
+    let raw_notes = scan_notes(vault, &scan_excludes)?;
 
     // Build graph for link counts
     let graph = build_vault_graph(vault, config)?;
@@ -320,7 +426,12 @@ fn scan_notes(vault: &Path, system_dirs: &[String]) -> Result<Vec<RawNote>> {
                     .map(|l| {
                         let s = l.trim();
                         if s.len() > 200 {
-                            format!("{}...", &s[..200])
+                            // UTF-8 문자 경계까지만 잘라야 CJK 노트에서 panic 방지
+                            let mut end = 200;
+                            while !s.is_char_boundary(end) {
+                                end -= 1;
+                            }
+                            format!("{}...", &s[..end])
                         } else {
                             s.to_string()
                         }
@@ -395,6 +506,26 @@ fn classify_zone(rel_path: &str) -> Zone {
     } else {
         Zone::Archives
     }
+}
+
+/// 대시보드 노트 스캔 시 제외할 최상위 디렉토리 — 메타/시스템 디렉토리만.
+/// PARA 본체(inbox, areas, resources, zettelkasten, archive, projects)는 스캔에 포함한다.
+fn dashboard_scan_excludes(config: &ForgeConfig) -> Vec<String> {
+    let mut dirs: Vec<String> = vec![
+        ".git".into(),
+        ".obsidian".into(),
+        ".obsidian-forge".into(),
+        ".alcove".into(),
+        ".claude".into(),
+        "target".into(),
+    ];
+    for d in [&config.vault.attachments_dir, &config.vault.templates_dir] {
+        if !d.is_empty() {
+            dirs.push(d.clone());
+        }
+    }
+    dirs.extend(config.vault.system_dirs.iter().cloned());
+    dirs
 }
 
 // ---------------------------------------------------------------------------

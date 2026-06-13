@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { DashboardState, VaultInfo } from './types';
+import type { DashboardState, NoteCard, VaultInfo } from './types';
 
 export async function getVaults(): Promise<VaultInfo[]> {
   return invoke('get_vaults');
@@ -11,4 +11,12 @@ export async function getDashboard(vaultName: string): Promise<DashboardState> {
 
 export async function openInObsidian(path: string): Promise<void> {
   return invoke('open_in_obsidian', { path });
+}
+
+export async function findRelated(path: string): Promise<NoteCard[]> {
+  return invoke('find_related', { path });
+}
+
+export async function askAi(path: string): Promise<string> {
+  return invoke('ask_ai', { path });
 }

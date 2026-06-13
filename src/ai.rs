@@ -207,6 +207,30 @@ impl AiClient {
         self.complete(&prompt).await
     }
 
+    /// 노트 내용으로부터 한 줄 요약, 핵심 질문, 연결 제안을 마크다운으로 생성한다.
+    /// 대시보드의 ASK AI 버튼용.
+    pub async fn insights(&self, title: &str, body: &str) -> Result<String> {
+        // 긴 본문은 UTF-8 문자 경계에서 절단 — 토큰/비용 절감
+        let body = if body.len() > 6000 {
+            let mut end = 6000;
+            while !body.is_char_boundary(end) {
+                end -= 1;
+            }
+            &body[..end]
+        } else {
+            body
+        };
+        let prompt = format!(
+            "다음 Obsidian 노트를 분석하고 마크다운으로 답하라.\n\n\
+             제목: {title}\n\n---\n{body}\n---\n\n\
+             다음 형식을 그대로 지킬 것:\n\
+             **한 줄 요약:** (노트 핵심 한 줄)\n\
+             **핵심 질문:**\n- (질문1)\n- (질문2)\n- (질문3)\n\
+             **연결 제안:** 이 노트와 엮을 만한 개념이나 다른 노트 2~3개\n"
+        );
+        self.complete(&prompt).await
+    }
+
     pub async fn generate_json<T: for<'de> Deserialize<'de>>(&self, prompt: &str) -> Result<T> {
         let raw = self.complete(prompt).await?;
         let json_str = extract_json(&raw);

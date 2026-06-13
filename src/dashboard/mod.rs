@@ -31,6 +31,8 @@ pub fn launch_dashboard() -> Result<()> {
             commands::get_vaults,
             commands::get_dashboard,
             commands::open_in_obsidian,
+            commands::find_related,
+            commands::ask_ai,
         ])
         .run(tauri::generate_context!())
         .map_err(|e| anyhow::anyhow!("Tauri error: {}", e))?;

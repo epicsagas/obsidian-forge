@@ -1,8 +1,8 @@
 <script lang="ts">
   import './app.css';
   import { onMount } from 'svelte';
-  import { getVaults, getDashboard } from './lib/api';
-  import type { DashboardState, VaultInfo } from './lib/types';
+  import { getVaults, getDashboard, findRelated, askAi } from './lib/api';
+  import type { DashboardState, NoteCard, VaultInfo } from './lib/types';
 
   let loading = $state(true);
   let errorMsg = $state<string | null>(null);
@@ -13,6 +13,9 @@
   let selectedZone = $state<string | null>(null);
   let activeTags = $state(new Set<string>());
   let expandedCard = $state<string | null>(null);
+  let relatedByPath = $state<Record<string, NoteCard[]>>({});
+  let aiByPath = $state<Record<string, string>>({});
+  let busyKey = $state<string | null>(null);
 
   const notes = $derived.by(() => {
     if (!dashboard) return [];
@@ -23,7 +26,9 @@
       const q = searchQuery.toLowerCase();
       list = list.filter(n =>
         n.title.toLowerCase().includes(q) ||
-        (n.summary ?? '').toLowerCase().includes(q)
+        n.path.toLowerCase().includes(q) ||
+        (n.summary ?? '').toLowerCase().includes(q) ||
+        n.tags.some(t => t.toLowerCase().includes(q))
       );
     }
     if (selectedZone)
@@ -70,6 +75,20 @@
     return new Date(iso).toLocaleDateString('ko-KR', { month:'short', day:'numeric' });
   }
 
+  async function loadRelated(path: string) {
+    busyKey = path + '|related';
+    try { relatedByPath[path] = await findRelated(path); }
+    catch { relatedByPath[path] = []; }
+    finally { busyKey = null; }
+  }
+
+  async function loadAi(path: string) {
+    busyKey = path + '|ai';
+    try { aiByPath[path] = await askAi(path); }
+    catch (e: any) { aiByPath[path] = '오류: ' + String(e?.message ?? e); }
+    finally { busyKey = null; }
+  }
+
   async function load(name?: string) {
     loading = true;
     errorMsg = null;
@@ -99,7 +118,7 @@
   <aside class="sidebar">
     <div class="sidebar-section">
       <h3>Zones</h3>
-      {#each [['inbox','Inbox'],['projects','Projects'],['areas','Areas'],['resources','Resources'],['zettelkasten','Zettelkasten']] as [key, label]}
+      {#each [['inbox','Inbox'],['projects','Projects'],['areas','Areas'],['resources','Resources'],['zettelkasten','Zettelkasten'],['archives','Archives']] as [key, label]}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="sidebar-item" class:active={selectedZone === key}
@@ -224,9 +243,36 @@
                   onclick={(e) => { e.stopPropagation(); import('./lib/api').then(a => a.openInObsidian(note.path)); }}>
                   OPEN
                 </button>
-                <button class="action-btn">FIND RELATED</button>
-                <button class="action-btn">ASK AI</button>
+                <button class="action-btn"
+                  onclick={(e) => { e.stopPropagation(); loadRelated(note.path); }}>FIND RELATED</button>
+                <button class="action-btn"
+                  onclick={(e) => { e.stopPropagation(); loadAi(note.path); }}>ASK AI</button>
               </div>
+
+              {#if busyKey === note.path + '|related'}
+                <div class="card-loading">관련 노드 검색 중...</div>
+              {:else if relatedByPath[note.path]}
+                {@const related = relatedByPath[note.path]}
+                <div class="related-section">
+                  <div class="related-title">관련 노드 ({related.length})</div>
+                  {#each related as r}
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div class="related-item"
+                      onclick={(e) => { e.stopPropagation(); searchQuery = r.title; }}
+                      role="button" tabindex="0">
+                      <span class="zone-badge">{zoneLabel(r.zone as any)}</span>
+                      <span>{r.title}</span>
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+
+              {#if busyKey === note.path + '|ai'}
+                <div class="card-loading">AI 분석 중...</div>
+              {:else if aiByPath[note.path]}
+                <div class="ai-section">{aiByPath[note.path]}</div>
+              {/if}
             {/if}
           </div>
         {/each}
