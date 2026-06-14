@@ -265,7 +265,12 @@ Jede Notiz wird mit einem **Vitalitätswert**, der **PARA-Zonen**-Klassifizierun
 - **VERWANDTE FINDEN** — graphbasierte verwandte Notizen (Rückverweise + gemeinsame Tags, Top 5)
 - **KI FRAGEN** — generiert eine einzeilige Zusammenfassung, Schlüsselfragen und Link-Vorschläge (erfordert KI-Konfiguration)
 
-> Das Dashboard ist ein optionales `dashboard-ui`-Feature, das nicht in den vorkompilierten Binärdateien enthalten ist. Aus dem Quellcode mit `--features dashboard-ui` kompilieren (siehe Installation). Mindestens ein registrierter Tresor ist erforderlich.
+> **Vorkompilierte Desktop-Builds** sind an jeden [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) angehängt — laden Sie die Datei für Ihr OS herunter:
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) oder `*_x64.dmg` (Intel)
+> - **Linux** — `.AppImage` (als ausführbar markieren: `chmod +x *.AppImage`)
+> - **Windows** — `.msi`-Installer
+>
+> Die Builds sind **unsignt**. Unter macOS umgehen Sie Gatekeeper: `xattr -cr "/Applications/Obsidian Forge Dashboard.app"`. Unter Windows wählen Sie „Weitere Informationen → Trotzdem ausführen", um SmartScreen zu passieren. Lieber aus dem Quellcode? `cargo install obsidian-forge --features dashboard-ui`. Mindestens ein registrierter Tresor ist erforderlich.
 
 ---
 

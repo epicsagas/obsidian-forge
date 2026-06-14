@@ -265,7 +265,12 @@ of dashboard --vault <name>     # 特定のvaultを開く
 - **FIND RELATED** — グラフベースの関連ノート（バックリンク + 共通タグ、上位5件）
 - **ASK AI** — 1行要約、重要な質問、リンク候補を生成（AI設定が必要）
 
-> ダッシュボードはオプションの`dashboard-ui`機能であり、プリビルドバイナリには含まれません。インストールセクションを参照し、`--features dashboard-ui`を指定してソースからビルドしてください。少なくとも1つの登録済みvaultが必要です。
+> **プリビルド版デスクトップビルド**は各[GitHub Release](https://github.com/epicsagas/obsidian-forge/releases)に添付されています — お使いのOS用のファイルを取得してください:
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) または `*_x64.dmg` (Intel)
+> - **Linux** — `.AppImage` (実行権限を付与: `chmod +x *.AppImage`)
+> - **Windows** — `.msi` インストーラー
+>
+> ビルドは**未署名**です。macOSではGatekeeperを解除してください: `xattr -cr "/Applications/Obsidian Forge Dashboard.app"`。WindowsではSmartScreenを越えて「詳細情報 → 実行」を選んでください。ソースからのビルドをお好みですか? `cargo install obsidian-forge --features dashboard-ui`。少なくとも1つの登録済みvaultが必要です。
 
 ---
 

@@ -265,7 +265,12 @@ Cada nota é exibida com uma **pontuação de vitalidade**, classificação de *
 - **ENCONTRAR RELACIONADAS** — notas relacionadas baseadas no grafo (backlinks + tags compartilhadas, top 5)
 - **PERGUNTAR À IA** — gera um resumo de uma linha, perguntas-chave e sugestões de links (requer configuração de IA)
 
-> O dashboard é uma funcionalidade opcional do `dashboard-ui`, excluída dos binários pré-compilados. Compile a partir do código-fonte com `--features dashboard-ui` (veja Instalação). É necessário pelo menos um cofre registrado.
+> Os **builds de desktop pré-compilados** estão anexados a cada [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) — baixe o arquivo para o seu SO:
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) ou `*_x64.dmg` (Intel)
+> - **Linux** — `.AppImage` (torne executável: `chmod +x *.AppImage`)
+> - **Windows** — instalador `.msi`
+>
+> Os builds **não são assinados**. No macOS, ignore o Gatekeeper: `xattr -cr "/Applications/Obsidian Forge Dashboard.app"`. No Windows, escolha "Mais informações → Executar mesmo assim" para passar pelo SmartScreen. Prefere a partir do código-fonte? `cargo install obsidian-forge --features dashboard-ui`. É necessário pelo menos um cofre registrado.
 
 ---
 

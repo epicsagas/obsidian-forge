@@ -265,7 +265,12 @@ of dashboard --vault <name>     # 打开指定知识库
 - **FIND RELATED** — 基于图谱的关联笔记（反向链接 + 共同标签，前 5 篇）
 - **ASK AI** — 生成一句话摘要、关键问题和链接建议（需要配置 AI）
 
-> 仪表盘是一个可选的 `dashboard-ui` 功能，未包含在预编译二进制文件中。请使用 `--features dashboard-ui` 从源码编译（见安装）。至少需要注册一个知识库。
+> **预编译的桌面构建**附带在各个 [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) 中 — 请下载与你的操作系统对应的文件:
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg`（Apple Silicon）或 `*_x64.dmg`（Intel）
+> - **Linux** — `.AppImage`（赋予可执行权限: `chmod +x *.AppImage`）
+> - **Windows** — `.msi` 安装程序
+>
+> 构建为**未签名**版本。在 macOS 上,请清除 Gatekeeper: `xattr -cr "/Applications/Obsidian Forge Dashboard.app"`。在 Windows 上,选择"更多信息 → 仍要运行"以通过 SmartScreen。倾向于从源码构建? `cargo install obsidian-forge --features dashboard-ui`。至少需要注册一个知识库。
 
 ---
 

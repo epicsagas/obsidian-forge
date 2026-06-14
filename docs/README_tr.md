@@ -265,7 +265,12 @@ Her not bir **canlılık skoru (vitality score)**, **PARA bölgesi** sınıfland
 - **İLİŞKİLİLERİ BUL (FIND RELATED)** — grafik tabanlı ilgili notlar (geri bağlantılar + paylaşılan etiketler, ilk 5)
 - **AI'YA SOR (ASK AI)** — tek satırlık bir özet, temel sorular ve bağlantı önerileri üretir (AI yapılandırması gerekir)
 
-> Panel, isteğe bağlı bir `dashboard-ui` özelliğidir ve önceden derlenmiş binary'lere dahil değildir. Kaynaktan `--features dashboard-ui` ile derleyin (bkz. Kurulum). En az bir kayıtlı kasa gerekir.
+> **Önceden derlenmiş masaüstü build'leri** her [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases)'e eklenmiştir — işletim sisteminize uygun dosyayı indirin:
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) veya `*_x64.dmg` (Intel)
+> - **Linux** — `.AppImage` (çalıştırılabilir yapın: `chmod +x *.AppImage`)
+> - **Windows** — `.msi` yükleyici
+>
+> Build'ler **imzalanmamıştır**. macOS'ta Gatekeeper'ı temizleyin: `xattr -cr "/Applications/Obsidian Forge Dashboard.app"`. Windows'ta SmartScreen'i geçmek için "Daha fazla bilgi → Yine de çalıştır"ı seçin. Kaynaktan derlemeyi mi tercih edersiniz? `cargo install obsidian-forge --features dashboard-ui`. En az bir kayıtlı kasa gerekir.
 
 ---
 

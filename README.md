@@ -273,7 +273,12 @@ Every note is shown with a **vitality score**, **PARA zone** classification, and
 - **FIND RELATED** — graph-based related notes (backlinks + shared tags, top 5)
 - **ASK AI** — generates a one-line summary, key questions, and link suggestions (needs AI config)
 
-> The dashboard is an optional `dashboard-ui` feature, excluded from prebuilt binaries. Build from source with `--features dashboard-ui` (see [Installation](#via-rust-toolchain)). At least one registered vault is required.
+> **Prebuilt desktop builds** are attached to each [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) — grab the file for your OS:
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) or `*_x64.dmg` (Intel)
+> - **Linux** — `.AppImage` (make it executable: `chmod +x *.AppImage`)
+> - **Windows** — `.msi` installer
+>
+> Builds are **unsigned**. On macOS, clear Gatekeeper: `xattr -cr "/Applications/Obsidian Forge Dashboard.app"`. On Windows, pick "More info → Run anyway" past SmartScreen. Prefer source? `cargo install obsidian-forge --features dashboard-ui`. At least one registered vault is required.
 
 ---
 

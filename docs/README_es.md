@@ -265,7 +265,12 @@ Cada nota se muestra con una **puntuación de vitalidad**, clasificación de **z
 - **BUSCAR RELACIONADAS** — notas relacionadas basadas en el grafo (backlinks + etiquetas compartidas, top 5)
 - **PREGUNTAR A LA IA** — genera un resumen de una línea, preguntas clave y sugerencias de enlaces (requiere configuración de IA)
 
-> El panel de control es una característica opcional `dashboard-ui`, excluida de los binarios preconstruidos. Compílalo desde el código fuente con `--features dashboard-ui` (ver Instalación). Se requiere al menos una bóveda registrada.
+> Las **compilaciones de escritorio preconstruidas** se adjuntan a cada [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) — descarga el archivo correspondiente a tu SO:
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) o `*_x64.dmg` (Intel)
+> - **Linux** — `.AppImage` (hazlo ejecutable: `chmod +x *.AppImage`)
+> - **Windows** — instalador `.msi`
+>
+> Las compilaciones **no están firmadas**. En macOS, elude Gatekeeper: `xattr -cr "/Applications/Obsidian Forge Dashboard.app"`. En Windows, elige "Más información → Ejecutar de todos modos" para pasar SmartScreen. ¿Prefieres el código fuente? `cargo install obsidian-forge --features dashboard-ui`. Se requiere al menos una bóveda registrada.
 
 ---
 

@@ -213,3 +213,7 @@ GEMINI.md
 ui/node_modules/
 ui/dist/
 gen/
+
+# Tauri icon generation (mobile not shipped; keep source for regeneration)
+icons/ios/
+icons/android/

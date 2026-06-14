@@ -265,7 +265,12 @@ of dashboard --vault <name>     # 특정 볼트 열기
 - **FIND RELATED** — 그래프 기반 관련 노트 (백링크 + 공유 태그, 상위 5개)
 - **ASK AI** — 한 줄 요약, 핵심 질문, 링크 제안 생성 (AI 설정 필요)
 
-> 대시보드는 선택적 `dashboard-ui` 기능이며, 미리 컴파일된 바이너리에는 포함되지 않습니다. 설치 항목을 참고하여 `--features dashboard-ui`로 소스에서 빌드하세요. 최소 하나 이상의 등록된 볼트가 필요합니다.
+> **미리 컴파일된 데스크톱 빌드**는 각 [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases)에 첨부되어 있습니다 — 사용 중인 OS에 맞는 파일을 받으세요:
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) 또는 `*_x64.dmg` (Intel)
+> - **Linux** — `.AppImage` (실행 권한 부여: `chmod +x *.AppImage`)
+> - **Windows** — `.msi` 설치 프로그램
+>
+> 빌드는 **서명되지 않았습니다**. macOS에서는 Gatekeeper를 해제하세요: `xattr -cr "/Applications/Obsidian Forge Dashboard.app"`. Windows에서는 SmartScreen을 지나 "추가 정보 → 실행"을 선택하세요. 소스 빌드를 선호하시나요? `cargo install obsidian-forge --features dashboard-ui`. 최소 하나 이상의 등록된 볼트가 필요합니다.
 
 ---
 

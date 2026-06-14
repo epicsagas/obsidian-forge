@@ -1,0 +1,79 @@
+name: dashboard-release
+
+# 대시보드 데스크톱 설치본(.dmg / .AppImage / .msi)을 빌드해 GitHub Release에 추가.
+# cargo-dist(release.yml)와 같은 v* 태그에서 동시에 실행 — 같은 Release에 설치본을 업로드한다.
+# tauri-action은 태그의 Release가 이미 존재하면 거기에 추가, 없으면 생성(create-or-upload).
+#
+# 참고: 미서명 빌드. macOS Gatekeeper / Windows SmartScreen 경고는 README 우회 안내 참조.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach builds to (e.g. v0.2.7)'
+        required: true
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-dashboard:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-14
+            rust_target: aarch64-apple-darwin
+            tauri_target: '--target aarch64-apple-darwin'
+          - platform: macos-13
+            rust_target: x86_64-apple-darwin
+            tauri_target: '--target x86_64-apple-darwin'
+          - platform: ubuntu-22.04
+            rust_target: ''
+            tauri_target: ''
+          - platform: windows-latest
+            rust_target: ''
+            tauri_target: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Install Linux system deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install UI dependencies
+        run: npm ci
+        working-directory: ui
+
+      - name: Build & upload dashboard bundles
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: 'Dashboard ${{ github.event.inputs.tag || github.ref_name }}'
+          releaseBody: |
+            Desktop dashboard builds (${{ github.event.inputs.tag || github.ref_name }}).
+            Unsigned — see README for macOS Gatekeeper and Windows SmartScreen bypass.
+          releaseDraft: false
+          prerelease: false
+          args: --features dashboard-ui ${{ matrix.tauri_target }}

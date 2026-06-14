@@ -265,7 +265,12 @@ Chaque note est affichée avec un **score de vitalité**, une classification **z
 - **TROUVER DES NOTES CONNEXES** — notes connexes basées sur le graphe (rétroliens + tags partagés, top 5)
 - **DEMANDER À L'IA** — génère un résumé d'une ligne, des questions clés et des suggestions de liens (nécessite une config IA)
 
-> Le tableau de bord est une fonctionnalité optionnelle `dashboard-ui`, exclue des binaires précompilés. Compilez depuis les sources avec `--features dashboard-ui` (voir Installation). Au moins un coffre enregistré est requis.
+> Les **builds de bureau précompilés** sont joints à chaque [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) — récupérez le fichier correspondant à votre OS :
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) ou `*_x64.dmg` (Intel)
+> - **Linux** — `.AppImage` (rendez-le exécutable : `chmod +x *.AppImage`)
+> - **Windows** — installateur `.msi`
+>
+> Les builds **ne sont pas signés**. Sur macOS, contournez Gatekeeper : `xattr -cr "/Applications/Obsidian Forge Dashboard.app"`. Sur Windows, choisissez « Plus d'infos → Exécuter quand même » pour passer SmartScreen. Vous préférez la source ? `cargo install obsidian-forge --features dashboard-ui`. Au moins un coffre enregistré est requis.
 
 ---
 
