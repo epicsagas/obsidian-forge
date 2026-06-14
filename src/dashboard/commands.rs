@@ -53,7 +53,10 @@ pub fn get_dashboard(
     let vault_path = PathBuf::from(&entry.path);
 
     if !vault_path.exists() {
-        return Err(format!("Vault path does not exist: {}", vault_path.display()));
+        return Err(format!(
+            "Vault path does not exist: {}",
+            vault_path.display()
+        ));
     }
 
     let config = ForgeConfig::load(&vault_path).map_err(|e| {
@@ -61,7 +64,10 @@ pub fn get_dashboard(
         format!("vault config: {}", e)
     })?;
 
-    eprintln!("[dashboard] building dashboard for: {}", vault_path.display());
+    eprintln!(
+        "[dashboard] building dashboard for: {}",
+        vault_path.display()
+    );
 
     let dashboard = build_dashboard(&vault_path, &config).map_err(|e| {
         eprintln!("[dashboard] build_dashboard error: {}", e);
@@ -124,7 +130,10 @@ pub fn find_related(state: State<'_, AppState>, path: String) -> Result<Vec<Note
 
     // 점수: 직접 링크(백링크/순방향) +2, 공유 태그당 +1
     let mut scores: HashMap<String, u32> = HashMap::new();
-    for set in [graph.incoming.get(&path), graph.outgoing.get(&path)].into_iter().flatten() {
+    for set in [graph.incoming.get(&path), graph.outgoing.get(&path)]
+        .into_iter()
+        .flatten()
+    {
         for n in set {
             *scores.entry(n.clone()).or_insert(0) += 2;
         }
@@ -146,7 +155,8 @@ pub fn find_related(state: State<'_, AppState>, path: String) -> Result<Vec<Note
     let mut ranked: Vec<(String, u32)> = scores.into_iter().collect();
     ranked.sort_by(|a, b| b.1.cmp(&a.1));
 
-    let by_path: HashMap<String, NoteCard> = notes.into_iter().map(|n| (n.path.clone(), n)).collect();
+    let by_path: HashMap<String, NoteCard> =
+        notes.into_iter().map(|n| (n.path.clone(), n)).collect();
     let related = ranked
         .iter()
         .take(5)
@@ -194,10 +204,7 @@ pub async fn ask_ai(state: State<'_, AppState>, path: String) -> Result<String, 
 // Dashboard builder
 // ---------------------------------------------------------------------------
 
-fn build_dashboard(
-    vault: &Path,
-    config: &ForgeConfig,
-) -> Result<DashboardState> {
+fn build_dashboard(vault: &Path, config: &ForgeConfig) -> Result<DashboardState> {
     // 대시보드는 PARA 전체 영역을 스캔해야 zone 통계가 의미 있다.
     // all_system_dirs()는 MOC/프로젝트 스캔용이라 inbox/areas/resources/zk/archive 본체까지
     // 제외해 버리므로, 여기서는 메타 디렉토리만 제외한다.
@@ -373,10 +380,7 @@ fn scan_notes(vault: &Path, system_dirs: &[String]) -> Result<Vec<RawNote>> {
             .modified()
             .ok()
             .and_then(|t| {
-                let secs: u64 = t
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .ok()?
-                    .as_secs();
+                let secs: u64 = t.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
                 chrono::DateTime::from_timestamp(secs as i64, 0)
             })
             .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S").to_string())
@@ -398,10 +402,7 @@ fn scan_notes(vault: &Path, system_dirs: &[String]) -> Result<Vec<RawNote>> {
         let tags = extract_tags(&fm);
 
         // Layer
-        let layer = tags
-            .iter()
-            .find(|t| t.starts_with("layer/"))
-            .cloned();
+        let layer = tags.iter().find(|t| t.starts_with("layer/")).cloned();
 
         // Title: first H1 or filename
         let title = content
@@ -474,7 +475,11 @@ fn extract_tags(fm: &serde_yaml::Value) -> Vec<String> {
 fn classify_zone(rel_path: &str) -> Zone {
     let path = Path::new(rel_path);
 
-    if let Some(first) = path.components().next().and_then(|c| c.as_os_str().to_str()) {
+    if let Some(first) = path
+        .components()
+        .next()
+        .and_then(|c| c.as_os_str().to_str())
+    {
         match first {
             "00-Inbox" => Zone::Inbox,
             "01-Projects" => Zone::Archives, // Projects is just MOC hub, not storage
@@ -534,10 +539,7 @@ fn dashboard_scan_excludes(config: &ForgeConfig) -> Vec<String> {
 
 fn days_since_modified(iso_date: &str) -> u32 {
     let date_str = iso_date.split('T').next().unwrap_or(iso_date);
-    let parts: Vec<u32> = date_str
-        .split('-')
-        .filter_map(|p| p.parse().ok())
-        .collect();
+    let parts: Vec<u32> = date_str.split('-').filter_map(|p| p.parse().ok()).collect();
 
     if parts.len() != 3 {
         return 999;

@@ -15,11 +15,8 @@ pub fn compute_vitality(note: &NoteCard) -> u8 {
     let substance = substance_score(note.word_count);
     let hub = if note.incoming_links >= 3 { 1.0 } else { 0.0 };
 
-    let raw = recency * 0.30
-        + connectivity * 0.25
-        + richness * 0.20
-        + substance * 0.15
-        + hub * 0.10;
+    let raw =
+        recency * 0.30 + connectivity * 0.25 + richness * 0.20 + substance * 0.15 + hub * 0.10;
 
     // Clamp to 1-5
     let score = (raw * 5.0).round() as u8;
@@ -51,10 +48,7 @@ fn substance_score(word_count: u32) -> f64 {
 fn days_since(iso_date: &str) -> u32 {
     // Handle common formats: "2026-05-29T12:00:00+09:00" or "2026-05-29"
     let date_str = iso_date.split('T').next().unwrap_or(iso_date);
-    let parts: Vec<u32> = date_str
-        .split('-')
-        .filter_map(|p| p.parse().ok())
-        .collect();
+    let parts: Vec<u32> = date_str.split('-').filter_map(|p| p.parse().ok()).collect();
 
     if parts.len() != 3 {
         return 90; // fallback: treat as stale
