@@ -266,7 +266,7 @@ of dashboard --vault <name>     # открыть конкретное храни
 - **СПРОСИТЬ ИИ** — генерирует однострочное резюме, ключевые вопросы и предложения ссылок (требуется настройка ИИ)
 
 > **Готовые сборки для десктопа** прикреплены к каждому [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) — скачайте файл для вашей ОС:
-> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) или `*_x64.dmg` (Intel)
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon; Intel из исходников)
 > - **Linux** — `.AppImage` (сделайте исполняемым: `chmod +x *.AppImage`)
 > - **Windows** — установщик `.msi`
 >

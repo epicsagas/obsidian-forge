@@ -266,7 +266,7 @@ of dashboard --vault <name>     # 특정 볼트 열기
 - **ASK AI** — 한 줄 요약, 핵심 질문, 링크 제안 생성 (AI 설정 필요)
 
 > **미리 컴파일된 데스크톱 빌드**는 각 [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases)에 첨부되어 있습니다 — 사용 중인 OS에 맞는 파일을 받으세요:
-> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) 또는 `*_x64.dmg` (Intel)
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon; Intel은 소스 빌드)
 > - **Linux** — `.AppImage` (실행 권한 부여: `chmod +x *.AppImage`)
 > - **Windows** — `.msi` 설치 프로그램
 >

@@ -266,7 +266,7 @@ Chaque note est affichée avec un **score de vitalité**, une classification **z
 - **DEMANDER À L'IA** — génère un résumé d'une ligne, des questions clés et des suggestions de liens (nécessite une config IA)
 
 > Les **builds de bureau précompilés** sont joints à chaque [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) — récupérez le fichier correspondant à votre OS :
-> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) ou `*_x64.dmg` (Intel)
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon ; Intel à partir des sources)
 > - **Linux** — `.AppImage` (rendez-le exécutable : `chmod +x *.AppImage`)
 > - **Windows** — installateur `.msi`
 >

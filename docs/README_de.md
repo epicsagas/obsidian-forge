@@ -266,7 +266,7 @@ Jede Notiz wird mit einem **Vitalitätswert**, der **PARA-Zonen**-Klassifizierun
 - **KI FRAGEN** — generiert eine einzeilige Zusammenfassung, Schlüsselfragen und Link-Vorschläge (erfordert KI-Konfiguration)
 
 > **Vorkompilierte Desktop-Builds** sind an jeden [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) angehängt — laden Sie die Datei für Ihr OS herunter:
-> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) oder `*_x64.dmg` (Intel)
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon; Intel aus dem Quellcode)
 > - **Linux** — `.AppImage` (als ausführbar markieren: `chmod +x *.AppImage`)
 > - **Windows** — `.msi`-Installer
 >

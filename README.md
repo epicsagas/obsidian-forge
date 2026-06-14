@@ -274,7 +274,7 @@ Every note is shown with a **vitality score**, **PARA zone** classification, and
 - **ASK AI** — generates a one-line summary, key questions, and link suggestions (needs AI config)
 
 > **Prebuilt desktop builds** are attached to each [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) — grab the file for your OS:
-> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) or `*_x64.dmg` (Intel)
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon; Intel builds from source)
 > - **Linux** — `.AppImage` (make it executable: `chmod +x *.AppImage`)
 > - **Windows** — `.msi` installer
 >

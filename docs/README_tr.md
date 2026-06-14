@@ -266,7 +266,7 @@ Her not bir **canlılık skoru (vitality score)**, **PARA bölgesi** sınıfland
 - **AI'YA SOR (ASK AI)** — tek satırlık bir özet, temel sorular ve bağlantı önerileri üretir (AI yapılandırması gerekir)
 
 > **Önceden derlenmiş masaüstü build'leri** her [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases)'e eklenmiştir — işletim sisteminize uygun dosyayı indirin:
-> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) veya `*_x64.dmg` (Intel)
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon; Intel kaynak koddan)
 > - **Linux** — `.AppImage` (çalıştırılabilir yapın: `chmod +x *.AppImage`)
 > - **Windows** — `.msi` yükleyici
 >

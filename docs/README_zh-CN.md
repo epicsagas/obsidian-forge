@@ -266,7 +266,7 @@ of dashboard --vault <name>     # 打开指定知识库
 - **ASK AI** — 生成一句话摘要、关键问题和链接建议（需要配置 AI）
 
 > **预编译的桌面构建**附带在各个 [GitHub Release](https://github.com/epicsagas/obsidian-forge/releases) 中 — 请下载与你的操作系统对应的文件:
-> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg`（Apple Silicon）或 `*_x64.dmg`（Intel）
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg`（Apple Silicon；Intel 从源码构建）
 > - **Linux** — `.AppImage`（赋予可执行权限: `chmod +x *.AppImage`）
 > - **Windows** — `.msi` 安装程序
 >

@@ -266,7 +266,7 @@ of dashboard --vault <name>     # 特定のvaultを開く
 - **ASK AI** — 1行要約、重要な質問、リンク候補を生成（AI設定が必要）
 
 > **プリビルド版デスクトップビルド**は各[GitHub Release](https://github.com/epicsagas/obsidian-forge/releases)に添付されています — お使いのOS用のファイルを取得してください:
-> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon) または `*_x64.dmg` (Intel)
+> - **macOS** — `Obsidian.Forge.Dashboard_*_aarch64.dmg` (Apple Silicon; Intelはソースビルド)
 > - **Linux** — `.AppImage` (実行権限を付与: `chmod +x *.AppImage`)
 > - **Windows** — `.msi` インストーラー
 >
