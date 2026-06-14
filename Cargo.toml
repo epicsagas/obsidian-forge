@@ -43,6 +43,10 @@ rayon = "1.8"
 tokio-stream = "0.1"
 tauri = { version = "2", optional = true , features = [] }
 
+# Windows 전용: open_url()이 외부 링크를 열 때 사용 (macOS/Linux는 std::process::Command)
+[target.'cfg(target_os = "windows")'.dependencies]
+opener = "0.8"
+
 [build-dependencies]
 tauri-build = { version = "2", optional = true , features = [] }
 
