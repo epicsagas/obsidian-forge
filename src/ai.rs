@@ -209,6 +209,7 @@ impl AiClient {
 
     /// 노트 내용으로부터 한 줄 요약, 핵심 질문, 연결 제안을 마크다운으로 생성한다.
     /// 대시보드의 ASK AI 버튼용.
+    #[cfg(feature = "dashboard-ui")]
     pub async fn insights(&self, title: &str, body: &str) -> Result<String> {
         // 긴 본문은 UTF-8 문자 경계에서 절단 — 토큰/비용 절감
         let body = if body.len() > 6000 {
