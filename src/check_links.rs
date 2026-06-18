@@ -219,8 +219,9 @@ fn replace_wikilink_in_file(
 
 /// Parse wikilinks from content, returning raw target strings.
 fn parse_raw_targets(content: &str) -> Vec<String> {
+    let content = crate::graph::wikilinks::strip_fenced_code_blocks(content);
     let re = wikilink_re();
-    re.captures_iter(content)
+    re.captures_iter(&content)
         .filter_map(|cap| {
             let raw = cap.get(1)?.as_str().trim().to_string();
             if raw.is_empty() {
@@ -638,5 +639,31 @@ mod tests {
             fs::read_to_string(tmp.path().join("My-Note.md")).unwrap(),
             "original body"
         );
+    }
+
+    #[test]
+    fn test_check_links_ignores_fenced_code_blocks() {
+        // Regression for #27: wikilinks inside fenced code blocks must not be
+        // flagged as broken, while a real (unresolvable) link outside a fence still is.
+        let tmp = TempDir::new().unwrap();
+        let config = make_config();
+
+        write_md(
+            tmp.path(),
+            "source.md",
+            "```bash\nif [[ -f file ]]; then echo ok; fi\n```\n\n\
+```yaml\n[[providers]]\nconfig = true\n```\n\n\
+Real link: [[Nonexistent]]\n",
+        );
+
+        let result = check_links(tmp.path(), &config, false).unwrap();
+
+        assert_eq!(
+            result.broken.len(),
+            1,
+            "only the real link should be flagged; got: {:?}",
+            result.broken
+        );
+        assert_eq!(result.broken[0].target, "Nonexistent");
     }
 }
