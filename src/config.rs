@@ -257,6 +257,11 @@ pub struct VaultConfig {
     pub templates_dir: String,
     #[serde(default)]
     pub system_dirs: Vec<String>,
+    /// Static, hand-maintained files that sync/regeneration must never overwrite
+    /// once they exist. `index.md` is the agent entry point and is protected by
+    /// default (see AGENTS.md). Generation on first run (file absent) is allowed.
+    #[serde(default = "default_protected_files")]
+    pub protected_files: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -370,6 +375,9 @@ fn default_attachments() -> String {
 }
 fn default_templates() -> String {
     "obsidian-templates".into()
+}
+fn default_protected_files() -> Vec<String> {
+    vec!["index.md".to_string()]
 }
 fn default_detect() -> String {
     "top-level-dirs".into()
@@ -585,6 +593,7 @@ impl ForgeConfig {
                 attachments_dir: default_attachments(),
                 templates_dir: default_templates(),
                 system_dirs: Vec::new(),
+                protected_files: default_protected_files(),
             },
             projects: ProjectsConfig::default(),
             graph: GraphConfig::default(),
@@ -629,6 +638,7 @@ archive_dir = "99-Archives"
 attachments_dir = "Attachments"
 templates_dir = "obsidian-templates"
 system_dirs = []
+protected_files = ["index.md"]  # static files sync/regeneration must never overwrite
 
 # ── Per-vault overrides ───────────────────────────────────────────────────
 
@@ -792,6 +802,29 @@ mod tests {
         assert!(dirs.contains(&"10-Zettelkasten".to_string()));
         assert!(dirs.contains(&".git".to_string()));
         assert!(dirs.contains(&".obsidian".to_string()));
+    }
+
+    #[test]
+    fn test_vault_protected_files_default_applied_on_parse() {
+        // Existing vault.toml files have no `protected_files` key; serde must apply the
+        // default so index.md is protected without users having to opt in.
+        let toml_v = r#"
+[vault]
+name = "v"
+layout = "para"
+inbox_dir = "00-Inbox"
+zettelkasten_dir = "10-Zettelkasten"
+archive_dir = "99-Archives"
+attachments_dir = "Attachments"
+templates_dir = "obsidian-templates"
+system_dirs = []
+"#;
+        let config: ForgeConfig = toml::from_str(toml_v).expect("parse");
+        assert_eq!(
+            config.vault.protected_files,
+            vec!["index.md".to_string()],
+            "missing protected_files key should default to [\"index.md\"]"
+        );
     }
 
     #[test]

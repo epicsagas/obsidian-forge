@@ -91,6 +91,20 @@ pub fn generate_index(vault_root: &Path, config: &ForgeConfig) -> Result<()> {
 
     // Only write if content changed
     let index_path = vault_root.join("index.md");
+
+    // `index.md` (and any file listed in `vault.protected_files`) is a static,
+    // hand-maintained entry point. Never overwrite an existing copy during sync;
+    // first-run generation (file absent) is still allowed.
+    let is_protected = config
+        .vault
+        .protected_files
+        .iter()
+        .any(|f| index_path == vault_root.join(f));
+    if is_protected && index_path.exists() {
+        info!("index.md is protected (manual curation); skipping regeneration");
+        return Ok(());
+    }
+
     let existing = fs::read_to_string(&index_path).unwrap_or_default();
 
     if existing != content {
@@ -274,6 +288,45 @@ mod tests {
         // Check governance links
         assert!(content.contains("[[TAGGING]]"));
         assert!(content.contains("[[Home]]"));
+    }
+
+    #[test]
+    fn test_generate_index_preserves_protected_manual_edits() {
+        // Regression for #26: the daemon/`of sync` must not regenerate a static,
+        // hand-maintained index.md. With the default config, index.md is protected.
+        let tmp = tempfile::tempdir().unwrap();
+        let vault_root = tmp.path();
+        let config = setup_test_vault(vault_root);
+
+        let manual = "---\ntype: agent-index\n---\n# MANUAL — do not regenerate\n";
+        fs::write(vault_root.join("index.md"), manual).unwrap();
+
+        generate_index(vault_root, &config).unwrap();
+
+        let content = fs::read_to_string(vault_root.join("index.md")).unwrap();
+        assert_eq!(
+            content, manual,
+            "protected index.md must survive a sync/generate cycle unchanged"
+        );
+        assert!(!content.contains("Agent Index"));
+    }
+
+    #[test]
+    fn test_generate_index_regenerates_when_protection_disabled() {
+        // Opt-out path: clearing protected_files re-enables regeneration.
+        let tmp = tempfile::tempdir().unwrap();
+        let vault_root = tmp.path();
+        let mut config = setup_test_vault(vault_root);
+        config.vault.protected_files.clear();
+
+        fs::write(vault_root.join("index.md"), "STALE\n").unwrap();
+        fs::write(vault_root.join("02-Areas/Rust.md"), "# Rust\n").unwrap();
+
+        generate_index(vault_root, &config).unwrap();
+
+        let content = fs::read_to_string(vault_root.join("index.md")).unwrap();
+        assert!(content.contains("Agent Index"));
+        assert!(!content.contains("STALE"));
     }
 
     #[test]
