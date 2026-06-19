@@ -31,7 +31,8 @@ Documents here must **never** be copied into public project repos.
 │       ├── collet/         # ... and all other active/inactive projects
 │       └── ...
 ├── _template/              # Template for new project docs
-├── Home.md                 # Vault dashboard / root MOC
+├── Home.md                 # Vault dashboard / root MOC (Dataview, auto-generated sections)
+├── index.md                # Agent entry point — static, hand-maintained; sync never overwrites it
 ├── TAGGING.md              # Tagging and frontmatter conventions
 └── vault.toml              # Per-vault obsidian-forge config
 ```

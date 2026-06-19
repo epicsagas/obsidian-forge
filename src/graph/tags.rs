@@ -374,10 +374,7 @@ fn apply_tag_normalization(
                 format!("{}\ntags: [{}]", yaml, new_tags_str)
             };
 
-            // Same class of bug as check_tags #25: the YAML captured by `fm_re`
-            // excludes the newline before the closing `---`, so place the delimiter
-            // on its own line and guard against any trailing whitespace.
-            let new_content = format!("---\n{}\n---\n{}", new_yaml.trim_end(), body);
+            let new_content = crate::vault_utils::reassemble_frontmatter(&new_yaml, body);
             if new_content != content {
                 fs::write(&path, &new_content)?;
                 changed += 1;

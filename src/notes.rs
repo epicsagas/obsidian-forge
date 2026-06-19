@@ -369,7 +369,7 @@ fn split_frontmatter(input: &str) -> Result<(Option<Frontmatter>, String)> {
 
 fn join_frontmatter(fm: &Frontmatter, body: &str) -> String {
     let yaml = serde_yaml::to_string(fm).unwrap_or_default();
-    format!("---\n{}---\n{}", yaml, body)
+    crate::vault_utils::reassemble_frontmatter(&yaml, body)
 }
 
 fn merge_vec(mut a: Vec<String>, b: Vec<String>) -> Vec<String> {

@@ -638,7 +638,7 @@ archive_dir = "99-Archives"
 attachments_dir = "Attachments"
 templates_dir = "obsidian-templates"
 system_dirs = []
-protected_files = ["index.md"]  # static files sync/regeneration must never overwrite
+protected_files = ["index.md"]  # sync must not overwrite static files; set to [] to auto-regenerate index.md
 
 # ── Per-vault overrides ───────────────────────────────────────────────────
 

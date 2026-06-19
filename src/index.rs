@@ -10,7 +10,7 @@ use crate::config::ForgeConfig;
 /// The file contains links to all areas, active projects, zettelkasten notes, key hub concepts,
 /// and governance documents. It is idempotent — safe to re-run. The file is only written when
 /// the generated content differs from the existing file.
-pub fn generate_index(vault_root: &Path, config: &ForgeConfig) -> Result<()> {
+pub fn generate_index(vault_root: &Path, config: &ForgeConfig) -> Result<bool> {
     let vault_name = &config.vault.name;
     let system_dirs = config.all_system_dirs();
     let exclude = &config.projects.exclude;
@@ -102,7 +102,7 @@ pub fn generate_index(vault_root: &Path, config: &ForgeConfig) -> Result<()> {
         .any(|f| index_path == vault_root.join(f));
     if is_protected && index_path.exists() {
         info!("index.md is protected (manual curation); skipping regeneration");
-        return Ok(());
+        return Ok(false);
     }
 
     let existing = fs::read_to_string(&index_path).unwrap_or_default();
@@ -110,11 +110,11 @@ pub fn generate_index(vault_root: &Path, config: &ForgeConfig) -> Result<()> {
     if existing != content {
         fs::write(&index_path, &content)?;
         info!("index.md generated at {}", index_path.display());
+        Ok(true)
     } else {
         info!("index.md unchanged, skipping write");
+        Ok(false)
     }
-
-    Ok(())
 }
 
 /// Collect all *.md files under a directory, returning relative paths without extension.
@@ -327,6 +327,23 @@ mod tests {
         let content = fs::read_to_string(vault_root.join("index.md")).unwrap();
         assert!(content.contains("Agent Index"));
         assert!(!content.contains("STALE"));
+    }
+
+    #[test]
+    fn test_generate_index_reports_written_flag() {
+        // generate_index reports whether it actually wrote (not just Ok).
+        let tmp = tempfile::tempdir().unwrap();
+        let vault_root = tmp.path();
+        let config = setup_test_vault(vault_root);
+
+        assert!(
+            generate_index(vault_root, &config).unwrap(),
+            "first run writes index.md"
+        );
+        assert!(
+            !generate_index(vault_root, &config).unwrap(),
+            "second run with no content diff should report false"
+        );
     }
 
     #[test]

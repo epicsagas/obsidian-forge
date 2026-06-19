@@ -121,49 +121,66 @@ fn wikilink_re() -> &'static Regex {
     })
 }
 
-/// Replace fenced code-block regions with blank lines so `[[ ]]` syntax inside
-/// them is not mistaken for wikilinks. Handles ``` ``` ``` and `~~~` fences; a
-/// fence opened with one marker only closes on the same marker. Indented code
+/// Byte-offset ranges `[start, end)` of fenced code-block regions, so
+/// wikilink-like `[[ ]]` syntax inside them is not mistaken for links. Handles
+/// ``` ``` ``` and `~~~` fences; a fence opened with one marker only closes on the
+/// same marker.
+///
+/// Note: this is a pragmatic fence detector, not full CommonMark — it does not
+/// model fence-length rules (e.g. a 4-backtick fence closed by 3 backticks) nor
+/// forbid an info string on a closing fence. Such cases are rare in real vaults,
+/// and the conservative direction (an unmatched fence is treated as still open
+/// through EOF) can only ever suppress links, never invent them. Indented code
 /// blocks and inline code spans are intentionally left untouched.
 ///
-/// Shared by both `graph health` and `check-links` so the two commands agree.
-pub(crate) fn strip_fenced_code_blocks(content: &str) -> String {
-    let mut out = String::with_capacity(content.len());
+/// Used by `parse_wikilinks` (shared by `graph health` and `check-links`).
+fn fenced_code_ranges(content: &str) -> Vec<(usize, usize)> {
+    let base = content.as_ptr() as usize;
+    let mut ranges = Vec::new();
     let mut fence: Option<char> = None;
+    let mut start = 0usize;
 
     for line in content.split_inclusive('\n') {
+        let line_start = line.as_ptr() as usize - base;
+        let line_end = line_start + line.len();
         let trimmed = line.trim_start();
         let opens_backtick = trimmed.starts_with("```");
         let opens_tilde = trimmed.starts_with("~~~");
 
         match fence {
             Some(open) => {
-                // Inside a fence — drop the line content but keep the newline so
-                // line numbering is preserved. Watch for a matching close fence.
-                out.push('\n');
-                if match open {
+                let closes = match open {
                     '`' => opens_backtick,
                     '~' => opens_tilde,
                     _ => false,
-                } {
+                };
+                if closes {
+                    ranges.push((start, line_end));
                     fence = None;
                 }
             }
             None => {
-                if opens_backtick {
-                    fence = Some('`');
-                    out.push('\n');
-                } else if opens_tilde {
-                    fence = Some('~');
-                    out.push('\n');
-                } else {
-                    out.push_str(line);
+                if opens_backtick || opens_tilde {
+                    fence = Some(if opens_backtick { '`' } else { '~' });
+                    start = line_start;
                 }
             }
         }
     }
 
-    out
+    // An unterminated fence runs to EOF.
+    if fence.is_some() {
+        ranges.push((start, content.len()));
+    }
+
+    ranges
+}
+
+/// True if `byte_offset` falls inside any range returned by [`fenced_code_ranges`].
+fn in_fenced_code(byte_offset: usize, ranges: &[(usize, usize)]) -> bool {
+    ranges
+        .iter()
+        .any(|(start, end)| byte_offset >= *start && byte_offset < *end)
 }
 
 pub fn build_vault_graph(vault_root: &Path, _config: &ForgeConfig) -> Result<VaultGraph> {
@@ -272,11 +289,15 @@ pub fn build_vault_graph(vault_root: &Path, _config: &ForgeConfig) -> Result<Vau
     Ok(graph)
 }
 
-fn parse_wikilinks(content: &str) -> Vec<Wikilink> {
-    let content = strip_fenced_code_blocks(content);
+pub(crate) fn parse_wikilinks(content: &str) -> Vec<Wikilink> {
+    let fences = fenced_code_ranges(content);
     let re = wikilink_re();
-    re.captures_iter(&content)
+    re.captures_iter(content)
         .filter_map(|cap| {
+            let full = cap.get(0)?;
+            if in_fenced_code(full.start(), &fences) {
+                return None;
+            }
             let raw = cap.get(1)?.as_str().trim().to_string();
             if raw.is_empty() {
                 return None;
@@ -291,7 +312,7 @@ fn parse_wikilinks(content: &str) -> Vec<Wikilink> {
         .collect()
 }
 
-fn resolve_link(
+pub(crate) fn resolve_link(
     target: &str,
     file_index: &BTreeMap<String, String>,
     stem_index: &BTreeMap<String, String>,

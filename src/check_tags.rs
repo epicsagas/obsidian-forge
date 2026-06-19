@@ -223,10 +223,7 @@ fn apply_tag_fixes(
         fixed_yaml = inject_tags_into_yaml(&fixed_yaml, missing_tags);
     }
 
-    // The YAML captured by `frontmatter_re` excludes the newline before the closing
-    // `---`, so place the delimiter on its own line. `trim_end()` guards against any
-    // tag-injection path leaving trailing whitespace (regression for issue #25).
-    let new_content = format!("---\n{}\n---\n{}", fixed_yaml.trim_end(), body);
+    let new_content = crate::vault_utils::reassemble_frontmatter(&fixed_yaml, body);
     if new_content != original_content {
         fs::write(path, &new_content)?;
         for issue in result.issues.iter_mut().skip(first_issue_idx) {
@@ -309,7 +306,7 @@ fn apply_no_frontmatter_fixes(
     }
 
     let yaml = format!("tags: [{}]\n", missing_tags.join(", "));
-    let new_content = format!("---\n{}---\n{}", yaml, original_content);
+    let new_content = crate::vault_utils::reassemble_frontmatter(&yaml, original_content);
     if new_content != *original_content {
         fs::write(path, &new_content)?;
         for issue in result.issues.iter_mut().skip(first_issue_idx) {
