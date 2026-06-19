@@ -1,8 +1,10 @@
 name: dashboard-release
 
 # 대시보드 데스크톱 설치본(.dmg / .AppImage / .msi)을 빌드해 GitHub Release에 추가.
-# cargo-dist(release.yml)와 같은 v* 태그에서 동시에 실행 — 같은 Release에 설치본을 업로드한다.
-# tauri-action은 태그의 Release가 이미 존재하면 거기에 추가, 없으면 생성(create-or-upload).
+# cargo-dist(release.yml)가 Release를 생성한 뒤에만 실행된다(workflow_run 순서 보장).
+# 이전에는 두 워크플로우가 같은 태그에서 동시에 Release를 create-or-upload하려 해
+# 경쟁 조건("a release with the same tag name already exists")이 발생했다.
+# 이제 dashboard는 항상 cargo-dist가 만든 Release에 upload-only로 동작한다.
 #
 # 참고: 미서명 빌드. macOS Gatekeeper / Windows SmartScreen 경고는 README 우회 안내 참조.
 
@@ -10,17 +12,19 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to attach builds to (e.g. v0.2.7)'
+        description: 'Release tag to attach builds to (e.g. v0.3.1)'
         required: true
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
 
 permissions:
   contents: write
 
 jobs:
   build-dashboard:
+    # cargo-dist가 Release 생성에 실패하면 dashboard도 실행하지 않는다(불완전 Release 방지).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -37,7 +41,16 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
+      - name: Resolve release tag
+        id: tag
+        run: |
+          tag="${{ github.event.inputs.tag || github.event.workflow_run.head_branch }}"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]] || { echo "::warning::not a release tag: $tag"; exit 1; }
+          echo "name=$tag" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.tag.outputs.name }}
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -66,10 +79,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.event.inputs.tag || github.ref_name }}
-          releaseName: 'Dashboard ${{ github.event.inputs.tag || github.ref_name }}'
+          tagName: ${{ steps.tag.outputs.name }}
+          releaseName: 'Dashboard ${{ steps.tag.outputs.name }}'
           releaseBody: |
-            Desktop dashboard builds (${{ github.event.inputs.tag || github.ref_name }}).
+            Desktop dashboard builds (${{ steps.tag.outputs.name }}).
             Unsigned — see README for macOS Gatekeeper and Windows SmartScreen bypass.
           releaseDraft: false
           prerelease: false
