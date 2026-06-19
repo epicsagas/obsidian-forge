@@ -223,7 +223,7 @@ fn apply_tag_fixes(
         fixed_yaml = inject_tags_into_yaml(&fixed_yaml, missing_tags);
     }
 
-    let new_content = format!("---\n{}---\n{}", fixed_yaml, body);
+    let new_content = crate::vault_utils::reassemble_frontmatter(&fixed_yaml, body);
     if new_content != original_content {
         fs::write(path, &new_content)?;
         for issue in result.issues.iter_mut().skip(first_issue_idx) {
@@ -306,7 +306,7 @@ fn apply_no_frontmatter_fixes(
     }
 
     let yaml = format!("tags: [{}]\n", missing_tags.join(", "));
-    let new_content = format!("---\n{}---\n{}", yaml, original_content);
+    let new_content = crate::vault_utils::reassemble_frontmatter(&yaml, original_content);
     if new_content != *original_content {
         fs::write(path, &new_content)?;
         for issue in result.issues.iter_mut().skip(first_issue_idx) {
@@ -727,6 +727,40 @@ mod tests {
             "Should contain project tag"
         );
         assert!(fixed_content.contains("# PRD"), "Body should be preserved");
+    }
+
+    #[test]
+    fn test_fix_keeps_closing_delimiter_on_own_line() {
+        // Regression for #25: `check-tags --fix` glued the closing `---` to the last
+        // frontmatter key when injecting a missing project tag (e.g. `created: 2026-05-14---`).
+        let vault = create_test_vault();
+        let config = make_config();
+
+        write_file(
+            vault.path(),
+            "99-Archives/projects/test-project/PRD.md",
+            "---\ntags: [layer/raw, type/prd]\ncreated: 2026-05-14\n---\n# PRD\n",
+        );
+
+        let result = check_tags(vault.path(), &config, true, TagScope::Project).expect("check");
+        assert!(result.fixed > 0, "Expected the project tag to be injected");
+
+        let fixed_content = read_file(vault.path(), "99-Archives/projects/test-project/PRD.md");
+
+        // The closing delimiter must sit on its own line, preceded by a newline.
+        assert!(
+            !fixed_content.contains("2026-05-14---"),
+            "closing --- must not be glued to the last key; got:\n{fixed_content}"
+        );
+        assert!(
+            fixed_content.contains("2026-05-14\n---\n"),
+            "closing --- should be on its own line after the last key; got:\n{fixed_content}"
+        );
+        // The whole frontmatter must still match the standard delimiter pattern.
+        assert!(
+            crate::vault_utils::frontmatter_re().is_match(&fixed_content),
+            "frontmatter should match the standard delimiter pattern; got:\n{fixed_content}"
+        );
     }
 
     #[test]

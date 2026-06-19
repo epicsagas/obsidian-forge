@@ -542,8 +542,12 @@ async fn handle_graph_action(
             println!("Graph strengthening complete.");
         }
         GraphAction::Index => {
-            index::generate_index(vault, config)?;
-            println!("index.md generated.");
+            let wrote = index::generate_index(vault, config)?;
+            if wrote {
+                println!("index.md generated.");
+            } else {
+                println!("index.md unchanged (protected by config or no content diff).");
+            }
         }
     }
     Ok(())

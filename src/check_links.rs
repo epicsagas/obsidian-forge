@@ -1,7 +1,7 @@
 use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fs, path::Path, sync::OnceLock};
+use std::{collections::BTreeMap, fs, path::Path};
 use tracing::{info, warn};
 use walkdir::WalkDir;
 
@@ -65,13 +65,6 @@ impl std::fmt::Display for LinkCheckResult {
         }
         Ok(())
     }
-}
-
-fn wikilink_re() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]").expect("valid wikilink regex")
-    })
 }
 
 /// Collect all `.md` file stems (relative path without extension) mapped to their full relative paths.
@@ -140,18 +133,16 @@ fn build_stem_index(md_files: &BTreeMap<String, String>) -> BTreeMap<String, Str
     index
 }
 
-/// Check if a raw wikilink target resolves to an existing .md file.
+/// Resolve a raw wikilink target by delegating to the graph resolver, so
+/// `check-links` and `graph health` share one resolution path (issue #27).
+/// `check-links` layers its own hyphen/space normalization
+/// ([`find_normalized_match`]) on top as a fallback.
 fn resolve_raw_target(
     target: &str,
     md_files: &BTreeMap<String, String>,
     stem_index: &BTreeMap<String, String>,
 ) -> Option<String> {
-    let key = target.to_lowercase();
-    if let Some(full) = md_files.get(&key) {
-        return Some(full.clone());
-    }
-    let short_key = key.split('/').next_back()?.to_string();
-    stem_index.get(&short_key).cloned()
+    crate::graph::wikilinks::resolve_link(target, md_files, stem_index)
 }
 
 /// Try to find an existing .md file that matches `target` with hyphens swapped to spaces or vice versa.
@@ -217,17 +208,12 @@ fn replace_wikilink_in_file(
     Ok(())
 }
 
-/// Parse wikilinks from content, returning raw target strings.
+/// Parse wikilink targets from content, reusing the graph extractor so the two
+/// commands share one fence-skipping implementation (issue #27).
 fn parse_raw_targets(content: &str) -> Vec<String> {
-    let re = wikilink_re();
-    re.captures_iter(content)
-        .filter_map(|cap| {
-            let raw = cap.get(1)?.as_str().trim().to_string();
-            if raw.is_empty() {
-                return None;
-            }
-            Some(raw)
-        })
+    crate::graph::wikilinks::parse_wikilinks(content)
+        .into_iter()
+        .map(|w| w.raw_target)
         .collect()
 }
 
@@ -638,5 +624,31 @@ mod tests {
             fs::read_to_string(tmp.path().join("My-Note.md")).unwrap(),
             "original body"
         );
+    }
+
+    #[test]
+    fn test_check_links_ignores_fenced_code_blocks() {
+        // Regression for #27: wikilinks inside fenced code blocks must not be
+        // flagged as broken, while a real (unresolvable) link outside a fence still is.
+        let tmp = TempDir::new().unwrap();
+        let config = make_config();
+
+        write_md(
+            tmp.path(),
+            "source.md",
+            "```bash\nif [[ -f file ]]; then echo ok; fi\n```\n\n\
+```yaml\n[[providers]]\nconfig = true\n```\n\n\
+Real link: [[Nonexistent]]\n",
+        );
+
+        let result = check_links(tmp.path(), &config, false).unwrap();
+
+        assert_eq!(
+            result.broken.len(),
+            1,
+            "only the real link should be flagged; got: {:?}",
+            result.broken
+        );
+        assert_eq!(result.broken[0].target, "Nonexistent");
     }
 }

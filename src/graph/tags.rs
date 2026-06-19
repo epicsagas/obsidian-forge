@@ -374,7 +374,7 @@ fn apply_tag_normalization(
                 format!("{}\ntags: [{}]", yaml, new_tags_str)
             };
 
-            let new_content = format!("---\n{}---\n{}", new_yaml, body);
+            let new_content = crate::vault_utils::reassemble_frontmatter(&new_yaml, body);
             if new_content != content {
                 fs::write(&path, &new_content)?;
                 changed += 1;
@@ -397,6 +397,38 @@ mod tests {
         assert_eq!(normalize_tag("Rust"), "rust");
         assert_eq!(normalize_tag("Machine Learning"), "machine-learning");
         assert_eq!(normalize_tag("rust-lang"), "rust-lang");
+    }
+
+    #[test]
+    fn test_apply_tag_normalization_keeps_closing_delimiter_on_own_line() {
+        // Regression (same class as #25): tag normalization must not glue the closing
+        // frontmatter `---` to the last key when the file ends in a non-tags key.
+        let tmp = tempfile::tempdir().expect("temp dir");
+        let vault_root = tmp.path();
+        let rel = "99-Archives/projects/proj/PRD.md";
+        let path = vault_root.join(rel);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            "---\ncreated: 2026-05-14\ntags: [Rust]\n---\n# PRD\n",
+        )
+        .unwrap();
+
+        let mut tag_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        tag_map.insert(rel.to_string(), vec!["Rust".to_string()]);
+        let canonical_map: BTreeMap<String, String> = BTreeMap::new();
+
+        apply_tag_normalization(vault_root, &tag_map, &canonical_map).unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            !content.contains("[rust]---"),
+            "closing --- must not be glued to the last key; got:\n{content}"
+        );
+        assert!(
+            content.contains("[rust]\n---\n"),
+            "closing --- should be on its own line; got:\n{content}"
+        );
     }
 
     #[test]

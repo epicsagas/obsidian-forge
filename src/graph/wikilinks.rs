@@ -121,6 +121,68 @@ fn wikilink_re() -> &'static Regex {
     })
 }
 
+/// Byte-offset ranges `[start, end)` of fenced code-block regions, so
+/// wikilink-like `[[ ]]` syntax inside them is not mistaken for links. Handles
+/// ``` ``` ``` and `~~~` fences; a fence opened with one marker only closes on the
+/// same marker.
+///
+/// Note: this is a pragmatic fence detector, not full CommonMark — it does not
+/// model fence-length rules (e.g. a 4-backtick fence closed by 3 backticks) nor
+/// forbid an info string on a closing fence. Such cases are rare in real vaults,
+/// and the conservative direction (an unmatched fence is treated as still open
+/// through EOF) can only ever suppress links, never invent them. Indented code
+/// blocks and inline code spans are intentionally left untouched.
+///
+/// Used by `parse_wikilinks` (shared by `graph health` and `check-links`).
+fn fenced_code_ranges(content: &str) -> Vec<(usize, usize)> {
+    let base = content.as_ptr() as usize;
+    let mut ranges = Vec::new();
+    let mut fence: Option<char> = None;
+    let mut start = 0usize;
+
+    for line in content.split_inclusive('\n') {
+        let line_start = line.as_ptr() as usize - base;
+        let line_end = line_start + line.len();
+        let trimmed = line.trim_start();
+        let opens_backtick = trimmed.starts_with("```");
+        let opens_tilde = trimmed.starts_with("~~~");
+
+        match fence {
+            Some(open) => {
+                let closes = match open {
+                    '`' => opens_backtick,
+                    '~' => opens_tilde,
+                    _ => false,
+                };
+                if closes {
+                    ranges.push((start, line_end));
+                    fence = None;
+                }
+            }
+            None => {
+                if opens_backtick || opens_tilde {
+                    fence = Some(if opens_backtick { '`' } else { '~' });
+                    start = line_start;
+                }
+            }
+        }
+    }
+
+    // An unterminated fence runs to EOF.
+    if fence.is_some() {
+        ranges.push((start, content.len()));
+    }
+
+    ranges
+}
+
+/// True if `byte_offset` falls inside any range returned by [`fenced_code_ranges`].
+fn in_fenced_code(byte_offset: usize, ranges: &[(usize, usize)]) -> bool {
+    ranges
+        .iter()
+        .any(|(start, end)| byte_offset >= *start && byte_offset < *end)
+}
+
 pub fn build_vault_graph(vault_root: &Path, _config: &ForgeConfig) -> Result<VaultGraph> {
     let md_files: Vec<(String, String)> = WalkDir::new(vault_root)
         .into_iter()
@@ -227,10 +289,15 @@ pub fn build_vault_graph(vault_root: &Path, _config: &ForgeConfig) -> Result<Vau
     Ok(graph)
 }
 
-fn parse_wikilinks(content: &str) -> Vec<Wikilink> {
+pub(crate) fn parse_wikilinks(content: &str) -> Vec<Wikilink> {
+    let fences = fenced_code_ranges(content);
     let re = wikilink_re();
     re.captures_iter(content)
         .filter_map(|cap| {
+            let full = cap.get(0)?;
+            if in_fenced_code(full.start(), &fences) {
+                return None;
+            }
             let raw = cap.get(1)?.as_str().trim().to_string();
             if raw.is_empty() {
                 return None;
@@ -245,7 +312,7 @@ fn parse_wikilinks(content: &str) -> Vec<Wikilink> {
         .collect()
 }
 
-fn resolve_link(
+pub(crate) fn resolve_link(
     target: &str,
     file_index: &BTreeMap<String, String>,
     stem_index: &BTreeMap<String, String>,
@@ -303,6 +370,35 @@ mod tests {
     fn test_parse_empty_wikilink_ignored() {
         let links = parse_wikilinks("[[]] and [[  ]]");
         assert!(links.is_empty());
+    }
+
+    #[test]
+    fn test_parse_skips_backtick_fenced_code_blocks() {
+        // Regression for #27: `[[ -f file ]]` (bash test) and `[[providers]]`
+        // (YAML-ish identifier) inside a fenced block must not be treated as links.
+        let content = "See [[Real Link]]\n\n\
+```bash\n\
+if [[ -f file ]]; then echo ok; fi\n\
+```\n\n\
+```yaml\n\
+[[providers]]\n\
+config = true\n\
+```\n";
+        let links = parse_wikilinks(content);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].raw_target, "Real Link");
+    }
+
+    #[test]
+    fn test_parse_skips_tilde_fenced_code_blocks() {
+        // `~~~` fences and mixed markers: a ``` fence must not be closed by `~~~`.
+        let content = "~~~\n[[inside-tilde]]\n~~~\n[[outside]]\n\
+```\n[[should-not-leak]]\n```\n[[after]]\n";
+        let links: Vec<String> = parse_wikilinks(content)
+            .into_iter()
+            .map(|l| l.raw_target)
+            .collect();
+        assert_eq!(links, vec!["outside".to_string(), "after".to_string()]);
     }
 
     #[test]
