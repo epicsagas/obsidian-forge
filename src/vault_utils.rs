@@ -11,6 +11,11 @@ pub const VAULT_EXCLUDED_DIRS: &[&str] = &[
     "seeded",
     "harness-engineering",
     "01-Projects",
+    // Public release bundles — standalone git repos nested in the vault
+    // (e.g. 04-Writing/paper/*/release/). These ship to readers and must
+    // never receive vault frontmatter, tags, or [[wikilinks]]. Matched per
+    // path-component so any nested depth is excluded.
+    "release",
 ];
 
 pub fn is_vault_excluded(path: &Path) -> bool {
