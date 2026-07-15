@@ -15,7 +15,7 @@ targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-
 tap = "epicsagas/homebrew-tap"
 formula = "obsidian-forge"
 # Publish jobs
-publish-jobs = ["homebrew"]
+publish-jobs = ["homebrew", "cargo"]
 allow-dirty = ["ci"]
 macos-sign = false
 # Install location (matches cargo install behavior)
