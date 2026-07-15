@@ -588,6 +588,7 @@ fn extract_project_name(file_path: &Path, projects_dir: &Path) -> Option<String>
 mod tests {
     use super::*;
     use crate::frontmatter::normalize_frontmatter;
+    use crate::graph::strengthen_graph;
     use tempfile::TempDir;
 
     fn create_test_vault() -> TempDir {
@@ -994,8 +995,14 @@ mod tests {
     #[test]
     fn test_nested_repo_excluded_from_fixers() {
         let vault = create_test_vault();
-        let config = make_config();
+        let mut config = make_config();
+        // Focus the graph pipeline on the backlinks contaminator only, so any
+        // unrelated graph step can't mask a regression in inject_backlinks.
+        config.graph.bridge_notes = false;
+        config.graph.related_projects = false;
+        config.graph.auto_tags = false;
 
+        // --- Frontmatter + tag fixers (scope: 99-Archives/projects) ---
         // A normal project doc — should be fixed by both fixers.
         write_file(
             vault.path(),
@@ -1005,31 +1012,78 @@ mod tests {
 
         // A nested standalone git repo (e.g. a public `release/` bundle).
         // It must never be touched by vault fixers, independent of the dir name.
-        let repo = vault
+        let repo_a = vault
             .path()
             .join("99-Archives")
             .join("projects")
             .join("proj")
             .join("release");
-        fs::create_dir_all(repo.join(".git")).expect("mkdir .git");
-        fs::write(repo.join(".git").join("HEAD"), "").expect("write HEAD");
-        let nested = repo.join("paper.md");
-        fs::write(&nested, "Original body, no frontmatter.\n").expect("write nested");
+        fs::create_dir_all(repo_a.join(".git")).expect("mkdir .git");
+        fs::write(repo_a.join(".git").join("HEAD"), "").expect("write HEAD");
+        let nested_a = repo_a.join("paper.md");
+        fs::write(&nested_a, "Original body, no frontmatter.\n").expect("write nested A");
 
         // Both fixers run with --fix.
         let fm = normalize_frontmatter(vault.path(), &config, true).expect("frontmatter");
         assert!(fm.scanned >= 1, "walker should still scan the vault");
         let _ = check_tags(vault.path(), &config, true, TagScope::Project).expect("tags");
 
-        // The nested repo file must be byte-identical (untouched).
-        let after = fs::read_to_string(&nested).expect("read nested");
+        // The nested repo file must be byte-identical (untouched) by the frontmatter + tags fixers.
+        let after_fixers_a = fs::read_to_string(&nested_a).expect("read nested A");
         assert_eq!(
-            after, "Original body, no frontmatter.\n",
+            after_fixers_a, "Original body, no frontmatter.\n",
             "nested repo file must be left untouched by vault fixers"
         );
-        // Sanity: a real project doc WAS modified by the fixer.
+
+        // --- Graph pipeline / inject_backlinks (scope: top-level project dir) ---
+        // The graph scanner only reaches top-level project dirs (99-Archives is a
+        // system dir it skips), so the backlinks scenario lives under 04-Writing.
+        write_file(
+            vault.path(),
+            "04-Writing/paper/proj/PRD.md",
+            "# PRD\n\nGraph body.\n",
+        );
+
+        // Another nested standalone git repo at the canonical #38 depth.
+        let repo_b = vault
+            .path()
+            .join("04-Writing")
+            .join("paper")
+            .join("proj")
+            .join("release");
+        fs::create_dir_all(repo_b.join(".git")).expect("mkdir .git B");
+        fs::write(repo_b.join(".git").join("HEAD"), "").expect("write HEAD B");
+        let nested_b = repo_b.join("paper.md");
+        fs::write(&nested_b, "Original body, no frontmatter.\n").expect("write nested B");
+
+        // The second #38 contaminator: strengthen-graph / inject_backlinks writes
+        // `## See Also` footers. The nested files must STILL be byte-identical afterward.
+        strengthen_graph(vault.path(), &config).expect("strengthen graph");
+
+        let after_graph_a = fs::read_to_string(&nested_a).expect("read nested A");
+        assert_eq!(
+            after_graph_a, "Original body, no frontmatter.\n",
+            "nested repo (fixers) must be left untouched by the graph pipeline"
+        );
+        let after_graph_b = fs::read_to_string(&nested_b).expect("read nested B");
+        assert_eq!(
+            after_graph_b, "Original body, no frontmatter.\n",
+            "nested release bundle must be left untouched by inject_backlinks"
+        );
+
+        // Sanity: real docs WERE modified by their respective fixers.
         let proj = fs::read_to_string(vault.path().join("99-Archives/projects/proj/PRD.md"))
             .expect("read proj");
-        assert!(proj.starts_with("---\n"), "project doc should be fixed");
+        assert!(
+            proj.starts_with("---\n"),
+            "project doc should be fixed by frontmatter fixer"
+        );
+
+        let graph_doc = fs::read_to_string(vault.path().join("04-Writing/paper/proj/PRD.md"))
+            .expect("read graph doc");
+        assert!(
+            graph_doc.contains("## See Also"),
+            "top-level project doc should receive a backlink footer from the graph pipeline"
+        );
     }
 }

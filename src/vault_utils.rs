@@ -38,6 +38,13 @@ pub fn is_vault_excluded(path: &Path, vault_root: &Path) -> bool {
 /// Returns `true` if `path` lies inside a directory (strictly below
 /// `vault_root`) that contains its own `.git` — i.e. a nested,
 /// independently-versioned repository that the vault fixers must skip.
+///
+/// NOTE (non-blocking, issue #38 edge case): detection keys off `.git` being a
+/// *directory*. A git worktree or submodule points its `.git` at a *file*
+/// (a `gitdir` pointer), which `is_dir()` does not match and is therefore
+/// currently NOT detected. The release bundles in scope ship a real `.git`
+/// *directory*, so this gap does not affect the #38 scenario; revisit if a
+/// worktree-style nested repo is ever embedded in the vault.
 fn is_inside_nested_repo(path: &Path, vault_root: &Path) -> bool {
     let mut current = if path.is_dir() {
         Some(path)
