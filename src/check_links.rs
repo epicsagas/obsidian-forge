@@ -79,7 +79,7 @@ fn collect_md_files(vault_root: &Path) -> BTreeMap<String, String> {
                     .and_then(|s| s.to_str())
                     .is_some_and(|ext| ext == "md")
         })
-        .filter(|e| !is_vault_excluded(e.path()))
+        .filter(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| {
             let rel = e.path().strip_prefix(vault_root).ok()?;
             let rel_str = rel.to_string_lossy().replace('\\', "/");
@@ -102,7 +102,7 @@ fn collect_txt_stems(vault_root: &Path) -> BTreeMap<String, String> {
                     .and_then(|s| s.to_str())
                     .is_some_and(|ext| ext == "txt")
         })
-        .filter(|e| !is_vault_excluded(e.path()))
+        .filter(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| {
             let rel = e.path().strip_prefix(vault_root).ok()?;
             let stem = rel.with_extension("").to_string_lossy().replace('\\', "/");

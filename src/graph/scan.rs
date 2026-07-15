@@ -9,6 +9,7 @@ use tracing::debug;
 use walkdir::WalkDir;
 
 use crate::config::ForgeConfig;
+use crate::vault_utils::is_vault_excluded;
 
 #[derive(Debug)]
 pub struct ProjectProfile {
@@ -40,19 +41,21 @@ pub fn scan_all_projects(vault_root: &Path, config: &ForgeConfig) -> Result<Vec<
 
     let profiles: Vec<ProjectProfile> = project_dirs
         .par_iter()
-        .filter_map(|(path, name)| match scan_project(path, name, config) {
-            Ok(profile) => {
-                if profile.docs.is_empty() {
-                    None
-                } else {
-                    Some(profile)
+        .filter_map(
+            |(path, name)| match scan_project(path, name, vault_root, config) {
+                Ok(profile) => {
+                    if profile.docs.is_empty() {
+                        None
+                    } else {
+                        Some(profile)
+                    }
                 }
-            }
-            Err(e) => {
-                debug!("Failed to scan project {}: {:?}", name, e);
-                None
-            }
-        })
+                Err(e) => {
+                    debug!("Failed to scan project {}: {:?}", name, e);
+                    None
+                }
+            },
+        )
         .collect();
 
     Ok(profiles)
@@ -61,6 +64,7 @@ pub fn scan_all_projects(vault_root: &Path, config: &ForgeConfig) -> Result<Vec<
 fn scan_project(
     project_dir: &Path,
     project_name: &str,
+    vault_root: &Path,
     config: &ForgeConfig,
 ) -> Result<ProjectProfile> {
     let mut docs = Vec::new();
@@ -69,6 +73,7 @@ fn scan_project(
     for entry in WalkDir::new(project_dir)
         .min_depth(1)
         .into_iter()
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
     {
         let p = entry.path();

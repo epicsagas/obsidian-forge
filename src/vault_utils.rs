@@ -7,6 +7,7 @@ pub const VAULT_EXCLUDED_DIRS: &[&str] = &[
     ".git",
     ".claude",
     ".alcove",
+    ".obsidian-forge",
     "_template",
     "seeded",
     "harness-engineering",
@@ -18,7 +19,7 @@ pub const VAULT_EXCLUDED_DIRS: &[&str] = &[
     "release",
 ];
 
-pub fn is_vault_excluded(path: &Path) -> bool {
+pub fn is_vault_excluded(path: &Path, vault_root: &Path) -> bool {
     for component in path.components() {
         if let std::path::Component::Normal(os_str) = component
             && let Some(name) = os_str.to_str()
@@ -26,6 +27,33 @@ pub fn is_vault_excluded(path: &Path) -> bool {
         {
             return true;
         }
+    }
+    // A directory that embeds its own `.git` (a nested standalone repo,
+    // e.g. a public `release/` bundle) is an exclusion boundary: files inside
+    // it must never receive vault metadata. The vault's own root `.git` is
+    // explicitly NOT treated as nested, so the surrounding vault stays scanned.
+    is_inside_nested_repo(path, vault_root)
+}
+
+/// Returns `true` if `path` lies inside a directory (strictly below
+/// `vault_root`) that contains its own `.git` — i.e. a nested,
+/// independently-versioned repository that the vault fixers must skip.
+fn is_inside_nested_repo(path: &Path, vault_root: &Path) -> bool {
+    let mut current = if path.is_dir() {
+        Some(path)
+    } else {
+        path.parent()
+    };
+    while let Some(dir) = current {
+        // Stop at the vault root (its own `.git` is not a nested repo) or the
+        // filesystem root (avoid probing above the vault).
+        if dir == vault_root || dir.parent().is_none() {
+            break;
+        }
+        if dir.join(".git").is_dir() {
+            return true;
+        }
+        current = dir.parent();
     }
     false
 }

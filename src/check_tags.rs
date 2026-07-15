@@ -366,7 +366,7 @@ fn scan_project_docs(
 ) -> Result<()> {
     for entry in WalkDir::new(projects_dir)
         .into_iter()
-        .filter_entry(|e| !is_vault_excluded(e.path()))
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
@@ -500,7 +500,7 @@ fn scan_resource_docs(
 ) -> Result<()> {
     for entry in WalkDir::new(laws_dir)
         .into_iter()
-        .filter_entry(|e| !is_vault_excluded(e.path()))
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
@@ -587,6 +587,7 @@ fn extract_project_name(file_path: &Path, projects_dir: &Path) -> Option<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::frontmatter::normalize_frontmatter;
     use tempfile::TempDir;
 
     fn create_test_vault() -> TempDir {
@@ -988,5 +989,47 @@ mod tests {
             fixed_content.contains("# Product Requirements"),
             "Body should be preserved"
         );
+    }
+
+    #[test]
+    fn test_nested_repo_excluded_from_fixers() {
+        let vault = create_test_vault();
+        let config = make_config();
+
+        // A normal project doc — should be fixed by both fixers.
+        write_file(
+            vault.path(),
+            "99-Archives/projects/proj/PRD.md",
+            "# PRD\n\nNo frontmatter yet.\n",
+        );
+
+        // A nested standalone git repo (e.g. a public `release/` bundle).
+        // It must never be touched by vault fixers, independent of the dir name.
+        let repo = vault
+            .path()
+            .join("99-Archives")
+            .join("projects")
+            .join("proj")
+            .join("release");
+        fs::create_dir_all(repo.join(".git")).expect("mkdir .git");
+        fs::write(repo.join(".git").join("HEAD"), "").expect("write HEAD");
+        let nested = repo.join("paper.md");
+        fs::write(&nested, "Original body, no frontmatter.\n").expect("write nested");
+
+        // Both fixers run with --fix.
+        let fm = normalize_frontmatter(vault.path(), &config, true).expect("frontmatter");
+        assert!(fm.scanned >= 1, "walker should still scan the vault");
+        let _ = check_tags(vault.path(), &config, true, TagScope::Project).expect("tags");
+
+        // The nested repo file must be byte-identical (untouched).
+        let after = fs::read_to_string(&nested).expect("read nested");
+        assert_eq!(
+            after, "Original body, no frontmatter.\n",
+            "nested repo file must be left untouched by vault fixers"
+        );
+        // Sanity: a real project doc WAS modified by the fixer.
+        let proj = fs::read_to_string(vault.path().join("99-Archives/projects/proj/PRD.md"))
+            .expect("read proj");
+        assert!(proj.starts_with("---\n"), "project doc should be fixed");
     }
 }
