@@ -1086,4 +1086,34 @@ mod tests {
             "top-level project doc should receive a backlink footer from the graph pipeline"
         );
     }
+
+    #[test]
+    fn test_nested_repo_gitfile_excluded() {
+        let vault = create_test_vault();
+        let config = make_config();
+
+        // A nested git *worktree/submodule*: its `.git` is a FILE (a gitdir
+        // pointer), not a directory. The old `is_dir()`-only check missed this;
+        // `exists()` must exclude it so the file stays untouched.
+        let repo = vault
+            .path()
+            .join("99-Archives")
+            .join("projects")
+            .join("proj")
+            .join("release");
+        fs::create_dir_all(&repo).expect("mkdir release");
+        fs::write(repo.join(".git"), "gitdir: ../.git/worktrees/example\n")
+            .expect("write .git file");
+        let nested = repo.join("paper.md");
+        fs::write(&nested, "Original body, no frontmatter.\n").expect("write nested");
+
+        let _ = normalize_frontmatter(vault.path(), &config, true).expect("frontmatter");
+        let _ = check_tags(vault.path(), &config, true, TagScope::Project).expect("tags");
+
+        let after = fs::read_to_string(&nested).expect("read nested");
+        assert_eq!(
+            after, "Original body, no frontmatter.\n",
+            "nested repo with a `.git` FILE must be left untouched by vault fixers"
+        );
+    }
 }
