@@ -131,7 +131,7 @@ pub fn normalize_frontmatter(
 
     for entry in WalkDir::new(vault_root)
         .into_iter()
-        .filter_entry(|e| !is_vault_excluded(e.path()))
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file() && e.path().extension().is_some_and(|ext| ext == "md"))
     {

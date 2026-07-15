@@ -4,6 +4,7 @@ use tracing::info;
 use walkdir::WalkDir;
 
 use crate::config::ForgeConfig;
+use crate::vault_utils::is_vault_excluded;
 
 /// Generate a static `index.md` file at the vault root that serves as the AI agent entry point.
 ///
@@ -125,20 +126,11 @@ fn collect_md_files(dir: &Path, vault_root: &Path) -> Vec<String> {
 
     let mut files: Vec<String> = WalkDir::new(dir)
         .into_iter()
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
         .filter(|e| {
             let p = e.path();
             p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("md")
-        })
-        .filter(|e| {
-            !e.path().components().any(|c| {
-                let os = c.as_os_str();
-                os == ".git"
-                    || os == ".obsidian"
-                    || os == ".obsidian-forge"
-                    || os == ".alcove"
-                    || os == ".claude"
-            })
         })
         .filter_map(|e| {
             let p = e.path();
@@ -434,11 +426,16 @@ mod tests {
         let vault_root = tmp.path();
         let areas_dir = vault_root.join("02-Areas");
 
-        fs::create_dir_all(areas_dir.join(".git")).unwrap();
+        // System dirs named by component are skipped...
         fs::create_dir_all(areas_dir.join(".obsidian")).unwrap();
         fs::write(areas_dir.join("Rust.md"), "# Rust\n").unwrap();
-        fs::write(areas_dir.join(".git/config"), "stuff\n").unwrap();
         fs::write(areas_dir.join(".obsidian/config"), "stuff\n").unwrap();
+
+        // ...and a nested standalone repo (its own `.git`) is pruned entirely,
+        // so its contents must never be collected. See issue #38.
+        let nested = areas_dir.join("release");
+        fs::create_dir_all(nested.join(".git")).unwrap();
+        fs::write(nested.join("paper.md"), "# Paper\n").unwrap();
 
         let files = collect_md_files(&areas_dir, vault_root);
         assert_eq!(files, vec!["02-Areas/Rust"]);

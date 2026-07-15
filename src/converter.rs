@@ -47,7 +47,7 @@ pub async fn convert_pdf_to_md(
 
         if status.success() {
             let generated_folder = inbox.join(&stem);
-            let generated_md = generated_folder.join(format!("{}.md", &stem));
+            let generated_md = generated_folder.join(format!("{}.md", stem));
 
             if generated_folder.exists() && generated_md.exists() {
                 let temp_folder = vault_root.join("temp_conversions").join(&stem);
@@ -59,7 +59,7 @@ pub async fn convert_pdf_to_md(
                 }
                 fs::rename(&generated_folder, &temp_folder)?;
                 archive_pdf(pdf_path, &archive);
-                return Ok(temp_folder.join(format!("{}.md", &stem)));
+                return Ok(temp_folder.join(format!("{}.md", stem)));
             }
         }
         warn!("marker_single failed for {}", pdf_path.display());
@@ -68,7 +68,7 @@ pub async fn convert_pdf_to_md(
     // Fallback to pdftotext
     if is_command_available("pdftotext").await {
         info!("Using pdftotext for PDF -> MD: {}", pdf_path.display());
-        let output_path = inbox.join(format!("{}.md", &stem));
+        let output_path = inbox.join(format!("{}.md", stem));
         let status = TokioCommand::new("pdftotext")
             .arg("-layout")
             .arg(pdf_path)

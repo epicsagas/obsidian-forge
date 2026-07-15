@@ -9,6 +9,7 @@ use tracing::{debug, info};
 use walkdir::WalkDir;
 
 use crate::config::ForgeConfig;
+use crate::vault_utils::is_vault_excluded;
 
 /// Regenerate hub files for every project folder in the vault.
 pub fn update_all_mocs(vault_root: &Path, config: &ForgeConfig) -> Result<()> {
@@ -51,6 +52,7 @@ fn update_moc_for_project(project_dir: &Path, project_name: &str, vault_root: &P
     for entry in WalkDir::new(project_dir)
         .min_depth(1)
         .into_iter()
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
     {
         let p = entry.path();

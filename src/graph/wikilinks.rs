@@ -11,6 +11,7 @@ use tracing::info;
 use walkdir::WalkDir;
 
 use crate::config::ForgeConfig;
+use crate::vault_utils::is_vault_excluded;
 
 #[derive(Debug, Clone)]
 pub struct Wikilink {
@@ -186,21 +187,11 @@ fn in_fenced_code(byte_offset: usize, ranges: &[(usize, usize)]) -> bool {
 pub fn build_vault_graph(vault_root: &Path, _config: &ForgeConfig) -> Result<VaultGraph> {
     let md_files: Vec<(String, String)> = WalkDir::new(vault_root)
         .into_iter()
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
         .filter(|e| {
             let p = e.path();
             p.is_file() && p.extension().and_then(|s| s.to_str()) == Some("md")
-        })
-        .filter(|e| {
-            let p = e.path();
-            !p.components().any(|c| {
-                let os = c.as_os_str();
-                os == ".git"
-                    || os == ".obsidian"
-                    || os == ".obsidian-forge"
-                    || os == ".alcove"
-                    || os == ".claude"
-            })
         })
         .filter_map(|e| {
             let p = e.path();

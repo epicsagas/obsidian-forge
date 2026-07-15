@@ -366,7 +366,7 @@ fn scan_project_docs(
 ) -> Result<()> {
     for entry in WalkDir::new(projects_dir)
         .into_iter()
-        .filter_entry(|e| !is_vault_excluded(e.path()))
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
@@ -500,7 +500,7 @@ fn scan_resource_docs(
 ) -> Result<()> {
     for entry in WalkDir::new(laws_dir)
         .into_iter()
-        .filter_entry(|e| !is_vault_excluded(e.path()))
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
@@ -587,6 +587,8 @@ fn extract_project_name(file_path: &Path, projects_dir: &Path) -> Option<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::frontmatter::normalize_frontmatter;
+    use crate::graph::strengthen_graph;
     use tempfile::TempDir;
 
     fn create_test_vault() -> TempDir {
@@ -987,6 +989,136 @@ mod tests {
         assert!(
             fixed_content.contains("# Product Requirements"),
             "Body should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_nested_repo_excluded_from_fixers() {
+        // Scope: the frontmatter + tag fixers (99-Archives/projects). A nested
+        // standalone git repo must be left byte-identical while a real project
+        // doc is fixed. The graph/inject_backlinks path is covered separately by
+        // `test_nested_repo_excluded_from_graph`.
+        let vault = create_test_vault();
+        let config = make_config();
+
+        // A normal project doc — should be fixed by both fixers.
+        write_file(
+            vault.path(),
+            "99-Archives/projects/proj/PRD.md",
+            "# PRD\n\nNo frontmatter yet.\n",
+        );
+
+        // A nested standalone git repo (e.g. a public `release/` bundle).
+        // It must never be touched by vault fixers, independent of the dir name.
+        let repo = vault
+            .path()
+            .join("99-Archives")
+            .join("projects")
+            .join("proj")
+            .join("release");
+        fs::create_dir_all(repo.join(".git")).expect("mkdir .git");
+        fs::write(repo.join(".git").join("HEAD"), "").expect("write HEAD");
+        let nested = repo.join("paper.md");
+        fs::write(&nested, "Original body, no frontmatter.\n").expect("write nested");
+
+        // Both fixers run with --fix.
+        let fm = normalize_frontmatter(vault.path(), &config, true).expect("frontmatter");
+        assert!(fm.scanned >= 1, "walker should still scan the vault");
+        let _ = check_tags(vault.path(), &config, true, TagScope::Project).expect("tags");
+
+        // The nested repo file must be byte-identical (untouched) by the fixers.
+        let after = fs::read_to_string(&nested).expect("read nested");
+        assert_eq!(
+            after, "Original body, no frontmatter.\n",
+            "nested repo file must be left untouched by vault fixers"
+        );
+
+        // Sanity: the real doc WAS modified by the frontmatter fixer.
+        let proj = fs::read_to_string(vault.path().join("99-Archives/projects/proj/PRD.md"))
+            .expect("read proj");
+        assert!(
+            proj.starts_with("---\n"),
+            "project doc should be fixed by frontmatter fixer"
+        );
+    }
+
+    #[test]
+    fn test_nested_repo_excluded_from_graph() {
+        // Scope: strengthen-graph / inject_backlinks, the second #38 contaminator
+        // that writes `## See Also` footers. A nested repo must be left
+        // byte-identical while a real top-level project doc receives a backlink.
+        let vault = create_test_vault();
+        let mut config = make_config();
+        // Focus the graph pipeline on the backlinks contaminator only, so any
+        // unrelated graph step can't mask a regression in inject_backlinks.
+        config.graph.bridge_notes = false;
+        config.graph.related_projects = false;
+        config.graph.auto_tags = false;
+
+        // The graph scanner only reaches top-level project dirs (99-Archives is a
+        // system dir it skips), so the backlinks scenario lives under 04-Writing.
+        write_file(
+            vault.path(),
+            "04-Writing/paper/proj/PRD.md",
+            "# PRD\n\nGraph body.\n",
+        );
+
+        // A nested standalone git repo at the canonical #38 depth.
+        let repo = vault
+            .path()
+            .join("04-Writing")
+            .join("paper")
+            .join("proj")
+            .join("release");
+        fs::create_dir_all(repo.join(".git")).expect("mkdir .git");
+        fs::write(repo.join(".git").join("HEAD"), "").expect("write HEAD");
+        let nested = repo.join("paper.md");
+        fs::write(&nested, "Original body, no frontmatter.\n").expect("write nested");
+
+        strengthen_graph(vault.path(), &config).expect("strengthen graph");
+
+        let after = fs::read_to_string(&nested).expect("read nested");
+        assert_eq!(
+            after, "Original body, no frontmatter.\n",
+            "nested release bundle must be left untouched by inject_backlinks"
+        );
+
+        // Sanity: the real top-level doc DID receive a backlink footer.
+        let graph_doc = fs::read_to_string(vault.path().join("04-Writing/paper/proj/PRD.md"))
+            .expect("read graph doc");
+        assert!(
+            graph_doc.contains("## See Also"),
+            "top-level project doc should receive a backlink footer from the graph pipeline"
+        );
+    }
+
+    #[test]
+    fn test_nested_repo_gitfile_excluded() {
+        let vault = create_test_vault();
+        let config = make_config();
+
+        // A nested git *worktree/submodule*: its `.git` is a FILE (a gitdir
+        // pointer), not a directory. The old `is_dir()`-only check missed this;
+        // `exists()` must exclude it so the file stays untouched.
+        let repo = vault
+            .path()
+            .join("99-Archives")
+            .join("projects")
+            .join("proj")
+            .join("release");
+        fs::create_dir_all(&repo).expect("mkdir release");
+        fs::write(repo.join(".git"), "gitdir: ../.git/worktrees/example\n")
+            .expect("write .git file");
+        let nested = repo.join("paper.md");
+        fs::write(&nested, "Original body, no frontmatter.\n").expect("write nested");
+
+        let _ = normalize_frontmatter(vault.path(), &config, true).expect("frontmatter");
+        let _ = check_tags(vault.path(), &config, true, TagScope::Project).expect("tags");
+
+        let after = fs::read_to_string(&nested).expect("read nested");
+        assert_eq!(
+            after, "Original body, no frontmatter.\n",
+            "nested repo with a `.git` FILE must be left untouched by vault fixers"
         );
     }
 }

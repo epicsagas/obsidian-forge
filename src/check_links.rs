@@ -71,6 +71,12 @@ impl std::fmt::Display for LinkCheckResult {
 fn collect_md_files(vault_root: &Path) -> BTreeMap<String, String> {
     WalkDir::new(vault_root)
         .into_iter()
+        // `filter_entry` prunes the whole subtree of an excluded directory
+        // (nested repos, system dirs) so those files are never visited. This
+        // must be a `filter_entry`, not a post-hoc `.filter()`, for the O(1)
+        // `is_inside_nested_repo` boundary check to correctly exclude a nested
+        // repo's contents. See `vault_utils::is_inside_nested_repo`.
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
         .filter(|e| {
             let p = e.path();
@@ -79,7 +85,6 @@ fn collect_md_files(vault_root: &Path) -> BTreeMap<String, String> {
                     .and_then(|s| s.to_str())
                     .is_some_and(|ext| ext == "md")
         })
-        .filter(|e| !is_vault_excluded(e.path()))
         .filter_map(|e| {
             let rel = e.path().strip_prefix(vault_root).ok()?;
             let rel_str = rel.to_string_lossy().replace('\\', "/");
@@ -94,6 +99,10 @@ fn collect_md_files(vault_root: &Path) -> BTreeMap<String, String> {
 fn collect_txt_stems(vault_root: &Path) -> BTreeMap<String, String> {
     WalkDir::new(vault_root)
         .into_iter()
+        // See `collect_md_files`: `filter_entry` prunes excluded subtrees so a
+        // nested repo's files are never visited (required for the O(1)
+        // `is_inside_nested_repo` boundary check to hold).
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
         .filter_map(|e| e.ok())
         .filter(|e| {
             let p = e.path();
@@ -102,7 +111,6 @@ fn collect_txt_stems(vault_root: &Path) -> BTreeMap<String, String> {
                     .and_then(|s| s.to_str())
                     .is_some_and(|ext| ext == "txt")
         })
-        .filter(|e| !is_vault_excluded(e.path()))
         .filter_map(|e| {
             let rel = e.path().strip_prefix(vault_root).ok()?;
             let stem = rel.with_extension("").to_string_lossy().replace('\\', "/");
