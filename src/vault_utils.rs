@@ -35,36 +35,28 @@ pub fn is_vault_excluded(path: &Path, vault_root: &Path) -> bool {
     is_inside_nested_repo(path, vault_root)
 }
 
-/// Returns `true` if `path` lies inside a directory (strictly below
-/// `vault_root`) that contains its own `.git` — i.e. a nested,
-/// independently-versioned repository that the vault fixers must skip. The
-/// `.git` may be either a directory (standalone repo, the #38 scenario) or a
-/// *file* (a `gitdir` pointer used by git worktrees and submodules).
+/// Returns `true` if `path` **is** a directory (strictly below `vault_root`)
+/// that contains its own `.git` — i.e. the top-level boundary of a nested,
+/// independently-versioned repository (e.g. a public `release/` bundle, the #38
+/// scenario) that the vault fixers must skip. The `.git` may be either a
+/// directory (standalone repo) or a *file* (a `gitdir` pointer used by git
+/// worktrees and submodules); `exists()` catches both, whereas an `is_dir()`
+/// check would miss the file case.
 ///
-/// Detection keys off `.git` *existing* (`exists()`) rather than being a
-/// directory, so worktree/submodule `.git` *files* are also excluded — the
-/// earlier `is_dir()`-only check missed that file case.
+/// This is intentionally an **O(1)** check on `path` itself, not an ancestor
+/// walk. Every vault walker routes exclusion through `filter_entry`, which
+/// prunes the *entire subtree* of any rejected directory. So when walkdir
+/// reaches a nested repo's top directory we reject it here once, and its files
+/// are never visited — no per-file ancestor probing needed. (`check_links`'s
+/// `collect_md_files`/`collect_txt_stems` likewise use `filter_entry` for this
+/// pruning to hold.)
+///
+/// The `path != vault_root` guard keeps the vault's *own* root `.git` from being
+/// treated as nested (production vaults are themselves git repos). walkdir
+/// builds every entry path from the exact `vault_root` passed to
+/// `WalkDir::new`, so the root entry compares byte-equal and is never pruned.
 fn is_inside_nested_repo(path: &Path, vault_root: &Path) -> bool {
-    let mut current = if path.is_dir() {
-        Some(path)
-    } else {
-        path.parent()
-    };
-    while let Some(dir) = current {
-        // Stop at the vault root (its own `.git` is not a nested repo) or the
-        // filesystem root (avoid probing above the vault).
-        if dir == vault_root || dir.parent().is_none() {
-            break;
-        }
-        // `.exists()` catches both a `.git` *directory* (standalone nested
-        // repo) and a `.git` *file* (worktree/submodule gitdir pointer),
-        // whereas `is_dir()` alone would miss the latter.
-        if dir.join(".git").exists() {
-            return true;
-        }
-        current = dir.parent();
-    }
-    false
+    path.is_dir() && path != vault_root && path.join(".git").exists()
 }
 
 pub fn frontmatter_re() -> &'static Regex {
