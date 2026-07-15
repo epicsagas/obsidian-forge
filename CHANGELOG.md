@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-15
+
+### Fixed
+
+- Vault walkers now exclude nested git repos whose `.git` is a file/gitdir pointer (e.g. public `release/` bundles), so vault frontmatter, tags, and wikilinks no longer leak into shipped artifacts
+- `is_inside_nested_repo` is now an O(1) check that relies on `filter_entry` subtree pruning
+
+### Changed
+
+- Bump `crossbeam-epoch` 0.9.18→0.9.20, `quick-xml` 0.39.4→0.41.0 (via `plist` 1.9.0→1.10.0), and `quinn-proto` 0.11.14→0.11.16 to clear RUSTSEC-2026-0204 / RUSTSEC-2026-0194 / RUSTSEC-2026-0195 / RUSTSEC-2026-0185
+
 ## [0.2.6] - 2026-06-13
 
 ### Fixed
