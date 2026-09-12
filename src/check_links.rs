@@ -528,7 +528,7 @@ fn rank_candidates<'a>(
         })
         .filter(|(score, _)| *score > 0)
         .collect();
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.sort_by_key(|(score, _)| std::cmp::Reverse(*score));
     scored
         .into_iter()
         .take(CANDIDATES_PER_LINK)
