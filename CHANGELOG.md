@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-12
+
+### Removed
+
+- `strengthen-graph` and `update-mocs` commands, plus the `graph orphans|extract|tags|strengthen|index` subcommands (`graph health` kept) — bridge notes, auto-tags, See Also injection, and auto link-list MOCs are retired as graph-semantics mechanisms (kg-overhaul-blueprint-2026-09 §4); semantics move to the LLM extraction pipeline
+- Unused commands: `clone-settings`, `settings`, `book`, `vault`
+- `vault.toml` `[graph]` block and `[book]` config — existing files carrying them keep parsing (unknown keys ignored)
+- MOC regeneration and index generation from the sync cycle
+
+### Changed
+
+- `sync` chain is now graph health check → git (logged via tracing; applies to `sync` and the daemon watch loop)
+- `init` is the sole vault registration path (`vault` command removed); init-time `index.md` seeding and `--clone-settings-from` are unchanged
+
+### Fixed
+
+- Vault scan excludes now match at any depth below the vault root: any dot-prefixed component (`.venv`, `.windsurf`, …) and `node_modules` are excluded, so nested junk trees are no longer indexed whole; component matching is scoped below the vault root so a vault living under an excluded-looking parent is not dropped wholesale
+
+### Dependencies
+
+- Bump `futures` 0.3.32→0.3.34, `tokio-stream` 0.1.18→0.1.19, `serde` 1.0.228→1.0.229, `anyhow` 1.0.103→1.0.104, `serde_json` 1.0.150→1.0.151, `tauri` 2.11.3→2.11.5
+
 ## [0.3.2] - 2026-07-15
 
 ### Fixed
