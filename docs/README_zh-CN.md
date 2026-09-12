@@ -2,7 +2,7 @@
 
 # ⚒️ obsidian-forge
 
-**Obsidian 知识库生成器、自动化守护进程和图谱增强工具**
+**Obsidian 知识库生成器、自动化守护进程和维护工具集**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
@@ -19,12 +19,12 @@
 
 ## 什么是 obsidian-forge？
 
-`obsidian-forge` 是一个 Rust 编写的 CLI 工具，用于创建、自动化和维护 [Obsidian](https://obsidian.md) 知识库。它作为后台守护进程运行，监控你的收件箱，增强你的知识图谱，并自动同步到 git —— 让你专注于写作。
+`obsidian-forge` 是一个 Rust 编写的 CLI 工具，用于创建、自动化和维护 [Obsidian](https://obsidian.md) 知识库。它作为后台守护进程运行，监控你的收件箱，检查知识库完整性，并自动同步到 git —— 让你专注于写作。
 
 ```
 of init my-brain          # 几秒钟内创建一个新知识库
 of daemon enable         # 注册为 macOS 登录项
-# → 你的知识库现在将自动处理、自动链接和自动提交
+# → 你的知识库现在将自动处理、健康检查和自动提交
 # "of" 是 "obsidian-forge" 的内置短别名
 ```
 
@@ -35,16 +35,15 @@ of daemon enable         # 注册为 macOS 登录项
 | | 功能 | 说明 |
 |---|---|---|
 | 🏗️ | **知识库脚手架** | PARA 布局、内置模板、`.obsidian` 配置、git 初始化 |
-| 🔗 | **图谱增强** | 反向链接、桥接笔记、关联项目链接、自动标签 |
+| 🛡️ | **知识库完整性** | 标签检查、断裂链接检查（识别代码块）、frontmatter 规范化 —— 均支持 `--fix` |
+| 📊 | **图谱健康** | 笔记/链接/孤立笔记/断裂链接指标，为你的 lint 循环提供依据 |
 | 📥 | **收件箱处理** | Frontmatter 注入、AI 分类、PARA 路由 |
-| 🔄 | **同步循环** | MOC 重建 → 图谱 → 定时自动 git commit/push |
-| 🗂️ | **多知识库** | 一个守护进程管理所有知识库；可逐个启用、暂停或禁用 |
-| ⚙️ | **设置存储** | 从一个知识库导入插件/主题，然后推送到所有其他知识库 |
+| 🔄 | **同步循环** | 图谱健康检查 → 定时自动 git commit/push |
+| 🗂️ | **多知识库** | 一个守护进程管理所有知识库；逐库开关由全局配置控制 |
 | 🤖 | **AI 元数据** | 支持 Ollama、OpenAI、OpenRouter、LM Studio 或任何 OpenAI 兼容端点 |
 | 📄 | **PDF → Markdown** | 通过 `marker_single` 转换，以 `pdftotext` 作为后备方案 |
 | 🍎 | **登录项** | 安装为 macOS LaunchAgent —— 自动启动、自动重启 |
 | ♻️ | **幂等性** | 可安全地多次运行任何操作；不会产生重复输出 |
-| 📚 | **图书项目** | 初始化、追踪、导出和同步知识库集成写作项目的来源 |
 
 ---
 
@@ -60,13 +59,13 @@ brew install epicsagas/tap/obsidian-forge
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.sh | sh
 ```
 
 ### Windows
 
 ```powershell
-irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.ps1 | iex
 ```
 
 ### 通过 Rust 工具链
@@ -94,13 +93,12 @@ cargo install obsidian-forge --features dashboard-ui  # 包含 `of dashboard` GU
 
 ### AI 代理插件
 
-obsidian-forge 内置了 5 个代理技能，为 AI 助手提供上下文感知的知识库操作：
+obsidian-forge 内置了 4 个代理技能，为 AI 助手提供上下文感知的知识库操作：
 
 | 技能 | 触发方式 |
 |-------|---------|
 | `vault-health` | 知识库健康检查、诊断知识库、知识库状态 |
-| `vault-sync` | 同步知识库、更新 MOC 和图谱、提交知识库变更 |
-| `graph-strengthen` | 增强图谱、图谱健康、修复孤立笔记 |
+| `vault-sync` | 同步知识库、图谱健康检查、提交知识库变更 |
 | `inbox-process` | 处理收件箱、分类笔记、PARA 路由 |
 | `vault-fix` | 修复知识库、修复标签、修复链接、修复 frontmatter |
 
@@ -139,15 +137,12 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 ## 快速开始
 
 ```bash
-# 1. 创建新知识库
+# 1. 创建新知识库（自动注册到全局配置）
 of init my-brain
 
 # 2. 在 Obsidian 中打开 → 文件 → 打开知识库 → my-brain
 
-# 3. 将其注册到全局配置
-of vault add ~/my-brain
-
-# 4. 安装后台守护进程
+# 3. 安装后台守护进程
 of daemon enable
 
 # 完成 — 将笔记放入 00-Inbox/，obsidian-forge 会处理其余工作
@@ -170,48 +165,32 @@ obsidian-forge init my-brain --path ~/
 
 ### 多知识库管理
 
-```bash
-obsidian-forge vault add <path> [--name <alias>]
-obsidian-forge vault remove <name>          # 取消注册（文件保留）
-obsidian-forge vault list                   # NAME / ENABLED / WATCH / PATH
-obsidian-forge vault enable  <name>
-obsidian-forge vault disable <name>         # 排除在同步和监控之外
-obsidian-forge vault pause   <name>         # 跳过守护进程；手动同步仍可用
-obsidian-forge vault resume  <name>
+知识库由 `init` 自动注册（在已有目录上重新运行是安全的）。
+逐库开关（`enabled`、`watch`）位于 `~/.config/obsidian-forge/config.toml`：
+
+```toml
+[[vaults]]
+name    = "my-brain"
+path    = "/path/to/my-brain"
+enabled = true    # 参与同步
+watch   = true    # 由守护进程监控
 ```
 
-### 设置管理
-
-在知识库之间同步 `.obsidian/` 插件、主题和片段。
+### 知识库完整性与图谱操作
 
 ```bash
-obsidian-forge settings import <vault>      # 将设置拉取到全局存储
-obsidian-forge settings push   <vault>      # 将全局设置推送到某个知识库
-obsidian-forge settings push-all            # 推送到所有已注册的知识库
-obsidian-forge settings status
-
-# 直接在两个知识库之间克隆
-obsidian-forge clone-settings <source> <target>
-```
-
-### 图谱操作
-
-```bash
-obsidian-forge graph health                 # 显示统计信息和健康指标
-obsidian-forge graph orphans [--auto-link]  # 列出孤立笔记（或使用 AI 自动链接）
-obsidian-forge graph extract [--no-ai]      # 提取链接和关系
-obsidian-forge graph tags [--dry-run]       # 规范化和聚类标签
-obsidian-forge graph strengthen             # 运行完整流水线
-
-# 旧版别名（运行完整流水线）
-obsidian-forge strengthen-graph
+obsidian-forge check-tags            [--vault <name>]  # 缺失 layer/type/project 标签
+obsidian-forge check-tags --fix      [--vault <name>]  # 注入缺失标签
+obsidian-forge check-links           [--vault <name>]  # 断裂的 wikilink（识别代码块）
+obsidian-forge check-links --fix     [--vault <name>]  # 修复文件名/扩展名不匹配
+obsidian-forge normalize-frontmatter [--vault <name>]  # YAML 格式异常
+obsidian-forge graph health          [--vault <name>]  # 统计信息和健康指标
 ```
 
 ### 一次性操作
 
 ```bash
-obsidian-forge sync               [--vault <name>]   # MOC → 图谱 → git
-obsidian-forge update-mocs        [--vault <name>]
+obsidian-forge sync               [--vault <name>]   # 图谱健康 → git
 obsidian-forge process-all        [--vault <name>]   # AI 收件箱处理
 obsidian-forge status             [--vault <name>]   # 显示配置和 AI 状态
 obsidian-forge doctor             [--vault <name>]   # 诊断知识库健康状态
@@ -236,19 +215,6 @@ obsidian-forge daemon status     # 显示 PID、上次退出状态和已调度�
 obsidian-forge watch              # 监控所有可监控的知识库
 obsidian-forge watch --vault <name> --interval <seconds>
 ```
-
-### 图书项目
-
-直接在知识库中管理书籍写作项目。
-
-```bash
-of book init <name> [--genre <genre>] [--lang <lang>]   # 在 01-Projects/ 下创建项目
-of book status [<name>]                                   # 初稿 / 编辑 / 出版阶段进度
-of book export <name> [--output <dir>]                   # 导出为 Velith 兼容目录
-of book sync   <name>                                     # 将标记的笔记链接到 sources/
-```
-
-知识库中标记了 `book/<name>` 的笔记，将通过 `book sync` 自动以符号链接的形式出现在 `sources/` 中。
 
 ### Dashboard
 
@@ -288,15 +254,9 @@ archive_dir     = "99-Archives"
 attachments_dir = "Attachments"
 templates_dir   = "obsidian-templates"
 
-[graph]
-backlinks        = true
-bridge_notes     = true
-auto_tags        = true
-related_projects = true
-# [[graph.concepts]]
-# name     = "AI"
-# keywords = ["machine learning", "LLM", "neural"]
-# tags     = ["ai", "ml"]
+# [projects]
+# exclude = ["_template"]           # 扫描时额外跳过的顶层目录
+                                    # （点目录和 node_modules 始终被排除）
 
 [sync]
 git_auto_commit  = true
@@ -364,18 +324,12 @@ obsidian-forge/
 ├── src/
 │   ├── main.rs        CLI (clap)，多知识库调度，同步循环
 │   ├── config.rs      vault.toml + 全局配置结构体
-│   ├── init.rs        知识库脚手架，设置导入/推送
-│   ├── moc.rs         MOC 中心文件生成
-│   ├── graph/         图谱增强流水线
-│   │   ├── mod.rs       流水线协调器
-│   │   ├── scan.rs      全知识库图谱扫描
-│   │   ├── tags.rs      基于概念的自动标签
-│   │   ├── wikilinks.rs wikilink 提取与注入
-│   │   ├── backlinks.rs 反向链接节生成
-│   │   ├── bridges.rs   桥接笔记创建
-│   │   ├── relationships.rs  关联项目链接
-│   │   ├── orphans.rs   孤立笔记检测
-│   │   ├── autotag.rs   自动标签编排
+│   ├── init.rs        知识库脚手架
+│   ├── check_tags.rs  标签健康检查（--fix）
+│   ├── check_links.rs 断裂 wikilink 检查（--fix）
+│   ├── frontmatter.rs frontmatter 规范化（--fix）
+│   ├── graph/
+│   │   ├── wikilinks.rs wikilink 提取与解析
 │   │   └── health.rs    图谱健康报告
 │   ├── git.rs         自动 commit + push（约定式提交）
 │   ├── notes.rs       收件箱处理 + PARA 路由
@@ -390,9 +344,9 @@ obsidian-forge/
 
 obsidian-forge 是 **[alcove](https://github.com/epicsagas/alcove) 的姊妹项目** —— 一个为 AI 代理提供项目文档服务的 MCP 服务器。它们共享一个 Cargo 工作区，协同工作，在个人知识和项目智能之间形成闭环：
 
-- **obsidian-forge** = **锻造厂**（写入/推送）。后台守护进程，自动化知识库维护，增强知识图谱，并同步到 git。
+- **obsidian-forge** = **锻造厂**（写入/推送）。后台守护进程，自动化知识库维护并同步到 git。
 - **alcove** = **图书馆**（读取/拉取）。MCP 服务器，为 AI 代理提供按需、可搜索的文档访问，而不会膨胀上下文窗口。
-- **[Velith](https://github.com/epicsagas/Velith)** = **印刷厂**（撰写/出版）。AI 辅助图书写作工具包，接受 `of book export` 导出的目录，驱动从初稿 → 编辑 → 出版的完整流程。
+- **[Velith](https://github.com/epicsagas/Velith)** = **印刷厂**（撰写/出版）。独立的 AI 辅助图书写作工具包，覆盖初稿 → 编辑 → 出版全流程。
 
 ```mermaid
 graph LR
@@ -401,48 +355,18 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Tools| E[AI Agent]
     E -.->|Refers to| D
-    B -->|of book export| F(Velith)
-    F -->|初稿 / 编辑 / 出版| G[图书]
 ```
 
 ### 与 Alcove 集成
 
-`obsidian-forge` 专注于构建和自动化你的知识图谱，而 [Alcove](https://github.com/epicsagas/alcove) 则确保这些知识能被 AI 编码代理有效利用。
+`obsidian-forge` 专注于维护知识库的日常健康，而 [Alcove](https://github.com/epicsagas/alcove) 则确保这些知识能被 AI 编码代理有效利用。
 
 #### 如何配合使用：
 
-1. **在 Obsidian 中构建**：使用 `obsidian-forge` 维护知识库的健康状态，创建 MOC，并自动链接相关概念。
+1. **在 Obsidian 中构建**：使用 `obsidian-forge` 保持知识库健康 —— 收件箱路由、完整性检查、git 同步。
 2. **提升为项目文档**：当一篇笔记（例如架构决策或功能规格）准备好用于项目时，运行 `alcove promote --source path/to/note.md`。
 3. **代理发现**：你的 AI 代理（使用 Alcove MCP 服务器）现在可以通过 `search_project_docs` 或 `get_doc_file` "发现"该笔记，而无需你手动复制粘贴到聊天中。
 4. **策略合规**：使用 Alcove 的 `validate_docs` 确保你提升的笔记符合项目的文档标准（在 `policy.toml` 中定义）。
-
-### 与 Velith 集成
-
-[Velith](https://github.com/epicsagas/Velith) 是专用的 AI 图书写作工具包。`obsidian-forge` 负责**知识库侧** —— 整理笔记、标记研究资料、搭建项目结构；`Velith` 负责**写作侧** —— 起草章节、编辑润色、打包出版。
-
-#### 工作流程：知识库 → 图书
-
-```bash
-# 1. 为知识库中的研究笔记添加标签
-#    在相关笔记的 frontmatter tags 中添加 "book/my-book"
-
-# 2. 初始化图书项目
-of book init my-book --genre non-fiction --lang zh
-
-# 3. 将标记的笔记同步到 sources/
-of book sync my-book
-
-# 4. 导出为 Velith 兼容目录
-of book export my-book --output ~/books/
-
-# 5. 移交给 Velith
-cd ~/books/my-book
-Velith draft        # 基于 sources/ 进行 AI 章节起草
-Velith edit         # 多轮编辑流水线
-Velith publish      # 打包 EPUB / PDF
-```
-
-导出目录包含 `PRD.md`（目标）、`STYLE.md`（风格指南）、`drafts/`、`edits/`、`publish/` —— 与 `Velith` 所期望的结构完全一致。
 
 ---
 

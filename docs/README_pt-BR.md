@@ -2,7 +2,7 @@
 
 # ⚒️ obsidian-forge
 
-**Gerador de cofres Obsidian, daemon de automação e fortalecedor de grafos**
+**Gerador de cofres Obsidian, daemon de automação e kit de manutenção**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
@@ -19,12 +19,12 @@
 
 ## O que é o obsidian-forge?
 
-`obsidian-forge` é uma CLI em Rust que monta, automatiza e mantém cofres do [Obsidian](https://obsidian.md). Ele roda como um daemon em segundo plano monitorando sua caixa de entrada, fortalecendo seu grafo de conhecimento e sincronizando com o git — para que você possa se concentrar em escrever.
+`obsidian-forge` é uma CLI em Rust que monta, automatiza e mantém cofres do [Obsidian](https://obsidian.md). Ele roda como um daemon em segundo plano monitorando sua caixa de entrada, verificando a integridade do cofre e sincronizando com o git — para que você possa se concentrar em escrever.
 
 ```
 of init my-brain          # monta um novo cofre em segundos
 of daemon enable         # registra como item de login do macOS
-# → seu cofre agora processa, linka e faz commit automaticamente
+# → seu cofre agora processa, verifica a saúde e faz commit automaticamente
 # "of" é um alias curto integrado para "obsidian-forge"
 ```
 
@@ -35,16 +35,15 @@ of daemon enable         # registra como item de login do macOS
 | | Funcionalidade | Descrição |
 |---|---|---|
 | 🏗️ | **Montagem de cofre** | Layout PARA, templates inclusos, config `.obsidian`, git init |
-| 🔗 | **Fortalecimento do grafo** | Backlinks, notas ponte, links de projetos relacionados, tags automáticas |
+| 🛡️ | **Integridade do cofre** | Verificações de tags, verificações de links quebrados (reconhece blocos de código), normalização de frontmatter — tudo com `--fix` |
+| 📊 | **Saúde do grafo** | Métricas de notas/links/órfãos/links quebrados que alimentam seu loop de lint |
 | 📥 | **Processamento de caixa de entrada** | Injeção de frontmatter, classificação por IA, roteamento PARA |
-| 🔄 | **Ciclo de sincronização** | Reconstrução MOC → grafo → commit/push automático no git por timer |
-| 🗂️ | **Multi-cofre** | Um daemon gerencia todos os cofres; habilite, pause ou desabilite por cofre |
-| ⚙️ | **Armazenamento de configurações** | Importe plugins/temas de um cofre e envie para todos os outros |
+| 🔄 | **Ciclo de sincronização** | Verificação de saúde do grafo → commit/push automático no git por timer |
+| 🗂️ | **Multi-cofre** | Um daemon gerencia todos os cofres; flags por cofre na configuração global |
 | 🤖 | **Metadados IA** | Ollama, OpenAI, OpenRouter, LM Studio ou qualquer endpoint compatível com OpenAI |
 | 📄 | **PDF → Markdown** | Converte via `marker_single` com fallback para `pdftotext` |
 | 🍎 | **Item de login** | Instala como macOS LaunchAgent — inicia e reinicia automaticamente |
 | ♻️ | **Idempotente** | Qualquer operação é segura para executar múltiplas vezes; sem saída duplicada |
-| 📚 | **Projetos de livro** | Inicializar, acompanhar, exportar e sincronizar projetos de escrita integrados ao cofre |
 
 ---
 
@@ -60,13 +59,13 @@ Sem Homebrew? Use o script de instalação:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.sh | sh
 ```
 
 ### Windows
 
 ```powershell
-irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.ps1 | iex
 ```
 
 ### Via toolchain Rust
@@ -94,13 +93,12 @@ O dashboard só é incluído em compilações a partir do código-fonte com `--f
 
 ### Plugins de Agente IA
 
-O obsidian-forge vem com 5 habilidades de agente integradas que fornecem aos assistentes de IA operações de cofre com contexto:
+O obsidian-forge vem com 4 habilidades de agente integradas que fornecem aos assistentes de IA operações de cofre com contexto:
 
 | Habilidade | Gatilho |
 |-------|---------|
 | `vault-health` | Verificação de saúde do cofre, diagnosticar cofre, status do cofre |
-| `vault-sync` | Sincronizar cofre, atualizar MOCs e grafo, commit de alterações do cofre |
-| `graph-strengthen` | Fortalecer grafo, saúde do grafo, corrigir órfãos |
+| `vault-sync` | Sincronizar cofre, verificação de saúde do grafo, commit de alterações do cofre |
 | `inbox-process` | Processar caixa de entrada, classificar notas, roteamento PARA |
 | `vault-fix` | Corrigir cofre, reparar tags, corrigir links, corrigir frontmatter |
 
@@ -139,15 +137,12 @@ Uma vez instalado, seu agente de IA aciona automaticamente a habilidade certa qu
 ## Início Rápido
 
 ```bash
-# 1. Criar um novo cofre
+# 1. Criar um novo cofre (registra-o na configuração global)
 of init my-brain
 
 # 2. Abrir no Obsidian → Arquivo → Abrir Cofre → my-brain
 
-# 3. Registrar na configuração global
-of vault add ~/my-brain
-
-# 4. Instalar o daemon em segundo plano
+# 3. Instalar o daemon em segundo plano
 of daemon enable
 
 # Pronto — coloque notas em 00-Inbox/ e o obsidian-forge cuida do resto
@@ -170,48 +165,32 @@ obsidian-forge init my-brain --path ~/
 
 ### Gerenciamento de Múltiplos Cofres
 
-```bash
-obsidian-forge vault add <path> [--name <alias>]
-obsidian-forge vault remove <name>          # desregistrar (arquivos mantidos)
-obsidian-forge vault list                   # NAME / ENABLED / WATCH / PATH
-obsidian-forge vault enable  <name>
-obsidian-forge vault disable <name>         # excluir da sincronização e monitoramento
-obsidian-forge vault pause   <name>         # pular daemon; sincronização manual ok
-obsidian-forge vault resume  <name>
+Os cofres são registrados automaticamente pelo `init` (seguro re-executar em um diretório existente).
+As flags por cofre (`enabled`, `watch`) ficam em `~/.config/obsidian-forge/config.toml`:
+
+```toml
+[[vaults]]
+name    = "my-brain"
+path    = "/path/to/my-brain"
+enabled = true    # incluído na sincronização
+watch   = true    # monitorado pelo daemon
 ```
 
-### Gerenciamento de Configurações
-
-Sincroniza plugins, temas e snippets de `.obsidian/` entre cofres.
+### Integridade do Cofre e Operações de Grafo
 
 ```bash
-obsidian-forge settings import <vault>      # importar configurações para o armazenamento global
-obsidian-forge settings push   <vault>      # enviar configurações globais para um cofre
-obsidian-forge settings push-all            # enviar para TODOS os cofres registrados
-obsidian-forge settings status
-
-# Clone direto entre dois cofres
-obsidian-forge clone-settings <source> <target>
-```
-
-### Operações de Grafo
-
-```bash
-obsidian-forge graph health                 # mostrar estatísticas e métricas de saúde
-obsidian-forge graph orphans [--auto-link]  # listar órfãos (ou auto-linkar com IA)
-obsidian-forge graph extract [--no-ai]      # extrair links e relacionamentos
-obsidian-forge graph tags [--dry-run]       # normalizar e agrupar tags
-obsidian-forge graph strengthen             # executar pipeline completo
-
-# Alias herdado (executa o pipeline completo)
-obsidian-forge strengthen-graph
+obsidian-forge check-tags            [--vault <name>]  # tags layer/type/project ausentes
+obsidian-forge check-tags --fix      [--vault <name>]  # injetar tags ausentes
+obsidian-forge check-links           [--vault <name>]  # wikilinks quebrados (reconhece blocos de código)
+obsidian-forge check-links --fix     [--vault <name>]  # corrigir incompatibilidades de nome/extensão de arquivo
+obsidian-forge normalize-frontmatter [--vault <name>]  # malformações de YAML
+obsidian-forge graph health          [--vault <name>]  # estatísticas e métricas de saúde
 ```
 
 ### Operações Únicas
 
 ```bash
-obsidian-forge sync               [--vault <name>]   # MOC → grafo → git
-obsidian-forge update-mocs        [--vault <name>]
+obsidian-forge sync               [--vault <name>]   # saúde do grafo → git
 obsidian-forge process-all        [--vault <name>]   # processamento de caixa de entrada por IA
 obsidian-forge status             [--vault <name>]   # mostrar status de config e IA
 obsidian-forge doctor             [--vault <name>]   # diagnosticar saúde do cofre
@@ -236,19 +215,6 @@ obsidian-forge daemon status     # mostra PID, último código de saída e cofre
 obsidian-forge watch              # todos os cofres monitoráveis
 obsidian-forge watch --vault <name> --interval <seconds>
 ```
-
-### Projetos de livro
-
-Gerencie projetos de escrita de livros diretamente do cofre.
-
-```bash
-of book init <name> [--genre <genre>] [--lang <lang>]   # criar estrutura em 01-Projects/
-of book status [<name>]                                   # progresso: rascunho / edição / publicação
-of book export <name> [--output <dir>]                   # exportar para Velith
-of book sync   <name>                                     # vincular notas marcadas → sources/
-```
-
-Notas do cofre com a tag `book/<name>` são automaticamente vinculadas em `sources/` pelo `book sync`.
 
 ### Dashboard
 
@@ -288,15 +254,9 @@ archive_dir     = "99-Archives"
 attachments_dir = "Attachments"
 templates_dir   = "obsidian-templates"
 
-[graph]
-backlinks        = true
-bridge_notes     = true
-auto_tags        = true
-related_projects = true
-# [[graph.concepts]]
-# name     = "AI"
-# keywords = ["machine learning", "LLM", "neural"]
-# tags     = ["ai", "ml"]
+# [projects]
+# exclude = ["_template"]           # diretórios de nível superior extras a ignorar na varredura
+                                    # (dot-dirs e node_modules são sempre excluídos)
 
 [sync]
 git_auto_commit  = true
@@ -364,18 +324,12 @@ obsidian-forge/
 ├── src/
 │   ├── main.rs        CLI (clap), despacho multi-cofre, loop de sincronização
 │   ├── config.rs      vault.toml + estruturas de configuração global
-│   ├── init.rs        montagem de cofre, importação/envio de configurações
-│   ├── moc.rs         geração de arquivo hub MOC
-│   ├── graph/         Pipeline de fortalecimento do grafo
-│   │   ├── mod.rs       coordenador do pipeline
-│   │   ├── scan.rs      escaneamento do grafo em todo o cofre
-│   │   ├── tags.rs      etiquetagem automática baseada em conceitos
-│   │   ├── wikilinks.rs extração e injeção de wikilinks
-│   │   ├── backlinks.rs geração de seção de backlinks
-│   │   ├── bridges.rs   criação de notas ponte
-│   │   ├── relationships.rs linkagem de projetos relacionados
-│   │   ├── orphans.rs   detecção de notas órfãs
-│   │   ├── autotag.rs   orquestração de tags automáticas
+│   ├── init.rs        montagem de cofre
+│   ├── check_tags.rs  verificações de saúde de tags (--fix)
+│   ├── check_links.rs verificações de wikilinks quebrados (--fix)
+│   ├── frontmatter.rs normalização de frontmatter (--fix)
+│   ├── graph/
+│   │   ├── wikilinks.rs extração e resolução de wikilinks
 │   │   └── health.rs    relatório de saúde do grafo
 │   ├── git.rs         commit + push automático (commits convencionais)
 │   ├── notes.rs       processamento de caixa de entrada + roteamento PARA
@@ -390,9 +344,9 @@ obsidian-forge/
 
 obsidian-forge é o **projeto parceiro do [alcove](https://github.com/epicsagas/alcove)** — um servidor MCP que fornece documentos de projeto para agentes de IA. Eles compartilham um workspace Cargo e trabalham juntos para fechar o ciclo entre o conhecimento pessoal e a inteligência de projeto:
 
-- **obsidian-forge** = **A Forja** (escrever/empurrar). Daemon em segundo plano que automatiza a manutenção do cofre, fortalece o grafo de conhecimento e sincroniza com o git.
+- **obsidian-forge** = **A Forja** (escrever/empurrar). Daemon em segundo plano que automatiza a manutenção do cofre e sincroniza com o git.
 - **alcove** = **A Biblioteca** (ler/puxar). Servidor MCP que fornece aos agentes de IA acesso sob demanda e pesquisável à documentação sem sobrecarregar a janela de contexto.
-- **[Velith](https://github.com/epicsagas/Velith)** = **A Tipografia** (redigir/publicar). Toolkit de escrita de livros assistido por IA que consome o diretório exportado por `of book export` e conduz o pipeline completo de rascunho → edição → publicação.
+- **[Velith](https://github.com/epicsagas/Velith)** = **A Tipografia** (redigir/publicar). Toolkit independente de escrita de livros assistido por IA para rascunho → edição → publicação.
 
 ```mermaid
 graph LR
@@ -401,48 +355,18 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|Ferramentas MCP| E[Agente de IA]
     E -.->|Refere-se a| D
-    B -->|of book export| F(Velith)
-    F -->|rascunho / edição / pub.| G[Livro]
 ```
 
 ### Integração com o Alcove
 
-Enquanto o `obsidian-forge` se concentra em construir e automatizar seu grafo de conhecimento, o [Alcove](https://github.com/epicsagas/alcove) garante que o conhecimento seja acionável para agentes de codificação de IA.
+Enquanto o `obsidian-forge` se concentra em manter a saúde mecânica do seu cofre, o [Alcove](https://github.com/epicsagas/alcove) garante que o conhecimento seja acionável para agentes de codificação de IA.
 
 #### Como usá-los juntos:
 
-1.  **Construa no Obsidian**: Use o `obsidian-forge` para manter a saúde do seu cofre, criar MOCs e auto-linkar conceitos relacionados.
+1.  **Construa no Obsidian**: Use o `obsidian-forge` para manter seu cofre saudável — roteamento da caixa de entrada, verificações de integridade e sincronização com o git.
 2.  **Promova para Documentos de Projeto**: Quando uma nota (ex: uma decisão arquitetural ou uma especificação de funcionalidade) estiver pronta para um projeto, execute `alcove promote --source caminho/para/nota.md`.
 3.  **Descoberta pelo Agente**: Seu agente de IA (usando o servidor MCP Alcove) agora pode "descobrir" essa nota via `search_project_docs` ou `get_doc_file` em vez de você ter que copiar e colar no chat.
 4.  **Conformidade com Políticas**: Use o `validate_docs` do Alcove para garantir que suas notas promovidas atendam aos padrões de documentação do projeto (definidos em `policy.toml`).
-
-### Integração com o Velith
-
-[Velith](https://github.com/epicsagas/Velith) é o toolkit dedicado à escrita de livros com IA. O `obsidian-forge` gerencia o **lado do cofre** — organizar notas, etiquetar pesquisas, criar a estrutura do projeto. O `Velith` gerencia o **lado da escrita** — rascunhos de capítulos, passes de edição, empacotamento para publicação.
-
-#### Fluxo de trabalho: Cofre → Livro
-
-```bash
-# 1. Etiquetar notas de pesquisa no cofre
-#    Adicionar "book/meu-livro" às tags do frontmatter das notas relevantes
-
-# 2. Inicializar o projeto de livro
-of book init meu-livro --genre non-fiction --lang pt
-
-# 3. Sincronizar notas etiquetadas em sources/
-of book sync meu-livro
-
-# 4. Exportar para diretório compatível com Velith
-of book export meu-livro --output ~/books/
-
-# 5. Transferir para o Velith
-cd ~/books/meu-livro
-Velith draft        # rascunho de capítulos com IA a partir de sources/
-Velith edit         # pipeline de edição em múltiplas passes
-Velith publish      # empacotar EPUB / PDF
-```
-
-O diretório exportado contém `PRD.md` (objetivos), `STYLE.md` (guia de estilo), `drafts/`, `edits/` e `publish/` — exatamente a estrutura que o `Velith` espera.
 
 ---
 

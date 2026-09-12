@@ -1,11 +1,11 @@
 ---
 name: vault-sync
-description: "Full vault sync cycle — runs `of sync` to rebuild MOCs, strengthen graph, and commit to git. Trigger: sync vault, update mocs and graph, commit vault changes."
+description: "Full vault sync cycle — runs `of sync` for a graph health check and git commit/push. Trigger: sync vault, graph health check, commit vault changes."
 ---
 
 # Vault Sync Cycle
 
-Run `of sync` to execute the full sync pipeline: MOC rebuild → graph strengthening → git commit/push.
+Run `of sync` to execute the sync cycle: graph health check → git commit/push.
 
 ## Process
 
@@ -43,10 +43,9 @@ git -C <vault-path> log -1 --format="%h %s (%cs)"
 
 Report in Korean:
 
-1. **MOC 업데이트** — which hub files were regenerated
-2. **그래프 강화** — backlinks added, bridge notes created, tags applied
-3. **Git 커밋** — commit hash, message, timestamp
-4. **소요 시간** — total time taken
+1. **그래프 상태** — note/link/orphan/broken-link counts from the health check
+2. **Git 커밋** — commit hash, message, timestamp (or "no changes")
+3. **소요 시간** — total time taken
 
 ### Step 4: Flag issues
 
@@ -60,19 +59,18 @@ Report in Korean:
 |--------|----------|-------------------|
 | "Skip the pre-sync check, just run it" | Silent failures waste user time | Always run `of doctor --no-ping` first |
 | "Sync is idempotent so it must have worked" | Exit code 1 means something failed | Check exit code, not assumptions |
-| "It succeeded" without evidence | Partial completion looks like success | Show MOC count, graph ops, git hash |
+| "It succeeded" without evidence | Partial completion looks like success | Show health counts and git hash |
 
 ## Evidence Required
 
 - [ ] Exit code from `of sync`
 - [ ] Git log showing the new commit (or absence thereof)
-- [ ] Specific counts of MOCs updated, graph operations performed
+- [ ] Health metrics from the sync log (notes, links, orphans, broken)
 
 **No evidence = not done.**
 
 ## Red Flags
 
 - Sync hangs → daemon may be running and holding a lock; check `of daemon status`
-- MOC rebuild produces empty files → `vault.toml` MOC paths may be misconfigured
-- Graph strengthening finds 0 new links → vault may need more cross-linked content
+- Broken-link count spikes → a recent edit may have introduced bad wikilinks; run `of check-links`
 - Git commit fails → check for merge conflicts or detached HEAD

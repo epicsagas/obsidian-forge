@@ -2,7 +2,7 @@
 
 # ⚒️ obsidian-forge
 
-**Obsidian kasa oluşturucu, otomasyon daemonu ve grafik güçlendirici**
+**Obsidian kasa oluşturucu, otomasyon daemonu ve bakım araç takımı**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
@@ -19,12 +19,12 @@
 
 ## obsidian-forge nedir?
 
-`obsidian-forge`, [Obsidian](https://obsidian.md) kasalarını kuran, otomatikleştiren ve bakımını yapan bir Rust CLI aracıdır. Arka planda bir daemon olarak çalışır; gelen kutunuzu izler, bilgi grafiğinizi güçlendirir ve git ile senkronize eder — böylece siz yazmaya odaklanabilirsiniz.
+`obsidian-forge`, [Obsidian](https://obsidian.md) kasalarını kuran, otomatikleştiren ve bakımını yapan bir Rust CLI aracıdır. Arka planda bir daemon olarak çalışır; gelen kutunuzu izler, kasa bütünlüğünü kontrol eder ve git ile senkronize eder — böylece siz yazmaya odaklanabilirsiniz.
 
 ```
 of init my-brain          # saniyeler içinde yeni kasa kur
 of daemon enable         # macOS giriş öğesi olarak kaydet
-# → kasanız artık otomatik işliyor, bağlantı kuruyor ve commit yapıyor
+# → kasanız artık otomatik işliyor, sağlık kontrolü yapıyor ve commit yapıyor
 # "of", "obsidian-forge" için yerleşik kısa takma addır
 ```
 
@@ -35,16 +35,15 @@ of daemon enable         # macOS giriş öğesi olarak kaydet
 | | Özellik | Açıklama |
 |---|---|---|
 | 🏗️ | **Kasa kurulumu** | PARA düzeni, paket şablonlar, `.obsidian` yapılandırması, git başlatma |
-| 🔗 | **Grafik güçlendirme** | Geri bağlantılar, köprü notları, ilgili proje bağlantıları, otomatik etiketler |
+| 🛡️ | **Kasa bütünlüğü** | Etiket kontrolleri, bozuk bağlantı kontrolleri (kod bloğu duyarlı), frontmatter normalizasyonu — tümü `--fix` ile |
+| 📊 | **Grafik sağlığı** | Lint döngünüzü besleyen not/bağlantı/yetim/bozuk bağlantı metrikleri |
 | 📥 | **Gelen kutusu işleme** | Frontmatter enjeksiyonu, AI sınıflandırma, PARA yönlendirme |
-| 🔄 | **Senkronizasyon döngüsü** | MOC yeniden oluşturma → grafik → zamanlayıcıyla otomatik git commit/push |
-| 🗂️ | **Çoklu kasa** | Bir daemon tüm kasaları yönetir; kasa bazında etkinleştir, duraklat veya devre dışı bırak |
-| ⚙️ | **Ayarlar deposu** | Bir kasadan eklentileri/temaları içe aktar ve diğer tüm kasalara gönder |
+| 🔄 | **Senkronizasyon döngüsü** | Grafik sağlık kontrolü → zamanlayıcıyla otomatik git commit/push |
+| 🗂️ | **Çoklu kasa** | Bir daemon tüm kasaları yönetir; kasa bazlı bayraklar global yapılandırmada |
 | 🤖 | **AI meta verileri** | Ollama, OpenAI, OpenRouter, LM Studio veya herhangi bir OpenAI uyumlu uç nokta |
 | 📄 | **PDF → Markdown** | `marker_single` ile dönüştürme, `pdftotext` yedek seçeneğiyle |
 | 🍎 | **Giriş öğesi** | macOS LaunchAgent olarak kurulur — otomatik başlar ve yeniden başlar |
 | ♻️ | **Idempotent** | Her işlem birden fazla kez güvenle çalıştırılabilir; yinelenen çıktı yok |
-| 📚 | **Kitap projeleri** | Kasa tümleşik yazma projelerini başlatın, takip edin, dışa aktarın ve kaynakları senkronize edin |
 
 ---
 
@@ -60,13 +59,13 @@ Homebrew yok mu? Kurulum betiğini kullanın:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.sh | sh
 ```
 
 ### Windows
 
 ```powershell
-irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.ps1 | iex
 ```
 
 ### Rust araç zinciri ile
@@ -94,13 +93,12 @@ Yukarıdaki tüm yöntemlerle hem `obsidian-forge` hem de `of` (kısa takma ad) 
 
 ### AI Ajan Eklentileri
 
-obsidian-forge, AI asistanlarına bağlam duyarlı kasa işlemleri sunan 5 yerleşik ajan yeteneğiyle birlikte gelir:
+obsidian-forge, AI asistanlarına bağlam duyarlı kasa işlemleri sunan 4 yerleşik ajan yeteneğiyle birlikte gelir:
 
 | Yetenek | Tetikleyici |
 |-------|---------|
 | `vault-health` | Kasa sağlık kontrolü, kasa teşhisi, kasa durumu |
-| `vault-sync` | Kasayı senkronize et, MOC'leri ve grafiği güncelle, kasa değişikliklerini commit et |
-| `graph-strengthen` | Grafiği güçlendir, grafik sağlığı, yetimleri düzelt |
+| `vault-sync` | Kasayı senkronize et, grafik sağlık kontrolü, kasa değişikliklerini commit et |
 | `inbox-process` | Gelen kutusunu işle, notları sınıflandır, PARA yönlendirme |
 | `vault-fix` | Kasayı düzelt, etiketleri onar, bağlantıları düzelt, frontmatter'ı düzelt |
 
@@ -139,15 +137,12 @@ Kurulduktan sonra, kasa yönetimi, PARA yönlendirme, grafik işlemleri veya dae
 ## Hızlı Başlangıç
 
 ```bash
-# 1. Yeni kasa oluştur
+# 1. Yeni bir kasa oluştur (global yapılandırmaya kaydeder)
 of init my-brain
 
 # 2. Obsidian'da aç → Dosya → Kasayı Aç → my-brain
 
-# 3. Global yapılandırmaya kaydet
-of vault add ~/my-brain
-
-# 4. Arka plan daemonunu kur
+# 3. Arka plan daemonunu kur
 of daemon enable
 
 # Bitti — 00-Inbox/ dizinine notlar bırakın, obsidian-forge gerisini halleder
@@ -170,48 +165,32 @@ obsidian-forge init my-brain --path ~/
 
 ### Çoklu Kasa Yönetimi
 
-```bash
-obsidian-forge vault add <path> [--name <alias>]
-obsidian-forge vault remove <name>          # kaydı sil (dosyalar korunur)
-obsidian-forge vault list                   # NAME / ENABLED / WATCH / PATH
-obsidian-forge vault enable  <name>
-obsidian-forge vault disable <name>         # senkronizasyon ve izlemeden hariç tut
-obsidian-forge vault pause   <name>         # daemonu atla; manuel senkronizasyon tamam
-obsidian-forge vault resume  <name>
+Kasalar `init` tarafından otomatik olarak kaydedilir (mevcut bir dizinde yeniden çalıştırmak güvenlidir).
+Kasa bazlı bayraklar (`enabled`, `watch`) `~/.config/obsidian-forge/config.toml` içinde tutulur:
+
+```toml
+[[vaults]]
+name    = "my-brain"
+path    = "/path/to/my-brain"
+enabled = true    # senkronizasyona dahil
+watch   = true    # daemon tarafından izlenir
 ```
 
-### Ayarlar Yönetimi
-
-Kasalar arasında `.obsidian/` eklentilerini, temalarını ve snippet'lerini senkronize eder.
+### Kasa Bütünlüğü ve Grafik İşlemleri
 
 ```bash
-obsidian-forge settings import <vault>      # ayarları global depoya çek
-obsidian-forge settings push   <vault>      # global ayarları bir kasaya gönder
-obsidian-forge settings push-all            # TÜM kayıtlı kasalara gönder
-obsidian-forge settings status
-
-# İki kasa arasında doğrudan klonlama
-obsidian-forge clone-settings <source> <target>
-```
-
-### Grafik İşlemleri
-
-```bash
-obsidian-forge graph health                 # istatistikleri ve sağlık metriklerini göster
-obsidian-forge graph orphans [--auto-link]  # yetim notları listele (veya AI ile otomatik bağla)
-obsidian-forge graph extract [--no-ai]      # bağlantıları ve ilişkileri çıkar
-obsidian-forge graph tags [--dry-run]       # etiketleri normalleştir ve kümele
-obsidian-forge graph strengthen             # tam boru hattını çalıştır
-
-# Eski takma ad (tam boru hattını çalıştırır)
-obsidian-forge strengthen-graph
+obsidian-forge check-tags            [--vault <name>]  # eksik layer/type/project etiketleri
+obsidian-forge check-tags --fix      [--vault <name>]  # eksik etiketleri enjekte et
+obsidian-forge check-links           [--vault <name>]  # bozuk wikilink'ler (kod bloğu duyarlı)
+obsidian-forge check-links --fix     [--vault <name>]  # dosya adı/uzantı uyuşmazlıklarını düzelt
+obsidian-forge normalize-frontmatter [--vault <name>]  # YAML bozuklukları
+obsidian-forge graph health          [--vault <name>]  # istatistikler ve sağlık metrikleri
 ```
 
 ### Tek Seferlik İşlemler
 
 ```bash
-obsidian-forge sync               [--vault <name>]   # MOC → grafik → git
-obsidian-forge update-mocs        [--vault <name>]
+obsidian-forge sync               [--vault <name>]   # grafik sağlığı → git
 obsidian-forge process-all        [--vault <name>]   # AI gelen kutusu işleme
 obsidian-forge status             [--vault <name>]   # yapılandırma ve AI durumunu göster
 obsidian-forge doctor             [--vault <name>]   # kasa sağlığını teşhis et
@@ -236,19 +215,6 @@ obsidian-forge daemon status     # PID, son çıkış kodu ve planlanmış kasal
 obsidian-forge watch              # izlenebilir tüm kasalar
 obsidian-forge watch --vault <name> --interval <saniye>
 ```
-
-### Kitap Projeleri
-
-Kitap yazma projelerini doğrudan kasa içinden yönetin.
-
-```bash
-of book init <name> [--genre <genre>] [--lang <lang>]   # 01-Projects/ altında yapı oluştur
-of book status [<name>]                                   # taslak / düzenleme / yayın aşaması ilerleme
-of book export <name> [--output <dir>]                   # Velith için dışa aktar
-of book sync   <name>                                     # etiketli notları sources/ klasörüne bağla
-```
-
-Kasada `book/<name>` etiketiyle işaretlenmiş notlar, `book sync` komutuyla `sources/` klasörüne otomatik olarak sembolik bağlantı olarak eklenir.
 
 ### Panel (Dashboard)
 
@@ -288,15 +254,9 @@ archive_dir     = "99-Archives"
 attachments_dir = "Attachments"
 templates_dir   = "obsidian-templates"
 
-[graph]
-backlinks        = true
-bridge_notes     = true
-auto_tags        = true
-related_projects = true
-# [[graph.concepts]]
-# name     = "AI"
-# keywords = ["machine learning", "LLM", "neural"]
-# tags     = ["ai", "ml"]
+# [projects]
+# exclude = ["_template"]           # tarama sırasında atlanacak ek üst düzey dizinler
+                                    # (nokta dizinleri ve node_modules her zaman hariç tutulur)
 
 [sync]
 git_auto_commit  = true
@@ -364,18 +324,12 @@ obsidian-forge/
 ├── src/
 │   ├── main.rs        CLI (clap), çoklu kasa dağıtımı, senkronizasyon döngüsü
 │   ├── config.rs      vault.toml + global yapılandırma yapıları
-│   ├── init.rs        kasa kurulumu, ayar içe aktarma/gönderme
-│   ├── moc.rs         MOC merkez dosyası oluşturma
-│   ├── graph/         Grafik güçlendirme boru hattı
-│   │   ├── mod.rs       boru hattı koordinatörü
-│   │   ├── scan.rs      kasa çapında grafik tarama
-│   │   ├── tags.rs      kavram tabanlı otomatik etiketleme
-│   │   ├── wikilinks.rs wikilink çıkarma ve enjeksiyonu
-│   │   ├── backlinks.rs geri bağlantı bölümü oluşturma
-│   │   ├── bridges.rs   köprü notu oluşturma
-│   │   ├── relationships.rs ilgili proje bağlantılama
-│   │   ├── orphans.rs   yetim not tespiti
-│   │   ├── autotag.rs   otomatik etiket orkestrasyonu
+│   ├── init.rs        kasa kurulumu
+│   ├── check_tags.rs  etiket sağlık kontrolleri (--fix)
+│   ├── check_links.rs bozuk wikilink kontrolleri (--fix)
+│   ├── frontmatter.rs frontmatter normalizasyonu (--fix)
+│   ├── graph/
+│   │   ├── wikilinks.rs wikilink çıkarma ve çözümleme
 │   │   └── health.rs    grafik sağlık raporlaması
 │   ├── git.rs         otomatik commit + push (conventional commits)
 │   ├── notes.rs       gelen kutusu işleme + PARA yönlendirme
@@ -390,9 +344,9 @@ obsidian-forge/
 
 obsidian-forge, AI ajanlarına proje belgeleri sunan bir MCP sunucusu olan **[alcove](https://github.com/epicsagas/alcove)**'un kardeş projesidir. Bir Cargo çalışma alanını paylaşırlar ve kişisel bilgi ile proje zekası arasındaki döngüyü kapatmak için birlikte çalışırlar:
 
-- **obsidian-forge** = **Demirhane (The Forge)** (yazma/itme). Kasa bakımını otomatikleştiren, bilgi grafiğini güçlendiren ve git ile senkronize eden arka plan daemonu.
+- **obsidian-forge** = **Demirhane (The Forge)** (yazma/itme). Kasa bakımını otomatikleştiren ve git ile senkronize eden arka plan daemonu.
 - **alcove** = **Kütüphane (The Library)** (okuma/çekme). AI ajanlarına, bağlam penceresini şişirmeden belgelere on-demand ve aranabilir erişim sağlayan MCP sunucusu.
-- **[Velith](https://github.com/epicsagas/Velith)** = **Matbaa (The Press)** (yazma/yayımlama). `of book export` ile dışa aktarılan dizini alıp taslak → düzenleme → yayımlama pipeline'ını yöneten AI destekli kitap yazma araç takımı.
+- **[Velith](https://github.com/epicsagas/Velith)** = **Matbaa (The Press)** (yazma/yayımlama). Taslak → düzenleme → yayımlama için bağımsız AI destekli kitap yazma araç takımı.
 
 ```mermaid
 graph LR
@@ -401,48 +355,18 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Araçları| E[AI Ajanı]
     E -.->|Şuna atıfta bulunur| D
-    B -->|of book export| F(Velith)
-    F -->|taslak / düzenleme / yayın| G[Kitap]
 ```
 
 ### Alcove ile Entegrasyon
 
-`obsidian-forge` bilgi grafiğinizi oluşturmaya ve otomatikleştirmeye odaklanırken, [Alcove](https://github.com/epicsagas/alcove) bu bilginin AI kodlama ajanları için eyleme dönüştürülebilir olmasını sağlar.
+`obsidian-forge` kasanızın mekanik sağlığını korumaya odaklanırken, [Alcove](https://github.com/epicsagas/alcove) bu bilginin AI kodlama ajanları için eyleme dönüştürülebilir olmasını sağlar.
 
 #### Birlikte nasıl kullanılır:
 
-1.  **Obsidian'da İnşa Edin**: Kasanızın sağlığını korumak, MOC'ler oluşturmak ve ilgili kavramları otomatik olarak bağlamak için `obsidian-forge` kullanın.
+1.  **Obsidian'da İnşa Edin**: Kasanızı sağlıklı tutmak için `obsidian-forge` kullanın — gelen kutusu yönlendirme, bütünlük kontrolleri, git senkronizasyonu.
 2.  **Proje Belgelerine Yükseltin**: Bir not (örneğin bir mimari karar veya özellik spesifikasyonu) bir proje için hazır olduğunda, `alcove promote --source path/to/note.md` komutunu çalıştırın.
 3.  **Ajan Keşfi**: AI ajanınız (Alcove MCP sunucusunu kullanarak) artık sohbet kutusuna kopyalayıp yapıştırmanıza gerek kalmadan `search_project_docs` veya `get_doc_file` aracılığıyla o notu "keşfedebilir".
 4.  **Politika Uyumluluğu**: Yükseltilen notlarınızın projenin belge standartlarını (`policy.toml` içinde tanımlanan) karşıladığından emin olmak için Alcove'un `validate_docs` aracını kullanın.
-
-### Velith ile Entegrasyon
-
-[Velith](https://github.com/epicsagas/Velith), AI destekli kitap yazma için özel araç takımıdır. `obsidian-forge` **kasa tarafını** yönetir — notları düzenleme, araştırmaları etiketleme, proje yapısını oluşturma. `Velith` **yazma tarafını** yönetir — bölüm taslakları, düzenleme turları, yayına hazırlama.
-
-#### İş akışı: Kasa → Kitap
-
-```bash
-# 1. Kasadaki araştırma notlarını etiketleyin
-#    İlgili notların frontmatter tags alanına "book/kitabim" ekleyin
-
-# 2. Kitap projesini başlatın
-of book init kitabim --genre non-fiction --lang tr
-
-# 3. Etiketli notları sources/ klasörüne senkronize edin
-of book sync kitabim
-
-# 4. Velith uyumlu dizine aktarın
-of book export kitabim --output ~/books/
-
-# 5. Velith'a devredin
-cd ~/books/kitabim
-Velith draft        # sources/ temelinde AI bölüm taslakları
-Velith edit         # çok turlu düzenleme pipeline'ı
-Velith publish      # EPUB / PDF paketleme
-```
-
-Dışa aktarılan dizin `PRD.md` (hedefler), `STYLE.md` (stil kılavuzu), `drafts/`, `edits/` ve `publish/` içerir — tam olarak `Velith`'un beklediği yapı.
 
 ---
 

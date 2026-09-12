@@ -2,7 +2,7 @@
 
 # ⚒️ obsidian-forge
 
-**Obsidian vault generator, automation daemon, and graph strengthener**
+**Obsidian vault generator, automation daemon, and maintenance toolkit**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
@@ -19,12 +19,12 @@
 
 ## obsidian-forgeとは？
 
-`obsidian-forge`は[Obsidian](https://obsidian.md) vaultのスキャフォルディング、自動化、保守を行うRust CLIツールです。バックグラウンドデーモンとして動作し、インボックスを監視し、ナレッジグラフを強化し、gitに同期します — あなたは執筆に集中できます。
+`obsidian-forge`は[Obsidian](https://obsidian.md) vaultのスキャフォルディング、自動化、保守を行うRust CLIツールです。バックグラウンドデーモンとして動作し、インボックスを監視し、vaultの整合性をチェックし、gitに同期します — あなたは執筆に集中できます。
 
 ```
 of init my-brain          # 数秒で新しいvaultをスキャフォールド
 of daemon enable         # macOSログイン項目として登録
-# → vaultが自動処理、自動リンク、自動コミットされるようになります
+# → vaultが自動処理、ヘルスチェック、自動コミットされるようになります
 # "of"は"obsidian-forge"の組み込みショートカットエイリアスです
 ```
 
@@ -35,16 +35,15 @@ of daemon enable         # macOSログイン項目として登録
 | | 機能 | 説明 |
 |---|---|---|
 | 🏗️ | **Vaultスキャフォルディング** | PARAレイアウト、バンドルテンプレート、`.obsidian`設定、git初期化 |
-| 🔗 | **グラフ強化** | バックリンク、ブリッジノート、関連プロジェクトリンク、自動タグ |
+| 🛡️ | **Vault整合性** | タグチェック、壊れたリンクのチェック（コードフェンス対応）、フロントマター正規化 — すべて`--fix`対応 |
+| 📊 | **グラフヘルス** | ノート/リンク/孤立ノート/壊れたリンクのメトリクス。リントループの材料に |
 | 📥 | **インボックス処理** | フロントマター注入、AI分類、PARAルーティング |
-| 🔄 | **同期サイクル** | MOC再構築 → グラフ → タイマーベースの自動gitコミット/プッシュ |
-| 🗂️ | **マルチvault** | 1つのデーモンがすべてのvaultを管理。vaultごとに有効化、一時停止、無効化 |
-| ⚙️ | **設定ストア** | 1つのvaultからプラグイン/テーマをインポートし、他のすべてのvaultにプッシュ |
+| 🔄 | **同期サイクル** | グラフヘルスチェック → タイマーベースの自動gitコミット/プッシュ |
+| 🗂️ | **マルチvault** | 1つのデーモンがすべてのvaultを管理。vaultごとのフラグはグローバル設定に記述 |
 | 🤖 | **AIメタデータ** | Ollama、OpenAI、OpenRouter、LM Studio、またはOpenAI互換エンドポイント |
 | 📄 | **PDF → Markdown** | `marker_single`による変換、`pdftotext`フォールバック対応 |
 | 🍎 | **ログイン項目** | macOS LaunchAgentとしてインストール — 自動起動、自動再起動 |
 | ♻️ | **冪等性** | どの操作も複数回実行しても安全。重複出力なし |
-| 📚 | **書籍プロジェクト** | vault統合執筆プロジェクトの初期化、追跡、エクスポート、ソース同期 |
 
 ---
 
@@ -60,13 +59,13 @@ Homebrewがない場合はインストーラースクリプトを使用してく
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.sh | sh
 ```
 
 ### Windows
 
 ```powershell
-irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.ps1 | iex
 ```
 
 ### Rustツールチェーン経由
@@ -94,13 +93,12 @@ cargo install obsidian-forge --features dashboard-ui  # `of dashboard` GUIを同
 
 ### AIエージェントプラグイン
 
-obsidian-forgeには、AIアシスタントにコンテキスト認識のボールト操作を提供する5つの組み込みエージェントスキルが含まれています:
+obsidian-forgeには、AIアシスタントにコンテキスト認識のボールト操作を提供する4つの組み込みエージェントスキルが含まれています:
 
 | スキル | トリガー |
 |-------|---------|
 | `vault-health` | ボールトヘルスチェック、ボールト診断、ボールトステータス |
-| `vault-sync` | ボールト同期、MOCとグラフの更新、ボールト変更のコミット |
-| `graph-strengthen` | グラフ強化、グラフヘルス、孤立ノートの修正 |
+| `vault-sync` | ボールト同期、グラフヘルスチェック、ボールト変更のコミット |
 | `inbox-process` | インボックス処理、ノート分類、PARAルーティング |
 | `vault-fix` | ボールト修正、タグ修復、リンク修正、フロントマター修正 |
 
@@ -139,15 +137,12 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 ## クイックスタート
 
 ```bash
-# 1. 新しいvaultを作成
+# 1. 新しいvaultを作成（グローバル設定に自動登録される）
 of init my-brain
 
 # 2. Obsidianで開く → ファイル → Vaultを開く → my-brain
 
-# 3. グローバル設定に登録
-of vault add ~/my-brain
-
-# 4. バックグラウンドデーモンをインストール
+# 3. バックグラウンドデーモンをインストール
 of daemon enable
 
 # 完了 — 00-Inbox/にノートを置くと、obsidian-forgeが残りを処理します
@@ -170,48 +165,32 @@ obsidian-forge init my-brain --path ~/
 
 ### マルチvault管理
 
-```bash
-obsidian-forge vault add <path> [--name <alias>]
-obsidian-forge vault remove <name>          # 登録解除（ファイルは保持）
-obsidian-forge vault list                   # NAME / ENABLED / WATCH / PATH
-obsidian-forge vault enable  <name>
-obsidian-forge vault disable <name>         # 同期と監視から除外
-obsidian-forge vault pause   <name>         # デーモンスキップ。手動同期は可能
-obsidian-forge vault resume  <name>
+vaultは`init`によって自動的に登録されます（既存のディレクトリで再実行しても安全）。
+vaultごとのフラグ（`enabled`、`watch`）は`~/.config/obsidian-forge/config.toml`に記述します:
+
+```toml
+[[vaults]]
+name    = "my-brain"
+path    = "/path/to/my-brain"
+enabled = true    # 同期に含める
+watch   = true    # デーモンの監視対象にする
 ```
 
-### 設定管理
-
-すべてのvaultにわたり`.obsidian/`プラグイン、テーマ、スニペットを同期します。
+### Vault整合性とグラフ操作
 
 ```bash
-obsidian-forge settings import <vault>      # 設定をグローバルストアにインポート
-obsidian-forge settings push   <vault>      # グローバル設定を1つのvaultにプッシュ
-obsidian-forge settings push-all            # 登録されたすべてのvaultにプッシュ
-obsidian-forge settings status
-
-# 2つのvault間で直接設定をクローン
-obsidian-forge clone-settings <source> <target>
-```
-
-### グラフ操作
-
-```bash
-obsidian-forge graph health                 # 統計とヘルスメトリクスを表示
-obsidian-forge graph orphans [--auto-link]  # 孤立ノートの一覧表示（またはAI自動リンク）
-obsidian-forge graph extract [--no-ai]      # リンクと関係を抽出
-obsidian-forge graph tags [--dry-run]       # タグの正規化とクラスタリング
-obsidian-forge graph strengthen             # フルパイプライン実行
-
-# レガシーエイリアス（フルパイプライン実行）
-obsidian-forge strengthen-graph
+obsidian-forge check-tags            [--vault <name>]  # 不足しているlayer/type/projectタグ
+obsidian-forge check-tags --fix      [--vault <name>]  # 不足タグの注入
+obsidian-forge check-links           [--vault <name>]  # 壊れたウィキリンク（コードフェンス対応）
+obsidian-forge check-links --fix     [--vault <name>]  # ファイル名/拡張子の不一致を修正
+obsidian-forge normalize-frontmatter [--vault <name>]  # YAMLの形式不良を修復
+obsidian-forge graph health          [--vault <name>]  # 統計とヘルスメトリクスを表示
 ```
 
 ### 単発操作
 
 ```bash
-obsidian-forge sync               [--vault <name>]   # MOC → グラフ → git
-obsidian-forge update-mocs        [--vault <name>]
+obsidian-forge sync               [--vault <name>]   # グラフヘルス → git
 obsidian-forge process-all        [--vault <name>]   # AIインボックス処理
 obsidian-forge status             [--vault <name>]   # 設定とAIステータスを表示
 obsidian-forge doctor             [--vault <name>]   # vaultヘルス診断
@@ -236,19 +215,6 @@ obsidian-forge daemon status     # PID、最終終了コード、スケジュー
 obsidian-forge watch              # 監視可能なすべてのvault
 obsidian-forge watch --vault <name> --interval <seconds>
 ```
-
-### 書籍プロジェクト
-
-vaultから直接書籍執筆プロジェクトを管理します。
-
-```bash
-of book init <name> [--genre <genre>] [--lang <lang>]   # 01-Projects/ 下にスキャフォールド
-of book status [<name>]                                   # 初稿 / 編集 / 出版フェーズの進捗
-of book export <name> [--output <dir>]                   # Velith 互換ディレクトリにエクスポート
-of book sync   <name>                                     # タグ付きノートを sources/ にリンク
-```
-
-`book/<name>` タグが付いたvaultのノートは、`book sync` によって `sources/` にシンボリックリンクとして自動的に追加されます。
 
 ### ダッシュボード
 
@@ -288,15 +254,9 @@ archive_dir     = "99-Archives"
 attachments_dir = "Attachments"
 templates_dir   = "obsidian-templates"
 
-[graph]
-backlinks        = true
-bridge_notes     = true
-auto_tags        = true
-related_projects = true
-# [[graph.concepts]]
-# name     = "AI"
-# keywords = ["machine learning", "LLM", "neural"]
-# tags     = ["ai", "ml"]
+# [projects]
+# exclude = ["_template"]           # スキャン時に除外する追加のトップレベルディレクトリ
+                                    # （ドット始まりのディレクトリとnode_modulesは常に除外）
 
 [sync]
 git_auto_commit  = true
@@ -364,18 +324,12 @@ obsidian-forge/
 ├── src/
 │   ├── main.rs        CLI (clap)、マルチvaultディスパッチ、同期ループ
 │   ├── config.rs      vault.toml + グローバル設定構造体
-│   ├── init.rs        vaultスキャフォルディング、設定インポート/プッシュ
-│   ├── moc.rs         MOCハブファイル生成
-│   ├── graph/         グラフ強化パイプライン
-│   │   ├── mod.rs       パイプラインコーディネーター
-│   │   ├── scan.rs      vault全体のグラフスキャン
-│   │   ├── tags.rs      コンセプトベースの自動タギング
-│   │   ├── wikilinks.rs ウィキリンクの抽出と注入
-│   │   ├── backlinks.rs バックリンクセクション生成
-│   │   ├── bridges.rs   ブリッジノート作成
-│   │   ├── relationships.rs  関連プロジェクトリンク
-│   │   ├── orphans.rs   孤立ノート検出
-│   │   ├── autotag.rs   自動タグオーケストレーション
+│   ├── init.rs        vaultスキャフォルディング
+│   ├── check_tags.rs  タグヘルスチェック（--fix）
+│   ├── check_links.rs 壊れたウィキリンクのチェック（--fix）
+│   ├── frontmatter.rs フロントマターの正規化（--fix）
+│   ├── graph/
+│   │   ├── wikilinks.rs ウィキリンクの抽出と解決
 │   │   └── health.rs    グラフヘルスレポート
 │   ├── git.rs         自動コミット + プッシュ（conventional commits）
 │   ├── notes.rs       インボックス処理 + PARAルーティング
@@ -390,9 +344,9 @@ obsidian-forge/
 
 `obsidian-forge`はAIエージェントにプロジェクトドキュメントを提供するMCPサーバーである**[alcove](https://github.com/epicsagas/alcove)**の姉妹プロジェクトです。Cargoワークスペースを共有し、個人の知識とプロジェクトインテリジェンスの間のループを完成させます:
 
-- **obsidian-forge** = **The Forge（鍛冶場）**（書き込み/プッシュ）。vaultの保守を自動化し、ナレッジグラフを強化し、gitに同期するバックグラウンドデーモン。
+- **obsidian-forge** = **The Forge（鍛冶場）**（書き込み/プッシュ）。vaultの保守を自動化し、gitに同期するバックグラウンドデーモン。
 - **alcove** = **The Library（図書館）**（読み取り/プル）。コンテキストウィンドウを肥大化させることなく、AIエージェントにオンデマンドで検索可能なドキュメントアクセスを提供するMCPサーバー。
-- **[Velith](https://github.com/epicsagas/Velith)** = **The Press（印刷所）**（執筆/出版）。`of book export`でエクスポートされたディレクトリを受け取り、初稿 → 編集 → 出版のフルパイプラインを駆動するAI書籍執筆ツールキット。
+- **[Velith](https://github.com/epicsagas/Velith)** = **The Press（印刷所）**（執筆/出版）。初稿 → 編集 → 出版を担うスタンドアローンのAI書籍執筆ツールキット。
 
 ```mermaid
 graph LR
@@ -401,48 +355,18 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Tools| E[AI Agent]
     E -.->|Refers to| D
-    B -->|of book export| F(Velith)
-    F -->|初稿 / 編集 / 出版| G[書籍]
 ```
 
 ### Alcoveとの統合
 
-`obsidian-forge`がナレッジグラフの構築と自動化に集中する一方で、[Alcove](https://github.com/epicsagas/alcove)はその知識がAIコーディングエージェントにとって実用的であることを保証します。
+`obsidian-forge`がvaultの機械的な健全性の維持に集中する一方で、[Alcove](https://github.com/epicsagas/alcove)はその知識がAIコーディングエージェントにとって実用的であることを保証します。
 
 #### 一緒に使う方法:
 
-1.  **Obsidianで構築**: `obsidian-forge`を使ってvaultの健全性を維持し、MOCを作成し、関連コンセプトを自動リンクします。
+1.  **Obsidianで構築**: `obsidian-forge`を使ってvaultの健全性を維持します — インボックスルーティング、整合性チェック、git同期。
 2.  **プロジェクトドキュメントへ昇格**: ノート（例: アーキテクチャ決定や機能仕様）がプロジェクトで使用できる状態になったら、`alcove promote --source path/to/note.md`を実行します。
 3.  **エージェントによる発見**: AIエージェント（Alcove MCPサーバー使用）は、チャットにコピーペーストすることなく、`search_project_docs`または`get_doc_file`を通じてそのノートを「発見」できます。
 4.  **ポリシーコンプライアンス**: Alcoveの`validate_docs`を使用して、昇格されたノートがプロジェクトのドキュメント基準（`policy.toml`で定義）を満たしていることを確認します。
-
-### Velithとの統合
-
-[Velith](https://github.com/epicsagas/Velith)は専用のAI書籍執筆ツールキットです。`obsidian-forge`は**vault側**を担当します — ノートの整理、リサーチのタグ付け、プロジェクト構造のスキャフォールド。`Velith`は**執筆側**を担当します — チャプター初稿作成、編集パス、出版パッケージング。
-
-#### ワークフロー: vault → 書籍
-
-```bash
-# 1. vaultのリサーチノートにタグを追加
-#    関連ノートのfrontmatter tagsに "book/my-book" を追加
-
-# 2. 書籍プロジェクトを初期化
-of book init my-book --genre non-fiction --lang ja
-
-# 3. タグ付きノートをsources/に同期
-of book sync my-book
-
-# 4. Velith互換ディレクトリにエクスポート
-of book export my-book --output ~/books/
-
-# 5. Velithに引き渡し
-cd ~/books/my-book
-Velith draft        # sources/を基にAIチャプター初稿作成
-Velith edit         # 多段階編集パイプライン
-Velith publish      # EPUB / PDFパッケージング
-```
-
-エクスポートされたディレクトリには`PRD.md`（目標）、`STYLE.md`（スタイルガイド）、`drafts/`、`edits/`、`publish/`が含まれ、`Velith`が期待する構造と完全に一致します。
 
 ---
 

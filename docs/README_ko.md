@@ -2,7 +2,7 @@
 
 # ⚒️ obsidian-forge
 
-**Obsidian 볼트 생성기, 자동화 데몬, 그래프 강화 도구**
+**Obsidian 볼트 생성기, 자동화 데몬, 유지 관리 툴킷**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
@@ -19,12 +19,12 @@
 
 ## obsidian-forge란?
 
-`obsidian-forge`는 [Obsidian](https://obsidian.md) 볼트를 스캐폴딩, 자동화, 유지 관리하는 Rust CLI 도구입니다. 백그라운드 데몬으로 실행되어 인박스를 감시하고, 지식 그래프를 강화하며, git에 동기화합니다 — 당신은 글쓰기에만 집중할 수 있습니다.
+`obsidian-forge`는 [Obsidian](https://obsidian.md) 볼트를 스캐폴딩, 자동화, 유지 관리하는 Rust CLI 도구입니다. 백그라운드 데몬으로 실행되어 인박스를 감시하고, 볼트 무결성을 검사하며, git에 동기화합니다 — 당신은 글쓰기에만 집중할 수 있습니다.
 
 ```
 of init my-brain          # 몇 초 만에 새 볼트 스캐폴딩
 of daemon enable         # macOS 로그인 항목으로 등록
-# → 이제 볼트가 자동 처리, 자동 링크, 자동 커밋됩니다
+# → 이제 볼트가 자동 처리, 헬스 체크, 자동 커밋됩니다
 # "of"는 "obsidian-forge"의 내장 단축 별칭입니다
 ```
 
@@ -35,16 +35,15 @@ of daemon enable         # macOS 로그인 항목으로 등록
 | | 기능 | 설명 |
 |---|---|---|
 | 🏗️ | **볼트 스캐폴딩** | PARA 레이아웃, 번들 템플릿, `.obsidian` 설정, git 초기화 |
-| 🔗 | **그래프 강화** | 백링크, 브릿지 노트, 관련 프로젝트 링크, 자동 태그 |
+| 🛡️ | **볼트 무결성** | 태그 검사, 깨진 링크 검사 (코드 펜스 인식), 프론트매터 정규화 — 모두 `--fix` 지원 |
+| 📊 | **그래프 헬스** | 노트/링크/고립/깨진 링크 메트릭 — 린트 루프에 활용 |
 | 📥 | **인박스 처리** | 프론트매터 주입, AI 분류, PARA 라우팅 |
-| 🔄 | **동기화 사이클** | MOC 재구축 → 그래프 → 타이머 기반 자동 git 커밋/푸시 |
-| 🗂️ | **멀티 볼트** | 하나의 데몬이 모든 볼트를 관리; 볼트별 활성화, 일시정지, 비활성화 |
-| ⚙️ | **설정 저장소** | 하나의 볼트에서 플러그인/테마를 가져와 다른 모든 볼트에 푸시 |
+| 🔄 | **동기화 사이클** | 그래프 헬스 검사 → 타이머 기반 자동 git 커밋/푸시 |
+| 🗂️ | **멀티 볼트** | 하나의 데몬이 모든 볼트를 관리; 볼트별 플래그는 글로벌 설정에 |
 | 🤖 | **AI 메타데이터** | Ollama, OpenAI, OpenRouter, LM Studio, 또는 OpenAI 호환 엔드포인트 |
 | 📄 | **PDF → 마크다운** | `marker_single`을 통해 변환, `pdftotext` 폴백 지원 |
 | 🍎 | **로그인 항목** | macOS LaunchAgent로 설치 — 자동 시작, 자동 재시작 |
 | ♻️ | **멱등성** | 어떤 작업도 여러 번 실행해도 안전; 중복 출력 없음 |
-| 📚 | **도서 프로젝트** | 볼트 통합 집필 프로젝트의 초기화, 진행 추적, 내보내기, 소스 동기화 |
 
 ---
 
@@ -60,13 +59,13 @@ Homebrew가 없다면 설치 스크립트를 사용하세요:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.sh | sh
 ```
 
 ### Windows
 
 ```powershell
-irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.ps1 | iex
 ```
 
 ### Rust 툴체인으로 설치
@@ -94,13 +93,12 @@ cargo install obsidian-forge --features dashboard-ui  # `of dashboard` GUI 포�
 
 ### AI 에이전트 플러그인
 
-obsidian-forge에는 AI 어시스턴트에게 컨텍스트 인식 볼트 작업을 제공하는 5개의 내장 에이전트 스킬이 포함되어 있습니다:
+obsidian-forge에는 AI 어시스턴트에게 컨텍스트 인식 볼트 작업을 제공하는 4개의 내장 에이전트 스킬이 포함되어 있습니다:
 
 | 스킬 | 트리거 |
 |-------|---------|
 | `vault-health` | 볼트 상태 확인, 볼트 진단, 볼트 상태 |
-| `vault-sync` | 볼트 동기화, MOC 및 그래프 업데이트, 볼트 변경사항 커밋 |
-| `graph-strengthen` | 그래프 강화, 그래프 상태, 고립 노트 수정 |
+| `vault-sync` | 볼트 동기화, 그래프 헬스 검사, 볼트 변경사항 커밋 |
 | `inbox-process` | 인박스 처리, 노트 분류, PARA 라우팅 |
 | `vault-fix` | 볼트 수정, 태그 복구, 링크 수정, 프론트매터 수정 |
 
@@ -139,15 +137,12 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 ## 빠른 시작
 
 ```bash
-# 1. 새 볼트 생성
+# 1. 새 볼트 생성 (글로벌 설정에 등록)
 of init my-brain
 
 # 2. Obsidian에서 열기 → 파일 → 볼트 열기 → my-brain
 
-# 3. 글로벌 설정에 등록
-of vault add ~/my-brain
-
-# 4. 백그라운드 데몬 설치
+# 3. 백그라운드 데몬 설치
 of daemon enable
 
 # 완료 — 00-Inbox/에 노트를 넣으면 obsidian-forge가 나머지를 처리합니다
@@ -170,48 +165,32 @@ obsidian-forge init my-brain --path ~/
 
 ### 멀티 볼트 관리
 
-```bash
-obsidian-forge vault add <path> [--name <alias>]
-obsidian-forge vault remove <name>          # 등록 해제 (파일 유지)
-obsidian-forge vault list                   # NAME / ENABLED / WATCH / PATH
-obsidian-forge vault enable  <name>
-obsidian-forge vault disable <name>         # 동기화 및 감시에서 제외
-obsidian-forge vault pause   <name>         # 데몬 건너뜀; 수동 동기화 가능
-obsidian-forge vault resume  <name>
+볼트는 `init`이 자동으로 등록합니다 (기존 디렉토리에 다시 실행해도 안전).
+볼트별 플래그(`enabled`, `watch`)는 `~/.config/obsidian-forge/config.toml`에 있습니다:
+
+```toml
+[[vaults]]
+name    = "my-brain"
+path    = "/path/to/my-brain"
+enabled = true    # 동기화에 포함
+watch   = true    # 데몬이 감시
 ```
 
-### 설정 관리
-
-모든 볼트에 걸쳐 `.obsidian/` 플러그인, 테마, 스니펫을 동기화합니다.
+### 볼트 무결성 및 그래프 작업
 
 ```bash
-obsidian-forge settings import <vault>      # 설정을 글로벌 저장소로 가져오기
-obsidian-forge settings push   <vault>      # 글로벌 설정을 하나의 볼트에 푸시
-obsidian-forge settings push-all            # 등록된 모든 볼트에 푸시
-obsidian-forge settings status
-
-# 두 볼트 간의 직접 설정 복제
-obsidian-forge clone-settings <source> <target>
-```
-
-### 그래프 작업
-
-```bash
-obsidian-forge graph health                 # 통계 및 건강 메트릭 표시
-obsidian-forge graph orphans [--auto-link]  # 고립된 노트 목록 표시 (또는 AI 자동 연결)
-obsidian-forge graph extract [--no-ai]      # 링크 및 관계 추출
-obsidian-forge graph tags [--dry-run]       # 태그 정규화 및 클러스터링
-obsidian-forge graph strengthen             # 전체 파이프라인 실행
-
-# 기존 별칭 (전체 파이프라인 실행)
-obsidian-forge strengthen-graph
+obsidian-forge check-tags            [--vault <name>]  # 누락된 layer/type/project 태그
+obsidian-forge check-tags --fix      [--vault <name>]  # 누락된 태그 주입
+obsidian-forge check-links           [--vault <name>]  # 깨진 위키링크 (코드 펜스 인식)
+obsidian-forge check-links --fix     [--vault <name>]  # 파일명/확장자 불일치 수정
+obsidian-forge normalize-frontmatter [--vault <name>]  # YAML 형식 오류
+obsidian-forge graph health          [--vault <name>]  # 통계 및 헬스 메트릭 표시
 ```
 
 ### 단발성 작업
 
 ```bash
-obsidian-forge sync               [--vault <name>]   # MOC → 그래프 → git
-obsidian-forge update-mocs        [--vault <name>]
+obsidian-forge sync               [--vault <name>]   # 그래프 헬스 → git
 obsidian-forge process-all        [--vault <name>]   # AI 인박스 처리
 obsidian-forge status             [--vault <name>]   # 설정 및 AI 상태 표시
 obsidian-forge doctor             [--vault <name>]   # 볼트 건강 진단
@@ -236,19 +215,6 @@ obsidian-forge daemon status     # PID, 마지막 종료 코드, 스케줄된 �
 obsidian-forge watch              # 감시 가능한 모든 볼트
 obsidian-forge watch --vault <name> --interval <seconds>
 ```
-
-### 도서 프로젝트
-
-볼트 안에서 책 쓰기 프로젝트를 직접 관리합니다.
-
-```bash
-of book init <name> [--genre <genre>] [--lang <lang>]   # 01-Projects/ 아래 스캐폴딩
-of book status [<name>]                                   # 초고 / 편집 / 출판 진행 현황
-of book export <name> [--output <dir>]                   # Velith 호환 디렉토리로 내보내기
-of book sync   <name>                                     # 태그 노트 → sources/ 심볼릭 링크
-```
-
-볼트에서 `book/<name>` 태그가 붙은 노트는 `book sync`를 통해 `sources/`에 자동으로 링크됩니다.
 
 ### 대시보드
 
@@ -288,15 +254,9 @@ archive_dir     = "99-Archives"
 attachments_dir = "Attachments"
 templates_dir   = "obsidian-templates"
 
-[graph]
-backlinks        = true
-bridge_notes     = true
-auto_tags        = true
-related_projects = true
-# [[graph.concepts]]
-# name     = "AI"
-# keywords = ["machine learning", "LLM", "neural"]
-# tags     = ["ai", "ml"]
+# [projects]
+# exclude = ["_template"]           # 스캔 시 건너뛸 추가 최상위 디렉토리
+                                    # (점 디렉토리와 node_modules는 항상 제외됨)
 
 [sync]
 git_auto_commit  = true
@@ -364,19 +324,13 @@ obsidian-forge/
 ├── src/
 │   ├── main.rs        CLI (clap), 멀티 볼트 디스패치, 동기화 루프
 │   ├── config.rs      vault.toml + 글로벌 설정 구조체
-│   ├── init.rs        볼트 스캐폴딩, 설정 가져오기/푸시
-│   ├── moc.rs         MOC 허브 파일 생성
-│   ├── graph/         그래프 강화 파이프라인
-│   │   ├── mod.rs       파이프라인 코디네이터
-│   │   ├── scan.rs      볼트 전체 그래프 스캐닝
-│   │   ├── tags.rs      컨셉 기반 자동 태깅
-│   │   ├── wikilinks.rs 위키링크 추출 및 주입
-│   │   ├── backlinks.rs 백링크 섹션 생성
-│   │   ├── bridges.rs   브릿지 노트 생성
-│   │   ├── relationships.rs  관련 프로젝트 연결
-│   │   ├── orphans.rs   고립 노트 감지
-│   │   ├── autotag.rs   자동 태그 오케스트레이션
-│   │   └── health.rs    그래프 상태 보고
+│   ├── init.rs        볼트 스캐폴딩
+│   ├── check_tags.rs  태그 헬스 검사 (--fix)
+│   ├── check_links.rs 깨진 위키링크 검사 (--fix)
+│   ├── frontmatter.rs 프론트매터 정규화 (--fix)
+│   ├── graph/
+│   │   ├── wikilinks.rs 위키링크 추출 및 해석
+│   │   └── health.rs    그래프 헬스 보고
 │   ├── git.rs         자동 커밋 + 푸시 (컨벤셔널 커밋)
 │   ├── notes.rs       인박스 처리 + PARA 라우팅
 │   ├── converter.rs   PDF → 마크다운
@@ -390,9 +344,9 @@ obsidian-forge/
 
 `obsidian-forge`는 AI 에이전트에게 프로젝트 문서를 제공하는 MCP 서버인 **[alcove](https://github.com/epicsagas/alcove)**의 자매 프로젝트입니다. 이들은 Cargo 워크스페이스를 공유하며 개인의 지식과 프로젝트 인텔리전스 사이의 루프를 완성합니다:
 
-- **obsidian-forge** = **대장간 (The Forge)** (쓰기/푸시). 볼트 유지 관리를 자동화하고, 지식 그래프를 강화하며, git에 동기화하는 백그라운드 데몬입니다.
+- **obsidian-forge** = **대장간 (The Forge)** (쓰기/푸시). 볼트 유지 관리를 자동화하고 git에 동기화하는 백그라운드 데몬입니다.
 - **alcove** = **도서관 (The Library)** (읽기/가져오기). 컨텍스트 창을 비대하게 만들지 않으면서 AI 에이전트에게 온디맨드 검색이 가능한 문서 접근 권한을 제공하는 MCP 서버입니다.
-- **[Velith](https://github.com/epicsagas/Velith)** = **인쇄소 (The Press)** (집필/출판). `of book export`로 내보낸 디렉토리를 입력받아 초고 → 편집 → 출판 전체 파이프라인을 구동하는 AI 기반 도서 집필 툴킷입니다.
+- **[Velith](https://github.com/epicsagas/Velith)** = **인쇄소 (The Press)** (집필/출판). 초고 → 편집 → 출판을 위한 독립형 AI 지원 도서 집필 툴킷입니다.
 
 ```mermaid
 graph LR
@@ -401,48 +355,18 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP 도구| E[AI 에이전트]
     E -.->|참조| D
-    B -->|of book export| F(Velith)
-    F -->|초고 / 편집 / 출판| G[도서]
 ```
 
 ### Alcove 연동
 
-`obsidian-forge`가 지식 그래프를 구축하고 자동화하는 데 집중한다면, [Alcove](https://github.com/epicsagas/alcove)는 그 지식이 AI 코딩 에이전트에게 실질적으로 활용될 수 있도록 보장합니다.
+`obsidian-forge`가 볼트의 기계적 건강 유지에 집중한다면, [Alcove](https://github.com/epicsagas/alcove)는 그 지식이 AI 코딩 에이전트에게 실질적으로 활용될 수 있도록 보장합니다.
 
 #### 함께 사용하는 방법:
 
-1.  **Obsidian에서 구축**: `obsidian-forge`를 사용하여 볼트의 건강 상태를 유지하고, MOC를 생성하며, 관련 컨셉을 자동으로 연결합니다.
+1.  **Obsidian에서 구축**: `obsidian-forge`를 사용하여 볼트를 건강하게 유지합니다 — 인박스 라우팅, 무결성 검사, git 동기화.
 2.  **프로젝트 문서로 승급**: 노트(예: 아키텍처 결정 또는 기능 사양)가 프로젝트에 사용될 준비가 되면, `alcove promote --source path/to/note.md`를 실행합니다.
 3.  **에이전트 발견**: 이제 AI 에이전트(Alcove MCP 서버 사용)는 채팅에 일일이 복사-붙여넣기 할 필요 없이 `search_project_docs` 또는 `get_doc_file`을 통해 해당 노트를 "발견"할 수 있습니다.
 4.  **정책 준수**: Alcove의 `validate_docs`를 사용하여 승급된 노트가 프로젝트의 문서 표준(`policy.toml`에 정의됨)을 충족하는지 확인합니다.
-
-### Velith 연동
-
-[Velith](https://github.com/epicsagas/Velith)는 AI 기반 도서 집필 전용 툴킷입니다. `obsidian-forge`는 **볼트 측**을 담당합니다 — 노트 정리, 리서치 태깅, 프로젝트 구조 스캐폴딩. `Velith`는 **집필 측**을 담당합니다 — 챕터 초안 작성, 편집 패스, 출판용 패키징.
-
-#### 워크플로우: 볼트 → 도서
-
-```bash
-# 1. 볼트의 리서치 노트에 태그 추가
-#    관련 노트의 frontmatter tags에 "book/my-novel" 추가
-
-# 2. 도서 프로젝트 초기화
-of book init my-novel --genre fiction --lang ko
-
-# 3. 태그된 노트를 sources/로 가져오기
-of book sync my-novel
-
-# 4. Velith 호환 디렉토리로 내보내기
-of book export my-novel --output ~/books/
-
-# 5. Velith에 인계
-cd ~/books/my-novel
-Velith draft        # sources/를 기반으로 AI 챕터 초안 작성
-Velith edit         # 다단계 편집 파이프라인
-Velith publish      # EPUB / PDF 패키징
-```
-
-내보낸 디렉토리에는 `PRD.md`(목표), `STYLE.md`(어조 가이드), `drafts/`, `edits/`, `publish/`가 포함되며, 이는 `Velith`가 기대하는 구조와 정확히 일치합니다.
 
 ---
 

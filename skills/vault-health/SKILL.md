@@ -41,7 +41,7 @@ Parse the output. Report in Korean:
 
 Based on findings:
 - Inbox has items → suggest `inbox-process` skill
-- Graph health unknown → suggest `graph-strengthen` skill
+- Graph health unknown → run `of graph health` and report the metrics
 - Uncommitted changes → suggest `vault-sync` skill
 - Tag/link issues detected → suggest `vault-fix` skill
 

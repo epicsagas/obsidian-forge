@@ -1,6 +1,6 @@
 ---
 name: obsidian-forge
-description: obsidian-forge (alias `of`) CLI skill for creating and managing Obsidian vaults, processing inbox notes with AI classification, strengthening knowledge graphs, syncing plugins across vaults, and running the background daemon. Use when initializing vaults, automating PARA routing, managing MOCs, or debugging vault sync and graph operations.
+description: obsidian-forge (alias `of`) CLI skill for creating and managing Obsidian vaults, processing inbox notes with AI classification, running vault integrity checks, and managing the background daemon. Use when initializing vaults, automating PARA routing, or debugging vault sync issues.
 ---
 
 # obsidian-forge CLI (`of`)
@@ -8,13 +8,12 @@ description: obsidian-forge (alias `of`) CLI skill for creating and managing Obs
 ## Quick Start
 
 ```bash
-# New vault
+# New vault (also registers it with the global config)
 of init my-vault --path ~/Documents
-of vault add ~/Documents/my-vault
-of daemon install   # macOS: auto-start background watcher
+of daemon enable    # macOS: auto-start background watcher
 
 # Check state
-of vault list
+of doctor --no-ping
 of daemon status
 ```
 
@@ -23,43 +22,32 @@ of daemon status
 ### Diagnose before acting
 Always run these first when user reports a problem:
 ```bash
-of vault list           # registered? enabled? watched?
-of settings status      # .obsidian store populated?
-of daemon status        # daemon running?
-RUST_LOG=debug of sync  # verbose output for errors
+of doctor --no-ping    # vault config, inbox, git, AI connectivity
+of daemon status       # daemon running?
+RUST_LOG=debug of sync # verbose output for errors
 ```
 
 ### Note processing (AI required)
 ```bash
 of process-all [--vault <name>]
 ```
-Reads `Inbox/`, calls AI provider, injects frontmatter, moves file to PARA folder.
+Reads `00-Inbox/`, calls AI provider, injects frontmatter, moves file to PARA folder.
 AI provider must be configured in `vault.toml [ai]`. If it fails, read the error — unknown provider or missing `base_url` will have a clear message.
 
-### Graph + MOC (no AI needed)
+### Vault integrity (mechanical, no AI needed)
 ```bash
-of update-mocs [--vault <name>]      # rebuild hub files
-of strengthen-graph [--vault <name>] # backlinks, bridge notes, auto-tags
-of sync [--vault <name>]             # MOC + graph + git in one shot
+of check-tags [--fix]            [--vault <name>]  # missing layer/type/project tags
+of check-links [--fix]           [--vault <name>]  # broken wikilinks (code-fence aware)
+of normalize-frontmatter [--fix] [--vault <name>]  # YAML malformations
+of graph health                  [--vault <name>]  # note/link/orphan/broken metrics
+of sync [--vault <name>]                           # graph health check → git in one shot
 ```
 All idempotent — safe to re-run.
-
-### Multi-vault plugin sync
-```bash
-of settings import <vault>   # vault → global store
-of settings push-all         # global store → all vaults
-```
-
-### Vault lifecycle
-```bash
-of vault disable/enable <name>  # exclude/include from sync + watch
-of vault pause/resume <name>    # daemon toggle only; manual sync still works
-of vault remove <name>          # unregister (files kept)
-```
 
 ## Key Facts
 
 - Config hierarchy: `vault.toml` (per-vault) overrides nothing — it IS the source of truth
-- PARA folders: `Inbox/` → `01-Projects/` `02-Areas/` `03-Resources/` `99-Archives/`
-- Daemon logs: `~/.obsidian-forge/logs/of/forge.log`
-- `graph.*` bools in `vault.toml` gate each graph operation individually
+- PARA folders: `00-Inbox/` → `01-Projects/` `02-Areas/` `03-Resources/` `99-Archives/`
+- Daemon logs: `~/.obsidian-forge/logs/forge.log`
+- Vault registration: `of init` (safe to re-run on an existing vault); per-vault `enabled`/`watch` flags live in `~/.config/obsidian-forge/config.toml`
+- Graph semantics (bridge notes, auto-tags, auto-MOCs) were retired in 0.4.0 — `of` is mechanical maintenance only; knowledge-graph extraction belongs to the LLM pipeline (knowledge-os)

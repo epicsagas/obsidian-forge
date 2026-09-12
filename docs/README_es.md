@@ -2,7 +2,7 @@
 
 # ⚒️ obsidian-forge
 
-**Generador de bóvedas Obsidian, demonio de automatización y potenciador de grafos**
+**Generador de bóvedas Obsidian, demonio de automatización y kit de mantenimiento**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org)
@@ -19,12 +19,12 @@
 
 ## ¿Qué es obsidian-forge?
 
-`obsidian-forge` es una CLI de Rust que construye, automatiza y mantiene bóvedas de [Obsidian](https://obsidian.md). Se ejecuta como un demonio en segundo plano vigilando tu bandeja de entrada, fortaleciendo tu grafo de conocimiento y sincronizando con git — para que puedas centrarte en escribir.
+`obsidian-forge` es una CLI de Rust que construye, automatiza y mantiene bóvedas de [Obsidian](https://obsidian.md). Se ejecuta como un demonio en segundo plano vigilando tu bandeja de entrada, comprobando la integridad de tu bóveda y sincronizando con git — para que puedas centrarte en escribir.
 
 ```
 of init my-brain          # construye una nueva bóveda en segundos
 of daemon enable         # registra como elemento de inicio de macOS
-# → tu bóveda ahora se procesa, enlaza y confirma automáticamente
+# → tu bóveda ahora se procesa, comprueba la salud y se confirma automáticamente
 # "of" es un alias corto integrado para "obsidian-forge"
 ```
 
@@ -35,16 +35,15 @@ of daemon enable         # registra como elemento de inicio de macOS
 | | Característica | Descripción |
 |---|---|---|
 | 🏗️ | **Construcción de bóvedas** | Estructura PARA, plantillas incluidas, configuración `.obsidian`, inicialización git |
-| 🔗 | **Fortalecimiento del grafo** | Backlinks, notas puente, enlaces a proyectos relacionados, etiquetas automáticas |
+| 🛡️ | **Integridad de la bóveda** | Comprobaciones de etiquetas, enlaces rotos (que ignoran los bloques de código) y normalización de frontmatter — todo con `--fix` |
+| 📊 | **Salud del grafo** | Métricas de notas/enlaces/huérfanos/enlaces rotos que alimentan tu bucle de lint |
 | 📥 | **Procesamiento de bandeja** | Inyección de frontmatter, clasificación IA, enrutamiento PARA |
-| 🔄 | **Ciclo de sincronización** | Reconstrucción MOC → grafo → commit/push git automático por temporizador |
-| 🗂️ | **Multi-bóveda** | Un demonio gestiona todas las bóvedas; habilita, pausa o deshabilita por bóveda |
-| ⚙️ | **Almacén de configuración** | Importa plugins/temas de una bóveda y los envía a todas las demás |
+| 🔄 | **Ciclo de sincronización** | Comprobación de salud del grafo → commit/push git automático por temporizador |
+| 🗂️ | **Multi-bóveda** | Un demonio gestiona todas las bóvedas; flags por bóveda en la configuración global |
 | 🤖 | **Metadatos IA** | Ollama, OpenAI, OpenRouter, LM Studio o cualquier endpoint compatible con OpenAI |
 | 📄 | **PDF → Markdown** | Convierte mediante `marker_single` con `pdftotext` como respaldo |
 | 🍎 | **Elemento de inicio** | Se instala como macOS LaunchAgent — se inicia y reinicia automáticamente |
 | ♻️ | **Idempotente** | Cualquier operación es segura de ejecutar múltiples veces; sin salida duplicada |
-| 📚 | **Proyectos de libro** | Inicializar, rastrear, exportar y sincronizar proyectos de escritura integrados en la bóveda |
 
 ---
 
@@ -60,13 +59,13 @@ brew install epicsagas/tap/obsidian-forge
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.sh | sh
+  https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.sh | sh
 ```
 
 ### Windows
 
 ```powershell
-irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/obsidian-forge-installer.ps1 | iex
+irm https://github.com/epicsagas/obsidian-forge/releases/latest/download/install.ps1 | iex
 ```
 
 ### Vía toolchain de Rust
@@ -94,13 +93,12 @@ Todos los métodos anteriores instalan tanto `obsidian-forge` como `of` (alias c
 
 ### Plugins de Agente IA
 
-obsidian-forge incluye 5 habilidades de agente integradas que proporcionan a los asistentes de IA operaciones de bóveda con contexto:
+obsidian-forge incluye 4 habilidades de agente integradas que proporcionan a los asistentes de IA operaciones de bóveda con contexto:
 
 | Habilidad | Activador |
 |-------|---------|
 | `vault-health` | Comprobar salud de bóveda, diagnosticar bóveda, estado de bóveda |
-| `vault-sync` | Sincronizar bóveda, actualizar MOCs y grafo, confirmar cambios de bóveda |
-| `graph-strengthen` | Fortalecer grafo, salud del grafo, corregir huérfanos |
+| `vault-sync` | Sincronizar bóveda, comprobación de salud del grafo, confirmar cambios de bóveda |
 | `inbox-process` | Procesar bandeja, clasificar notas, enrutamiento PARA |
 | `vault-fix` | Reparar bóveda, reparar etiquetas, corregir enlaces, corregir frontmatter |
 
@@ -139,15 +137,12 @@ Una vez instalado, tu agente de IA activa automáticamente la habilidad adecuada
 ## Inicio rápido
 
 ```bash
-# 1. Crear una nueva bóveda
+# 1. Crear una nueva bóveda (la registra en la configuración global)
 of init my-brain
 
 # 2. Abrir en Obsidian → Archivo → Abrir bóveda → my-brain
 
-# 3. Registrarla en la configuración global
-of vault add ~/my-brain
-
-# 4. Instalar el demonio en segundo plano
+# 3. Instalar el demonio en segundo plano
 of daemon enable
 
 # Listo — coloca notas en 00-Inbox/ y obsidian-forge se encarga del resto
@@ -170,48 +165,32 @@ obsidian-forge init my-brain --path ~/
 
 ### Gestión de múltiples bóvedas
 
-```bash
-obsidian-forge vault add <path> [--name <alias>]
-obsidian-forge vault remove <name>          # desregistrar (archivos conservados)
-obsidian-forge vault list                   # NAME / ENABLED / WATCH / PATH
-obsidian-forge vault enable  <name>
-obsidian-forge vault disable <name>         # excluir de sincronización y vigilancia
-obsidian-forge vault pause   <name>         # omitir demonio; sincronización manual ok
-obsidian-forge vault resume  <name>
+Las bóvedas se registran automáticamente con `init` (seguro de reejecutar en un directorio existente).
+Los flags por bóveda (`enabled`, `watch`) viven en `~/.config/obsidian-forge/config.toml`:
+
+```toml
+[[vaults]]
+name    = "my-brain"
+path    = "/ruta/a/my-brain"
+enabled = true    # incluida en la sincronización
+watch   = true    # vigilada por el demonio
 ```
 
-### Gestión de configuración
-
-Sincroniza plugins, temas y fragmentos de `.obsidian/` entre bóvedas.
+### Operaciones de integridad y grafo
 
 ```bash
-obsidian-forge settings import <vault>      # importar configuración al almacén global
-obsidian-forge settings push   <vault>      # enviar configuración global a una bóveda
-obsidian-forge settings push-all            # enviar a TODAS las bóvedas registradas
-obsidian-forge settings status
-
-# Clonación directa entre dos bóvedas
-obsidian-forge clone-settings <source> <target>
-```
-
-### Operaciones de grafo
-
-```bash
-obsidian-forge graph health                 # mostrar estadísticas y métricas de salud
-obsidian-forge graph orphans [--auto-link]  # listar huérfanos (o auto-enlazar con IA)
-obsidian-forge graph extract [--no-ai]      # extraer enlaces y relaciones
-obsidian-forge graph tags [--dry-run]       # normalizar y agrupar etiquetas
-obsidian-forge graph strengthen             # ejecutar flujo completo
-
-# Alias heredado (ejecuta el flujo completo)
-obsidian-forge strengthen-graph
+obsidian-forge check-tags            [--vault <name>]  # etiquetas layer/type/project faltantes
+obsidian-forge check-tags --fix      [--vault <name>]  # inyectar etiquetas faltantes
+obsidian-forge check-links           [--vault <name>]  # wikilinks rotos (que ignoran los bloques de código)
+obsidian-forge check-links --fix     [--vault <name>]  # corregir discordancias de nombre/extensión
+obsidian-forge normalize-frontmatter [--vault <name>]  # malformaciones de YAML
+obsidian-forge graph health          [--vault <name>]  # estadísticas y métricas de salud
 ```
 
 ### Operaciones únicas
 
 ```bash
-obsidian-forge sync               [--vault <name>]   # MOC → grafo → git
-obsidian-forge update-mocs        [--vault <name>]
+obsidian-forge sync               [--vault <name>]   # salud del grafo → git
 obsidian-forge process-all        [--vault <name>]   # procesamiento IA de bandeja
 obsidian-forge status             [--vault <name>]   # mostrar estado de config e IA
 obsidian-forge doctor             [--vault <name>]   # diagnosticar salud de la bóveda
@@ -236,19 +215,6 @@ obsidian-forge daemon status     # muestra PID, último código de salida y bóv
 obsidian-forge watch              # todas las bóvedas vigilables
 obsidian-forge watch --vault <name> --interval <segundos>
 ```
-
-### Proyectos de libro
-
-Gestiona proyectos de escritura de libros directamente desde la bóveda.
-
-```bash
-of book init <name> [--genre <genre>] [--lang <lang>]   # crear estructura en 01-Projects/
-of book status [<name>]                                   # progreso: borrador / edición / publicación
-of book export <name> [--output <dir>]                   # exportar para Velith
-of book sync   <name>                                     # enlazar notas etiquetadas → sources/
-```
-
-Las notas etiquetadas con `book/<name>` en la bóveda se enlazan automáticamente en `sources/` mediante `book sync`.
 
 ### Panel de control
 
@@ -288,15 +254,9 @@ archive_dir     = "99-Archives"
 attachments_dir = "Attachments"
 templates_dir   = "obsidian-templates"
 
-[graph]
-backlinks        = true
-bridge_notes     = true
-auto_tags        = true
-related_projects = true
-# [[graph.concepts]]
-# name     = "AI"
-# keywords = ["machine learning", "LLM", "neural"]
-# tags     = ["ai", "ml"]
+# [projects]
+# exclude = ["_template"]           # directorios de nivel superior adicionales que se omiten al escanear
+                                    # (los que empiezan por punto y node_modules siempre se excluyen)
 
 [sync]
 git_auto_commit  = true
@@ -364,18 +324,12 @@ obsidian-forge/
 ├── src/
 │   ├── main.rs        CLI (clap), despacho multi-bóveda, bucle de sincronización
 │   ├── config.rs      vault.toml + estructuras de configuración global
-│   ├── init.rs        construcción de bóvedas, importación/envío de configuración
-│   ├── moc.rs         generación de archivos hub MOC
-│   ├── graph/         Flujo de fortalecimiento del grafo
-│   │   ├── mod.rs       coordinador del flujo
-│   │   ├── scan.rs      escaneo del grafo en toda la bóveda
-│   │   ├── tags.rs      etiquetado automático basado en conceptos
-│   │   ├── wikilinks.rs extracción e inyección de wikilinks
-│   │   ├── backlinks.rs generación de sección de backlinks
-│   │   ├── bridges.rs   creación de notas puente
-│   │   ├── relationships.rs enlace de proyectos relacionados
-│   │   ├── orphans.rs   detección de notas huérfanas
-│   │   ├── autotag.rs   orquestación de etiquetas automáticas
+│   ├── init.rs        construcción de bóvedas
+│   ├── check_tags.rs  comprobaciones de salud de etiquetas (--fix)
+│   ├── check_links.rs comprobaciones de wikilinks rotos (--fix)
+│   ├── frontmatter.rs normalización de frontmatter (--fix)
+│   ├── graph/
+│   │   ├── wikilinks.rs extracción y resolución de wikilinks
 │   │   └── health.rs    informe de salud del grafo
 │   ├── git.rs         commit + push automático (commits convencionales)
 │   ├── notes.rs       procesamiento de bandeja + enrutamiento PARA
@@ -390,9 +344,9 @@ obsidian-forge/
 
 obsidian-forge es el **proyecto compañero de [alcove](https://github.com/epicsagas/alcove)** — un servidor MCP que sirve documentos de proyecto a agentes IA. Comparten un espacio de trabajo Cargo y trabajan juntos para cerrar el ciclo entre el conocimiento personal y la inteligencia de proyecto:
 
-- **obsidian-forge** = **La Forja** (escribir/empujar). Demonio en segundo plano que automatiza el mantenimiento de la bóveda, fortalece el grafo de conocimiento y sincroniza con git.
+- **obsidian-forge** = **La Forja** (escribir/empujar). Demonio en segundo plano que automatiza el mantenimiento de la bóveda y sincroniza con git.
 - **alcove** = **La Biblioteca** (leer/tirar). Servidor MCP que proporciona a los agentes IA acceso bajo demanda y con capacidad de búsqueda a la documentación sin inflar la ventana de contexto.
-- **[Velith](https://github.com/epicsagas/Velith)** = **La Imprenta** (redactar/publicar). Toolkit de escritura de libros asistido por IA que consume el directorio exportado por `of book export` y gestiona el pipeline completo de borrador → edición → publicación.
+- **[Velith](https://github.com/epicsagas/Velith)** = **La Imprenta** (redactar/publicar). Toolkit independiente de escritura de libros asistido por IA para el flujo borrador → edición → publicación.
 
 ```mermaid
 graph LR
@@ -401,48 +355,18 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Tools| E[AI Agent]
     E -.->|Refers to| D
-    B -->|of book export| F(Velith)
-    F -->|borrador / edición / pub.| G[Libro]
 ```
 
 ### Integración con Alcove
 
-Mientras `obsidian-forge` se centra en construir y automatizar tu grafo de conocimiento, [Alcove](https://github.com/epicsagas/alcove) asegura que el conocimiento sea accionable para los agentes de codificación IA.
+Mientras `obsidian-forge` se centra en mantener la salud mecánica de tu bóveda, [Alcove](https://github.com/epicsagas/alcove) asegura que el conocimiento sea accionable para los agentes de codificación IA.
 
 #### Cómo usarlos juntos:
 
-1.  **Construye en Obsidian**: Usa `obsidian-forge` para mantener la salud de tu bóveda, crear MOCs y auto-enlazar conceptos relacionados.
+1.  **Construye en Obsidian**: Usa `obsidian-forge` para mantener tu bóveda sana — enrutamiento de bandeja, comprobaciones de integridad, sincronización con git.
 2.  **Promociona a Documentos de Proyecto**: Cuando una nota (ej. una decisión arquitectónica o una especificación de característica) esté lista para un proyecto, ejecuta `alcove promote --source ruta/a/nota.md`.
 3.  **Descubrimiento por el Agente**: Tu agente IA (usando el servidor MCP Alcove) ahora puede "descubrir" esa nota vía `search_project_docs` o `get_doc_file` en lugar de que tú tengas que copiar y pegar en el chat.
 4.  **Cumplimiento de Políticas**: Usa `validate_docs` de Alcove para asegurar que tus notas promocionadas cumplan con los estándares de documentación del proyecto (definidos en `policy.toml`).
-
-### Integración con Velith
-
-[Velith](https://github.com/epicsagas/Velith) es el toolkit dedicado de escritura de libros con IA. `obsidian-forge` gestiona el **lado de la bóveda** — organizar notas, etiquetar investigaciones, crear la estructura del proyecto. `Velith` gestiona el **lado de la escritura** — borradores de capítulos, pasadas de edición, empaquetado para publicación.
-
-#### Flujo de trabajo: Bóveda → Libro
-
-```bash
-# 1. Etiquetar notas de investigación en la bóveda
-#    Añadir "book/mi-libro" a las tags del frontmatter de las notas relevantes
-
-# 2. Inicializar el proyecto de libro
-of book init mi-libro --genre non-fiction --lang es
-
-# 3. Sincronizar notas etiquetadas en sources/
-of book sync mi-libro
-
-# 4. Exportar a directorio compatible con Velith
-of book export mi-libro --output ~/books/
-
-# 5. Transferir a Velith
-cd ~/books/mi-libro
-Velith draft        # borrador de capítulos con IA desde sources/
-Velith edit         # pipeline de edición en múltiples pasadas
-Velith publish      # empaquetar EPUB / PDF
-```
-
-El directorio exportado contiene `PRD.md` (objetivos), `STYLE.md` (guía de estilo), `drafts/`, `edits/` y `publish/` — exactamente la estructura que `Velith` espera.
 
 ---
 

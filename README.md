@@ -2,7 +2,7 @@
 
 # ⚒️ obsidian-forge
 
-**Obsidian vault generator, automation daemon, and graph strengthener**
+**Obsidian vault generator, automation daemon, and maintenance toolkit**
 
 <p align="center">
   <a href="https://github.com/epicsagas/obsidian-forge/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/epicsagas/obsidian-forge?style=for-the-badge&labelColor=0d1117&color=ffd700&logo=github&logoColor=white" /></a>
@@ -27,12 +27,12 @@
 
 ## What is obsidian-forge?
 
-`obsidian-forge` is a Rust CLI that scaffolds, automates, and maintains [Obsidian](https://obsidian.md) vaults. It runs as a background daemon watching your inbox, strengthening your knowledge graph, and syncing to git — so you can focus on writing.
+`obsidian-forge` is a Rust CLI that scaffolds, automates, and maintains [Obsidian](https://obsidian.md) vaults. It runs as a background daemon watching your inbox, checking vault integrity, and syncing to git — so you can focus on writing.
 
 ```
 of init my-brain          # scaffold a new vault in seconds
 of daemon enable         # register as a macOS login item
-# → your vault now auto-processes, auto-links, and auto-commits
+# → your vault now auto-processes, health-checks, and auto-commits
 # "of" is a built-in short alias for "obsidian-forge"
 ```
 
@@ -43,16 +43,15 @@ of daemon enable         # register as a macOS login item
 | | Feature | Description |
 |---|---|---|
 | 🏗️ | **Vault scaffolding** | PARA layout, bundled templates, `.obsidian` config, git init |
-| 🔗 | **Graph strengthening** | Backlinks, bridge notes, related-project links, auto-tags |
+| 🛡️ | **Vault integrity** | Tag checks, broken-link checks (code-fence aware), frontmatter normalization — all with `--fix` |
+| 📊 | **Graph health** | Note/link/orphan/broken-link metrics that feed your lint loop |
 | 📥 | **Inbox processing** | Frontmatter injection, AI classification, PARA routing |
-| 🔄 | **Sync cycle** | MOC rebuild → graph → auto git commit/push on a timer |
-| 🗂️ | **Multi-vault** | One daemon manages all vaults; enable, pause, or disable per vault |
-| ⚙️ | **Settings store** | Import plugins/themes from one vault and push to all others |
+| 🔄 | **Sync cycle** | Graph health check → auto git commit/push on a timer |
+| 🗂️ | **Multi-vault** | One daemon manages all vaults; per-vault flags in the global config |
 | 🤖 | **AI metadata** | Ollama, OpenAI, OpenRouter, LM Studio, or any OpenAI-compatible endpoint |
 | 📄 | **PDF → Markdown** | Converts via `marker_single` with `pdftotext` fallback |
 | 🍎 | **Login item** | Installs as a macOS LaunchAgent — auto-starts, auto-restarts |
 | ♻️ | **Idempotent** | Safe to run any operation multiple times; no duplicate output |
-| 📚 | **Book projects** | Init, track, export, and source-sync vault-integrated writing projects |
 
 ---
 
@@ -102,13 +101,12 @@ Both `obsidian-forge` and `of` (short alias) are installed by all methods above.
 
 ### AI Agent Plugins
 
-obsidian-forge ships with 5 built-in agent skills that give AI assistants context-aware vault operations:
+obsidian-forge ships with 4 built-in agent skills that give AI assistants context-aware vault operations:
 
 | Skill | Trigger |
 |-------|---------|
 | `vault-health` | Vault health check, diagnose vault, vault status |
-| `vault-sync` | Sync vault, update mocs and graph, commit vault changes |
-| `graph-strengthen` | Strengthen graph, graph health, fix orphans |
+| `vault-sync` | Sync vault, graph health check, commit vault changes |
 | `inbox-process` | Process inbox, classify notes, PARA routing |
 | `vault-fix` | Fix vault, repair tags, fix links, fix frontmatter |
 
@@ -147,15 +145,12 @@ Once installed, your AI agent automatically triggers the right skill when you as
 ## Quick Start
 
 ```bash
-# 1. Create a new vault
+# 1. Create a new vault (registers it with the global config)
 of init my-brain
 
 # 2. Open in Obsidian → File → Open Vault → my-brain
 
-# 3. Register it with the global config
-of vault add ~/my-brain
-
-# 4. Install the background daemon
+# 3. Install the background daemon
 of daemon enable
 
 # Done — drop notes into 00-Inbox/ and obsidian-forge handles the rest
@@ -178,48 +173,32 @@ obsidian-forge init my-brain --path ~/
 
 ### Multi-Vault Management
 
-```bash
-obsidian-forge vault add <path> [--name <alias>]
-obsidian-forge vault remove <name>          # unregister (files kept)
-obsidian-forge vault list                   # NAME / ENABLED / WATCH / PATH
-obsidian-forge vault enable  <name>
-obsidian-forge vault disable <name>         # exclude from sync and watch
-obsidian-forge vault pause   <name>         # skip daemon; manual sync ok
-obsidian-forge vault resume  <name>
+Vaults are registered automatically by `init` (safe to re-run on an existing directory).
+Per-vault flags (`enabled`, `watch`) live in `~/.config/obsidian-forge/config.toml`:
+
+```toml
+[[vaults]]
+name    = "my-brain"
+path    = "/path/to/my-brain"
+enabled = true    # included in sync
+watch   = true    # watched by the daemon
 ```
 
-### Settings Management
-
-Sync `.obsidian/` plugins, themes, and snippets across vaults.
+### Vault Integrity & Graph Operations
 
 ```bash
-obsidian-forge settings import <vault>      # pull settings into global store
-obsidian-forge settings push   <vault>      # push global settings to one vault
-obsidian-forge settings push-all            # push to ALL registered vaults
-obsidian-forge settings status
-
-# Direct clone between two vaults
-obsidian-forge clone-settings <source> <target>
-```
-
-### Graph Operations
-
-```bash
-obsidian-forge graph health                 # show statistics and health metrics
-obsidian-forge graph orphans [--auto-link]  # list orphans (or auto-link with AI)
-obsidian-forge graph extract [--no-ai]      # extract links and relationships
-obsidian-forge graph tags [--dry-run]       # normalize and cluster tags
-obsidian-forge graph strengthen             # run full pipeline
-
-# Legacy alias (runs full pipeline)
-obsidian-forge strengthen-graph
+obsidian-forge check-tags            [--vault <name>]  # missing layer/type/project tags
+obsidian-forge check-tags --fix      [--vault <name>]  # inject missing tags
+obsidian-forge check-links           [--vault <name>]  # broken wikilinks (code-fence aware)
+obsidian-forge check-links --fix     [--vault <name>]  # fix filename/extension mismatches
+obsidian-forge normalize-frontmatter [--vault <name>]  # YAML malformations
+obsidian-forge graph health          [--vault <name>]  # statistics and health metrics
 ```
 
 ### One-off Operations
 
 ```bash
-obsidian-forge sync               [--vault <name>]   # MOC → graph → git
-obsidian-forge update-mocs        [--vault <name>]
+obsidian-forge sync               [--vault <name>]   # graph health → git
 obsidian-forge process-all        [--vault <name>]   # AI inbox processing
 obsidian-forge status             [--vault <name>]   # show config and AI status
 obsidian-forge doctor             [--vault <name>]   # diagnose vault health
@@ -244,19 +223,6 @@ obsidian-forge daemon status     # shows PID, last exit, and scheduled vaults
 obsidian-forge watch              # all watchable vaults
 obsidian-forge watch --vault <name> --interval <seconds>
 ```
-
-### Book Projects
-
-Manage book writing projects from within the vault.
-
-```bash
-of book init <name> [--genre <genre>] [--lang <lang>]   # scaffold in 01-Projects/
-of book status [<name>]                                   # draft / edit / publish progress
-of book export <name> [--output <dir>]                   # export for Velith
-of book sync   <name>                                     # link tagged notes → sources/
-```
-
-Notes tagged `book/<name>` in the vault are auto-linked into `sources/` by `book sync`.
 
 ### Dashboard
 
@@ -296,15 +262,9 @@ archive_dir     = "99-Archives"
 attachments_dir = "Attachments"
 templates_dir   = "obsidian-templates"
 
-[graph]
-backlinks        = true
-bridge_notes     = true
-auto_tags        = true
-related_projects = true
-# [[graph.concepts]]
-# name     = "AI"
-# keywords = ["machine learning", "LLM", "neural"]
-# tags     = ["ai", "ml"]
+# [projects]
+# exclude = ["_template"]           # extra top-level dirs to skip when scanning
+                                    # (dot-dirs and node_modules are always excluded)
 
 [sync]
 git_auto_commit  = true
@@ -372,20 +332,13 @@ obsidian-forge/
 ├── src/
 │   ├── main.rs        CLI (clap), multi-vault dispatch, sync loop
 │   ├── config.rs      vault.toml + global config structs
-│   ├── init.rs        vault scaffolding, settings import/push
-│   ├── moc.rs         MOC hub file generation
-│   ├── graph/         Graph strengthening pipeline
-│   │   ├── mod.rs       pipeline coordinator
-│   │   ├── scan.rs      vault-wide graph scanning
-│   │   ├── tags.rs      concept-based auto-tagging
-│   │   ├── wikilinks.rs wikilink extraction & injection
-│   │   ├── backlinks.rs backlink section generation
-│   │   ├── bridges.rs   bridge note creation
-│   │   ├── relationships.rs  related-project linking
-│   │   ├── orphans.rs   orphan detection
-│   │   ├── autotag.rs   auto-tag orchestration
+│   ├── init.rs        vault scaffolding
+│   ├── check_tags.rs  tag health checks (--fix)
+│   ├── check_links.rs broken wikilink checks (--fix)
+│   ├── frontmatter.rs frontmatter normalization (--fix)
+│   ├── graph/
+│   │   ├── wikilinks.rs wikilink extraction & resolution
 │   │   └── health.rs    graph health reporting
-│   ├── book.rs        Book project management (init, status, export, sync)
 │   ├── git.rs         auto commit + push (conventional commits)
 │   ├── notes.rs       inbox processing + PARA routing
 │   ├── converter.rs   PDF → Markdown
@@ -399,9 +352,9 @@ obsidian-forge/
 
 obsidian-forge is the **companion project to [alcove](https://github.com/epicsagas/alcove)** — an MCP server that serves project docs to AI agents. They share a Cargo workspace and work together to close the loop between personal knowledge and project intelligence:
 
-- **obsidian-forge** = **The Forge** (write/push). Background daemon that automates vault maintenance, strengthens the knowledge graph, and syncs to git.
+- **obsidian-forge** = **The Forge** (write/push). Background daemon that automates vault maintenance and syncs to git.
 - **alcove** = **The Library** (read/pull). MCP server that provides AI agents with on-demand, searchable access to documentation without bloating the context window.
-- **[Velith](https://github.com/epicsagas/Velith)** = **The Press** (compose/publish). AI-assisted book writing toolkit that consumes the exported directory from `of book export` and drives the full drafting → editing → publishing pipeline.
+- **[Velith](https://github.com/epicsagas/Velith)** = **The Press** (compose/publish). Standalone AI-assisted book writing toolkit for drafting → editing → publishing.
 
 ```mermaid
 graph LR
@@ -410,48 +363,18 @@ graph LR
     A -->|alcove promote| D[.alcove / docs]
     D -->|MCP Tools| E[AI Agent]
     E -.->|Refers to| D
-    B -->|of book export| F(Velith)
-    F -->|draft / edit / publish| G[Book]
 ```
 
 ### Integration with Alcove
 
-While `obsidian-forge` focuses on building and automating your knowledge graph, [Alcove](https://github.com/epicsagas/alcove) ensures that knowledge is actionable for AI coding agents.
+While `obsidian-forge` focuses on maintaining your vault's mechanical health, [Alcove](https://github.com/epicsagas/alcove) ensures that knowledge is actionable for AI coding agents.
 
 #### How to use them together:
 
-1.  **Build in Obsidian**: Use `obsidian-forge` to maintain your vault's health, create MOCs, and auto-link related concepts.
+1.  **Build in Obsidian**: Use `obsidian-forge` to keep your vault healthy — inbox routing, integrity checks, git sync.
 2.  **Promote to Project Docs**: When a note (e.g., an architectural decision or a feature spec) is ready for a project, run `alcove promote --source path/to/note.md`.
 3.  **Agent Discovery**: Your AI agent (using the Alcove MCP server) can now "discover" that note via `search_project_docs` or `get_doc_file` instead of you having to copy-paste it into the chat.
 4.  **Policy Compliance**: Use Alcove's `validate_docs` to ensure your promoted notes meet the project's documentation standards (defined in `policy.toml`).
-
-### Integration with Velith
-
-[Velith](https://github.com/epicsagas/Velith) is the dedicated AI book writing toolkit. `obsidian-forge` handles the **vault side** — organizing notes, tagging research, and scaffolding the project structure. `Velith` handles the **writing side** — drafting chapters, editing passes, and packaging for publishing.
-
-#### Workflow: Vault → Book
-
-```bash
-# 1. Tag research notes in your vault
-#    Add "book/my-novel" to frontmatter tags of any relevant note
-
-# 2. Initialize the book project
-of book init my-novel --genre fiction --lang en
-
-# 3. Pull tagged notes into sources/
-of book sync my-novel
-
-# 4. Export to a Velith-compatible directory
-of book export my-novel --output ~/books/
-
-# 5. Hand off to Velith
-cd ~/books/my-novel
-Velith draft        # AI-assisted chapter drafting from sources/
-Velith edit         # multi-pass editing pipeline
-Velith publish      # package EPUB / PDF
-```
-
-The exported directory contains `PRD.md` (goals), `STYLE.md` (voice & tone guide), `drafts/`, `edits/`, and `publish/` — exactly the structure `Velith` expects.
 
 ---
 
