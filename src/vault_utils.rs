@@ -2,28 +2,31 @@ use regex::Regex;
 use std::path::Path;
 use std::sync::OnceLock;
 
+/// Directory names excluded from every vault walk, matched per path
+/// component at ANY depth (kg-overhaul-blueprint-2026-09 Phase 0: nested
+/// junk like `01-Projects/foo/node_modules/` was previously indexed whole).
+/// Any dot-prefixed component (`.venv`, `.windsurf`, …) is excluded by rule.
 pub const VAULT_EXCLUDED_DIRS: &[&str] = &[
-    ".obsidian",
-    ".git",
-    ".claude",
-    ".alcove",
-    ".obsidian-forge",
     "_template",
     "seeded",
     "harness-engineering",
+    "node_modules",
     "01-Projects",
     // Public release bundles — standalone git repos nested in the vault
     // (e.g. 04-Writing/paper/*/release/). These ship to readers and must
-    // never receive vault frontmatter, tags, or [[wikilinks]]. Matched per
-    // path-component so any nested depth is excluded.
+    // never receive vault frontmatter, tags, or [[wikilinks]].
     "release",
 ];
 
 pub fn is_vault_excluded(path: &Path, vault_root: &Path) -> bool {
-    for component in path.components() {
+    // Match components BELOW the vault root only, so a vault that happens to
+    // live under a dot-dir or excluded name (e.g. ~/work/.env-mirror/vault)
+    // is not excluded wholesale.
+    let rel = path.strip_prefix(vault_root).unwrap_or(path);
+    for component in rel.components() {
         if let std::path::Component::Normal(os_str) = component
             && let Some(name) = os_str.to_str()
-            && VAULT_EXCLUDED_DIRS.contains(&name)
+            && (name.starts_with('.') || VAULT_EXCLUDED_DIRS.contains(&name))
         {
             return true;
         }
@@ -99,5 +102,46 @@ pub fn supplementary_doc_type_tag(dir_name: &str) -> Option<&'static str> {
         "research" => Some("type/research"),
         "strategy" => Some("type/strategy"),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_nested_junk_excluded_at_any_depth() {
+        let root = Path::new("/vault");
+
+        // Nested junk dirs (blueprint Phase 0): excluded at any depth.
+        for junk in [
+            "01-Projects/app/node_modules/pkg/readme.md",
+            "99-Archives/projects/proj/research/.venv/lib.py.md",
+            "02-Areas/x/seeded/note.md",
+            "03-Resources/y/release/bundle.md",
+            "04-Writing/.windsurf/cache.md",
+        ] {
+            assert!(
+                is_vault_excluded(&root.join(junk), root),
+                "{} should be excluded",
+                junk
+            );
+        }
+
+        // Regular content is not.
+        assert!(!is_vault_excluded(
+            &root.join("99-Archives/projects/proj/PRD.md"),
+            root
+        ));
+    }
+
+    #[test]
+    fn test_exclusion_scopes_to_vault_root() {
+        // A vault that lives under a dot-dir or an excluded name must not be
+        // excluded wholesale — only components below the vault root count.
+        let root = Path::new("/work/.env-mirror/release/vault");
+        assert!(!is_vault_excluded(&root.join("note.md"), root));
+        // …but junk below the root still is.
+        assert!(is_vault_excluded(&root.join(".trash/note.md"), root));
     }
 }
