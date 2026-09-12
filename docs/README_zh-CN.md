@@ -124,7 +124,8 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 #### Grok CLI
 
 ```bash
-grok plugin install epicsagas/obsidian-forge --trust
+grok plugin marketplace add epicsagas/plugins
+grok plugin install obsidian-forge@epicsagas --trust
 ```
 
 安装后，当你询问知识库管理、PARA 路由、完整性检查或守护进程相关问题时，AI 代理会自动触发相应的技能。

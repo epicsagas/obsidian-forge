@@ -124,7 +124,8 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 #### Grok CLI
 
 ```bash
-grok plugin install epicsagas/obsidian-forge --trust
+grok plugin marketplace add epicsagas/plugins
+grok plugin install obsidian-forge@epicsagas --trust
 ```
 
 Nach der Installation löst Ihr KI-Agent automatisch den richtigen Skill aus, wenn Sie nach Tresor-Verwaltung, PARA-Routing, Integritätsprüfungen oder Daemon-Problemen fragen.

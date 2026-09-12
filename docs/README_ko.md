@@ -124,7 +124,8 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 #### Grok CLI
 
 ```bash
-grok plugin install epicsagas/obsidian-forge --trust
+grok plugin marketplace add epicsagas/plugins
+grok plugin install obsidian-forge@epicsagas --trust
 ```
 
 설치하면, 볼트 관리, PARA 라우팅, 무결성 점검 또는 데몬 문제에 대해 질문할 때 AI 에이전트가 자동으로 적절한 스킬을 트리거합니다.

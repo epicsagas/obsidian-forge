@@ -124,7 +124,8 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 #### Grok CLI
 
 ```bash
-grok plugin install epicsagas/obsidian-forge --trust
+grok plugin marketplace add epicsagas/plugins
+grok plugin install obsidian-forge@epicsagas --trust
 ```
 
 После установки ваш ИИ-агент автоматически активирует нужный навык, когда вы спрашиваете об управлении хранилищем, маршрутизации PARA, проверках целостности или проблемах демона.

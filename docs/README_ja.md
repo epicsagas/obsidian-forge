@@ -124,7 +124,8 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 #### Grok CLI
 
 ```bash
-grok plugin install epicsagas/obsidian-forge --trust
+grok plugin marketplace add epicsagas/plugins
+grok plugin install obsidian-forge@epicsagas --trust
 ```
 
 インストール後、ボールト管理、PARAルーティング、整合性チェック、またはデーモンの問題について尋ねると、AIエージェントが自動的に適切なスキルをトリガーします。

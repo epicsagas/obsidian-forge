@@ -124,7 +124,8 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 #### Grok CLI
 
 ```bash
-grok plugin install epicsagas/obsidian-forge --trust
+grok plugin marketplace add epicsagas/plugins
+grok plugin install obsidian-forge@epicsagas --trust
 ```
 
 Uma vez instalado, seu agente de IA aciona automaticamente a habilidade certa quando você pergunta sobre gerenciamento de cofre, roteamento PARA, verificações de integridade ou problemas do daemon.

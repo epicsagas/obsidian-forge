@@ -124,7 +124,8 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 #### Grok CLI
 
 ```bash
-grok plugin install epicsagas/obsidian-forge --trust
+grok plugin marketplace add epicsagas/plugins
+grok plugin install obsidian-forge@epicsagas --trust
 ```
 
 Kurulduktan sonra, kasa yönetimi, PARA yönlendirme, bütünlük kontrolleri veya daemon sorunları hakkında sorular sorduğunuzda AI ajanınız otomatik olarak doğru yeteneği tetikler.

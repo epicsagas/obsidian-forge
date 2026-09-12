@@ -132,7 +132,8 @@ agy plugin install https://github.com/epicsagas/obsidian-forge
 #### Grok CLI
 
 ```bash
-grok plugin install epicsagas/obsidian-forge --trust
+grok plugin marketplace add epicsagas/plugins
+grok plugin install obsidian-forge@epicsagas --trust
 ```
 
 Once installed, your AI agent automatically triggers the right skill when you ask about vault management, PARA routing, integrity checks, or daemon issues.
