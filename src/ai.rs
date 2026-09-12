@@ -34,7 +34,9 @@ pub struct AiClient {
 fn request_gate() -> &'static tokio::sync::Mutex<std::time::Instant> {
     static GATE: std::sync::OnceLock<tokio::sync::Mutex<std::time::Instant>> =
         std::sync::OnceLock::new();
-    GATE.get_or_init(|| tokio::sync::Mutex::new(std::time::Instant::now() - std::time::Duration::from_secs(3600)))
+    GATE.get_or_init(|| {
+        tokio::sync::Mutex::new(std::time::Instant::now() - std::time::Duration::from_secs(3600))
+    })
 }
 
 /// Wait until at least `min_interval_ms` has passed since the previous
@@ -79,10 +81,12 @@ impl AiClient {
 
         // Rate-limit guard: remote providers get a conservative default gap
         // between request starts; local servers and ollama are unthrottled.
-        let min_interval_ms = cfg.min_request_interval_ms.unwrap_or(match cfg.provider.as_str() {
-            "ollama" | "lmstudio" => 0,
-            _ => 2000,
-        });
+        let min_interval_ms = cfg
+            .min_request_interval_ms
+            .unwrap_or(match cfg.provider.as_str() {
+                "ollama" | "lmstudio" => 0,
+                _ => 2000,
+            });
 
         Self {
             provider: cfg.provider.clone(),
@@ -414,7 +418,10 @@ impl AiClient {
                 .header("X-Title", "obsidian-forge");
         }
 
-        let resp = req.send().await.map_err(|e| AiError::Other(e.to_string()))?;
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| AiError::Other(e.to_string()))?;
 
         let status = resp.status();
         if !status.is_success() {
@@ -462,7 +469,10 @@ enum AiError {
         body: String,
         retry_after_ms: Option<u64>,
     },
-    Permanent { status: u16, body: String },
+    Permanent {
+        status: u16,
+        body: String,
+    },
     Other(String),
 }
 

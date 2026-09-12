@@ -2,7 +2,12 @@ use anyhow::{Result, bail};
 use futures::stream::{self, StreamExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fs, path::{Path, PathBuf}, sync::OnceLock};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 use tracing::info;
 use walkdir::WalkDir;
 

@@ -508,10 +508,7 @@ const CANDIDATES_PER_LINK: usize = 8;
 
 /// Rank vault stems by naive word overlap with the link target — cheap local
 /// prefilter so the AI only adjudicates plausible matches.
-fn rank_candidates<'a>(
-    target: &str,
-    stems: impl Iterator<Item = &'a String>,
-) -> Vec<String> {
+fn rank_candidates<'a>(target: &str, stems: impl Iterator<Item = &'a String>) -> Vec<String> {
     let target_lower = target.to_lowercase();
     let words: Vec<&str> = target_lower
         .split(|c: char| !c.is_alphanumeric())
@@ -520,10 +517,7 @@ fn rank_candidates<'a>(
     let mut scored: Vec<(usize, &String)> = stems
         .map(|stem| {
             let lower = stem.to_lowercase();
-            let score = words
-                .iter()
-                .filter(|w| lower.contains(*w))
-                .count();
+            let score = words.iter().filter(|w| lower.contains(*w)).count();
             (score, stem)
         })
         .filter(|(score, _)| *score > 0)
@@ -541,10 +535,7 @@ fn rank_candidates<'a>(
 /// Read-only: prints `[SUGGEST]` lines per broken link. Nothing is renamed or
 /// rewritten — apply good suggestions by editing the link (or re-run
 /// `check-links --fix` for mechanical mismatches).
-pub async fn suggest_link_targets(
-    vault_root: &Path,
-    config: &ForgeConfig,
-) -> Result<String> {
+pub async fn suggest_link_targets(vault_root: &Path, config: &ForgeConfig) -> Result<String> {
     let result = check_links(vault_root, config, false)?;
 
     // Unresolved links grouped per source file.
@@ -615,9 +606,7 @@ pub async fn suggest_link_targets(
     for (source, resolved) in suggestions {
         for (target, candidate) in resolved {
             match candidate {
-                Some(c) => out.push_str(&format!(
-                    "  [SUGGEST] {source} -> [[{target}]] ⇒ {c}\n"
-                )),
+                Some(c) => out.push_str(&format!("  [SUGGEST] {source} -> [[{target}]] ⇒ {c}\n")),
                 None => out.push_str(&format!(
                     "  [SUGGEST] {source} -> [[{target}]] ⇒ (no match)\n"
                 )),
@@ -642,12 +631,7 @@ async fn suggest_one(
 
     let listing: String = pairs
         .iter()
-        .map(|(target, cands)| {
-            format!(
-                "- [[{target}]] 후보: [{}]",
-                cands.join(", ")
-            )
-        })
+        .map(|(target, cands)| format!("- [[{target}]] 후보: [{}]", cands.join(", ")))
         .collect::<Vec<_>>()
         .join("\n");
 

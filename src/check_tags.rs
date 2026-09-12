@@ -615,7 +615,9 @@ pub async fn suggest_tags(
     files.truncate(SUGGEST_FILE_CAP);
 
     if files.is_empty() {
-        return Ok("=== Tag Suggestions ===\nNo files with tag issues — nothing to suggest.".into());
+        return Ok(
+            "=== Tag Suggestions ===\nNo files with tag issues — nothing to suggest.".into(),
+        );
     }
 
     let client = crate::ai::AiClient::from_config(&config.ai);
@@ -653,7 +655,11 @@ pub async fn suggest_tags(
         .await;
 
     for (rel, tags) in suggestions {
-        out.push_str(&format!("  [SUGGEST] {} — tags: [{}]\n", rel, tags.join(", ")));
+        out.push_str(&format!(
+            "  [SUGGEST] {} — tags: [{}]\n",
+            rel,
+            tags.join(", ")
+        ));
     }
     out.push_str("\nNothing applied — review, then run `of check-tags --fix` or edit manually.\n");
     Ok(out)

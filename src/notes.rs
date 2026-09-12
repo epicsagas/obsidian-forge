@@ -142,7 +142,11 @@ pub type RecentSummaries = Vec<(String, String)>;
 /// Scan the vault for notes already processed by AI (frontmatter `summary` +
 /// `processed_at`), most recent first. One walk per call — callers running
 /// batches should compute this once and share the result.
-pub fn collect_recent_summaries(vault_root: &Path, config: &ForgeConfig, limit: usize) -> RecentSummaries {
+pub fn collect_recent_summaries(
+    vault_root: &Path,
+    config: &ForgeConfig,
+    limit: usize,
+) -> RecentSummaries {
     let mut items: Vec<(String, String, String)> = Vec::new(); // (processed_at, rel, summary)
     for entry in WalkDir::new(vault_root)
         .into_iter()
@@ -153,11 +157,7 @@ pub fn collect_recent_summaries(vault_root: &Path, config: &ForgeConfig, limit: 
         // Skip the inbox itself — unprocessed neighbours are not duplicate targets.
         if entry.path().strip_prefix(vault_root).is_ok_and(|p| {
             p.starts_with(&config.vault.inbox_dir)
-                || config
-                    .vault
-                    .system_dirs
-                    .iter()
-                    .any(|d| p.starts_with(d))
+                || config.vault.system_dirs.iter().any(|d| p.starts_with(d))
         }) {
             continue;
         }
@@ -175,7 +175,11 @@ pub fn collect_recent_summaries(vault_root: &Path, config: &ForgeConfig, limit: 
         }
     }
     items.sort_by(|a, b| b.0.cmp(&a.0));
-    items.into_iter().take(limit).map(|(_, r, s)| (r, s)).collect()
+    items
+        .into_iter()
+        .take(limit)
+        .map(|(_, r, s)| (r, s))
+        .collect()
 }
 
 /// Convenience wrapper used by tests; batch paths call
@@ -282,11 +286,7 @@ pub async fn process_one_with_context(
         .duplicate_of
         .filter(|d| !d.trim().is_empty() && !d.eq_ignore_ascii_case("null"))
     {
-        warn!(
-            "Possible duplicate of '{}': {}",
-            dup,
-            path.display()
-        );
+        warn!("Possible duplicate of '{}': {}", dup, path.display());
         current_fm.duplicate_of = Some(dup);
     }
 
