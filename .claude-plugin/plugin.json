@@ -1,7 +1,7 @@
 {
   "name": "obsidian-forge",
-  "version": "0.2.4",
-  "description": "Obsidian vault lifecycle management — inbox AI classification, graph strengthening, MOC regeneration, and multi-vault sync.",
+  "version": "0.3.0",
+  "description": "Obsidian vault lifecycle management — AI inbox classification, vault integrity checks (tags, links, frontmatter), graph health reporting, and multi-vault git sync.",
   "author": {
     "name": "epicsagas",
     "url": "https://github.com/epicsagas"
@@ -21,11 +21,14 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Obsidian Forge",
-    "shortDescription": "Obsidian vault lifecycle management — AI inbox, graph strengthening, sync.",
-    "longDescription": "Rust CLI for Obsidian vault automation: AI-powered inbox classification (PARA routing), knowledge graph strengthening (backlinks, bridge notes, auto-tags), MOC regeneration, multi-vault plugin sync, and background daemon. Single binary, multi-vault, zero config to start.",
+    "shortDescription": "Obsidian vault lifecycle management — AI inbox, integrity checks, sync.",
+    "longDescription": "Rust CLI for Obsidian vault automation: AI-powered inbox classification (PARA routing) with duplicate detection, vault integrity checks (tag health, broken wikilinks, frontmatter normalization) with AI-assisted fix suggestion and missing-frontmatter generation, graph health reporting, multi-vault git sync, and a background daemon. Rate-limited AI requests (global throttle + exponential backoff) keep free-tier providers usable. Single binary, multi-vault, zero config to start.",
     "developerName": "epicsagas",
     "category": "Productivity",
-    "capabilities": ["Read", "Write"],
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
     "websiteURL": "https://github.com/epicsagas/obsidian-forge"
   }
 }

@@ -1,6 +1,6 @@
 ---
 name: vault-fix
-description: "Batch vault repair — runs `of check-tags --fix`, `of check-links --fix`, and `of normalize-frontmatter --fix` to repair tag health, broken wikilinks, and YAML malformations. Trigger: fix vault, repair tags, fix links, fix frontmatter, vault maintenance."
+description: "Batch vault repair — runs `of check-tags --fix`, `of check-links --fix`, and `of normalize-frontmatter --fix` to repair tag health, broken wikilinks, and YAML malformations, with AI-suggest preflight for ambiguous cases. Trigger: fix vault, repair tags, fix links, fix frontmatter, vault maintenance."
 ---
 
 # Batch Vault Repair
@@ -28,6 +28,25 @@ Present the dry-run results in Korean:
 3. **프론매터 이슈** — YAML malformations, missing fields
 
 Ask user to confirm before applying fixes (unless user explicitly said "just fix everything").
+
+### Step 2b: AI preflight for ambiguous issues (rate-limit aware)
+
+Mechanical `--fix` only resolves what it can resolve safely. For what remains, use the read-only AI modes — each costs one AI call per affected file (capped at 50), paced by the global request throttle:
+
+```bash
+of check-tags --suggest --vault <name>    # proposed tag sets for files with issues
+of check-links --suggest --vault <name>   # candidate resolutions for unresolved links
+```
+
+Show the `[SUGGEST]` lines to the user and apply only the ones they accept — via targeted edits or the mechanical `--fix` where the proposal matches its behavior.
+
+Frontmatter generation is the one AI mode that WRITES:
+
+```bash
+of normalize-frontmatter --fill-missing --vault <name>   # AI-generates frontmatter for docs that have none
+```
+
+Only run it with user confirmation, on a git-synced vault, and show `git diff --stat` afterwards. The inbox is skipped automatically (those files belong to `process-all`).
 
 ### Step 3: Apply fixes
 

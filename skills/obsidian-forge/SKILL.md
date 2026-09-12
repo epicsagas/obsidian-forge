@@ -33,16 +33,19 @@ of process-all [--vault <name>]
 ```
 Reads `00-Inbox/`, calls AI provider, injects frontmatter, moves file to PARA folder.
 AI provider must be configured in `vault.toml [ai]`. If it fails, read the error — unknown provider or missing `base_url` will have a clear message.
+Duplicate detection rides the classification call: a note that substantially duplicates an already-processed note gets `duplicate_of: <rel-path>` in frontmatter — flag it to the user before routing.
 
-### Vault integrity (mechanical, no AI needed)
+### Vault integrity (mechanical + AI-assisted repair)
 ```bash
-of check-tags [--fix]            [--vault <name>]  # missing layer/type/project tags
-of check-links [--fix]           [--vault <name>]  # broken wikilinks (code-fence aware)
-of normalize-frontmatter [--fix] [--vault <name>]  # YAML malformations
-of graph health                  [--vault <name>]  # note/link/orphan/broken metrics
-of sync [--vault <name>]                           # graph health check → git in one shot
+of check-tags [--fix|--suggest]          [--vault <name>]  # missing layer/type/project tags
+of check-links [--fix|--suggest]         [--vault <name>]  # broken wikilinks (code-fence aware)
+of normalize-frontmatter [--fix|--fill-missing] [--vault <name>]  # YAML malformations / missing frontmatter
+of graph health                          [--vault <name>]  # note/link/orphan/broken metrics
+of sync [--vault <name>]                                   # graph health check → git in one shot
 ```
 All idempotent — safe to re-run.
+
+**Prefer suggest before fix.** `--suggest` modes are read-only and cost one AI call per affected file (capped at 50): they print proposed tags / link resolutions. Review the output with the user, then apply with `--fix` (mechanical) or targeted edits. `normalize-frontmatter --fill-missing` WRITES AI-generated frontmatter into every frontmatter-less doc outside the inbox — run it on git-synced vaults only, and report the diff after.
 
 ## Key Facts
 
