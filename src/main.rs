@@ -148,7 +148,7 @@ enum Commands {
         vault: Option<String>,
     },
 
-    /// Run full sync cycle: MOC → Graph → Git
+    /// Run sync cycle: graph health check → git
     Sync {
         /// Sync only this vault (omit for all enabled vaults)
         #[arg(long)]
@@ -1209,14 +1209,19 @@ fn run_sync_all(filter: Option<String>) -> Result<()> {
 // ---------------------------------------------------------------------------
 
 fn run_sync_cycle(vault: &Path, config: &ForgeConfig) {
-    if let Err(e) = moc::update_all_mocs(vault, config) {
-        tracing::warn!("[{}] MOC update error: {:?}", config.vault.name, e);
-    }
-    if let Err(e) = index::generate_index(vault, config) {
-        tracing::warn!("[{}] Index generation error: {:?}", config.vault.name, e);
-    }
-    if let Err(e) = graph::strengthen_graph(vault, config) {
-        tracing::warn!("[{}] Graph error: {:?}", config.vault.name, e);
+    // KG overhaul Phase 0 (kg-overhaul-blueprint-2026-09 §4): sync no longer
+    // regenerates MOCs or strengthens the graph — graph semantics move to the
+    // LLM extraction pipeline. Sync = graph health check → git.
+    match graph::graph_health(vault, config) {
+        Ok(h) => tracing::info!(
+            "[{}] Graph health: {} notes, {} links, {} orphans, {} broken",
+            config.vault.name,
+            h.total_notes,
+            h.total_links,
+            h.orphan_count,
+            h.broken_links.len()
+        ),
+        Err(e) => tracing::warn!("[{}] Graph health error: {:?}", config.vault.name, e),
     }
     if config.sync.git_auto_commit
         && let Err(e) = git::auto_commit_and_push(vault, config.sync.git_auto_push)
