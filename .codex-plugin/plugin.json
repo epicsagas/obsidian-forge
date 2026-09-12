@@ -1,6 +1,6 @@
 {
   "name": "obsidian-forge",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "description": "Obsidian vault lifecycle management — AI inbox classification, vault integrity checks (tags, links, frontmatter), graph health reporting, and multi-vault git sync.",
   "author": {
     "name": "epicsagas",
