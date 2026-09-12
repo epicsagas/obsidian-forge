@@ -32,13 +32,12 @@ const GLOBAL_CONFIG_PREAMBLE: &str = r#"# obsidian-forge — global configuratio
 #               Not meaningful per-vault — always managed here.
 #
 # ── Shared defaults (vault.toml can override per-vault) ───────────────────
-#   [projects]  Default exclude list for MOC/graph scanning.
-#   [graph]     Default graph strengthening toggles (backlinks, bridge notes, tags, concepts).
+#   [projects]  Default exclude list for graph/link scanning.
 #   [sync]      Default git auto commit/push and sync interval.
 #
 # ── Vault registry ────────────────────────────────────────────────────────
 #   [[vaults]]  Registered vaults with name, path, enabled, watch flags.
-#               Managed automatically by `obsidian-forge init` and `vault add/remove`.
+#               Managed automatically by `obsidian-forge init`.
 #
 # ── [ai] optional keys (omitted from generated TOML when unset) ───────────
 # base_url = "https://api.openai.com/v1"       # openai
@@ -68,9 +67,6 @@ pub struct GlobalConfig {
     /// Shared project detection defaults (vault.toml `[projects]` overrides when present).
     #[serde(default)]
     pub projects: Option<ProjectsConfig>,
-    /// Shared graph defaults (vault.toml `[graph]` overrides when present).
-    #[serde(default)]
-    pub graph: Option<GraphConfig>,
     #[serde(default)]
     pub sync: Option<SyncConfig>,
     #[serde(default)]
@@ -118,7 +114,6 @@ impl GlobalConfig {
             return Ok(Self {
                 vaults: Vec::new(),
                 projects: None,
-                graph: None,
                 sync: None,
                 ai: None,
                 daemon: None,
@@ -156,18 +151,8 @@ impl GlobalConfig {
         });
     }
 
-    pub fn remove_vault(&mut self, name: &str) -> bool {
-        let before = self.vaults.len();
-        self.vaults.retain(|v| v.name != name);
-        self.vaults.len() < before
-    }
-
     pub fn find_vault(&self, name: &str) -> Option<&VaultEntry> {
         self.vaults.iter().find(|v| v.name == name)
-    }
-
-    pub fn find_vault_mut(&mut self, name: &str) -> Option<&mut VaultEntry> {
-        self.vaults.iter_mut().find(|v| v.name == name)
     }
 
     /// Return all vaults that should be watched by the daemon.
@@ -183,18 +168,14 @@ impl GlobalConfig {
         self.vaults.iter().filter(|v| v.enabled).collect()
     }
 
-    /// Fills shared sections (`projects`, `graph`, `sync`, `ai`, `daemon`) when absent (`None`).
-    /// Called after `init` / `vault add` so the global file lists every knob with defaults.
+    /// Fills shared sections (`projects`, `sync`, `ai`, `daemon`) when absent (`None`).
+    /// Called after `init` so the global file lists every knob with defaults.
     ///
     /// Returns `true` if any section was added (global file will gain new keys on save).
     pub fn seed_missing_tooling_sections(&mut self) -> bool {
         let mut added = false;
         if self.projects.is_none() {
             self.projects = Some(ProjectsConfig::default());
-            added = true;
-        }
-        if self.graph.is_none() {
-            self.graph = Some(GraphConfig::default());
             added = true;
         }
         if self.sync.is_none() {
@@ -229,15 +210,11 @@ pub struct ForgeConfig {
     #[serde(default)]
     pub projects: ProjectsConfig,
     #[serde(default)]
-    pub graph: GraphConfig,
-    #[serde(default)]
     pub sync: SyncConfig,
     #[serde(default)]
     pub ai: AiConfig,
     #[serde(default)]
     pub daemon: DaemonConfig,
-    #[serde(default)]
-    pub book: Option<BookConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,37 +251,6 @@ pub struct ProjectsConfig {
     pub exclude: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct GraphConfig {
-    #[serde(default = "yes")]
-    pub backlinks: bool,
-    #[serde(default = "yes")]
-    pub bridge_notes: bool,
-    #[serde(default = "yes")]
-    pub auto_tags: bool,
-    #[serde(default = "yes")]
-    pub related_projects: bool,
-    #[serde(default)]
-    pub concepts: Vec<ConceptDef>,
-    /// Extract typed relationships between notes using AI
-    #[serde(default)]
-    pub ai_relationships: bool,
-    /// Normalize flat tags into hierarchical structure
-    #[serde(default)]
-    pub tag_hierarchy: bool,
-    /// Detect and report orphan notes
-    #[serde(default)]
-    pub orphan_detection: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ConceptDef {
-    pub name: String,
-    pub keywords: Vec<String>,
-    #[serde(default)]
-    pub tags: Vec<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SyncConfig {
     #[serde(default)]
@@ -331,16 +277,6 @@ pub struct AiConfig {
     /// Maximum concurrent AI requests (for parallel processing)
     #[serde(default = "default_max_concurrent")]
     pub max_concurrent: Option<usize>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct BookConfig {
-    #[serde(default = "default_book_dir")]
-    pub book_dir: String,
-}
-
-fn default_book_dir() -> String {
-    "01-Projects".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -416,21 +352,6 @@ impl Default for ProjectsConfig {
     }
 }
 
-impl Default for GraphConfig {
-    fn default() -> Self {
-        Self {
-            backlinks: true,
-            bridge_notes: true,
-            auto_tags: true,
-            related_projects: true,
-            concepts: Vec::new(),
-            ai_relationships: false,
-            tag_hierarchy: false,
-            orphan_detection: false,
-        }
-    }
-}
-
 impl Default for AiConfig {
     fn default() -> Self {
         Self {
@@ -463,11 +384,6 @@ fn merge_global_into_forge(config: &mut ForgeConfig, global: &GlobalConfig) {
         && config.projects == ProjectsConfig::default()
     {
         config.projects = gp.clone();
-    }
-    if let Some(ref gg) = global.graph
-        && config.graph == GraphConfig::default()
-    {
-        config.graph = gg.clone();
     }
     if let Some(ref global_sync) = global.sync {
         config.sync = SyncConfig {
@@ -596,19 +512,17 @@ impl ForgeConfig {
                 protected_files: default_protected_files(),
             },
             projects: ProjectsConfig::default(),
-            graph: GraphConfig::default(),
             // sync, ai, daemon omitted - use global config defaults
             sync: SyncConfig::default(),
             ai: AiConfig::default(),
             daemon: DaemonConfig::default(),
-            book: None,
         }
     }
 }
 
-/// Initial `vault.toml` for `init` and `vault add`. Only `[vault]` is active.
+/// Initial `vault.toml` for `init`. Only `[vault]` is active.
 ///
-/// Shared defaults (`projects`, `graph`, `sync`) and global-only settings (`ai`, `daemon`) live in
+/// Shared defaults (`projects`, `sync`) and global-only settings (`ai`, `daemon`) live in
 /// `~/.config/obsidian-forge/config.toml`. Uncomment a section below only to override for this vault.
 pub fn default_vault_toml_template(vault_name: &str) -> String {
     format!(
@@ -618,8 +532,8 @@ pub fn default_vault_toml_template(vault_name: &str) -> String {
 #   [vault]     Display name and folder layout (inbox, PARA paths, templates, …).
 #
 # ── Per-vault overrides (uncomment to differ from global config.toml) ─────
-#   [projects]  Exclude specific top-level dirs from MOC/graph scanning.
-#   [graph]     Graph strengthening toggles and custom concepts for this vault.
+#   [projects]  Exclude specific top-level dirs from graph/link scanning.
+#               (node_modules and dot-dirs are always excluded at any depth.)
 #   [sync]      Git auto commit/push and sync interval for this vault.
 #   [ai]        Override model or concurrency for AI operations in this vault.
 #               (provider / base_url / api_key are global infrastructure — set in config.toml)
@@ -645,25 +559,6 @@ protected_files = ["index.md"]  # sync must not overwrite static files; set to [
 # [projects]
 # detect = "top-level-dirs"   # reserved for future use
 # exclude = ["_template"]
-
-# [graph]
-# backlinks = true
-# bridge_notes = true
-# auto_tags = true
-# related_projects = true
-# ai_relationships = true     # AI-powered typed relationship extraction
-# tag_hierarchy = true        # Normalize flat tags into hierarchical structure
-# orphan_detection = true     # Detect notes with no incoming/outgoing links
-# concepts = [
-#   {{ name = "Search", keywords = ["bm25", "full-text search", "tantivy", "search quality", "retrieval"], tags = ["topics/search"] }},
-#   {{ name = "Rust", keywords = ["rust", "cargo", "agent runtime", "systems programming"], tags = ["topics/rust"] }},
-#   {{ name = "LLM", keywords = ["llm", "large language model", "ollama"], tags = ["topics/ai/llm"] }},
-#   {{ name = "Zettelkasten", keywords = ["zettelkasten", "permanent note", "atomic note"], tags = ["topics/zettelkasten"] }},
-#   {{ name = "AI Agent", keywords = ["agent", "ai agent", "mcp server"], tags = ["topics/ai-agent"] }},
-#   {{ name = "TUI", keywords = ["tui", "terminal", "ratatui"], tags = ["topics/tui"] }},
-#   {{ name = "Knowledge Graph", keywords = ["knowledge graph", "wikilink", "backlink"], tags = ["topics/knowledge-graph"] }},
-#   {{ name = "Ontology", keywords = ["ontology", "knowledge management", "pkm", "taxonomy"], tags = ["topics/ontology"] }},
-# ]
 
 # [sync]
 # git_auto_commit = false
@@ -716,7 +611,6 @@ mod tests {
         let cfg: ForgeConfig = toml::from_str(&s).expect("template TOML");
         assert_eq!(cfg.vault.name, "my-vault");
         assert_eq!(cfg.projects.detect, ProjectsConfig::default().detect);
-        assert!(cfg.graph.backlinks);
     }
 
     #[test]
@@ -729,16 +623,6 @@ mod tests {
         assert_eq!(cfg.vault.attachments_dir, "Attachments");
         assert_eq!(cfg.vault.templates_dir, "obsidian-templates");
         assert_eq!(cfg.vault.layout, "para");
-    }
-
-    #[test]
-    fn test_graph_config_defaults() {
-        let cfg = GraphConfig::default();
-        assert!(cfg.backlinks);
-        assert!(cfg.bridge_notes);
-        assert!(cfg.auto_tags);
-        assert!(cfg.related_projects);
-        assert!(cfg.concepts.is_empty());
     }
 
     #[test]
@@ -762,7 +646,7 @@ mod tests {
     }
 
     #[test]
-    fn test_global_config_add_remove_vault() {
+    fn test_global_config_add_vault_replaces_duplicate() {
         let mut global = GlobalConfig::default();
         global.add_vault("test", "/tmp/test");
         assert_eq!(global.vaults.len(), 1);
@@ -772,13 +656,6 @@ mod tests {
         global.add_vault("test", "/tmp/test2");
         assert_eq!(global.vaults.len(), 1);
         assert_eq!(global.vaults[0].path, "/tmp/test2");
-
-        let removed = global.remove_vault("test");
-        assert!(removed);
-        assert!(global.vaults.is_empty());
-
-        let not_found = global.remove_vault("nonexistent");
-        assert!(!not_found);
     }
 
     #[test]
@@ -786,9 +663,7 @@ mod tests {
         let mut global = GlobalConfig::default();
         global.add_vault("active", "/tmp/active");
         global.add_vault("paused", "/tmp/paused");
-        if let Some(v) = global.find_vault_mut("paused") {
-            v.watch = false;
-        }
+        global.vaults[1].watch = false;
         let watchable = global.watchable_vaults();
         assert_eq!(watchable.len(), 1);
         assert_eq!(watchable[0].name, "active");
@@ -844,7 +719,7 @@ git_auto_push = false
     }
 
     #[test]
-    fn test_merge_global_replaces_default_projects_and_graph() {
+    fn test_merge_global_replaces_default_projects() {
         let mut config: ForgeConfig =
             toml::from_str(&default_vault_toml_template("v")).expect("vault template");
         let global = GlobalConfig {
@@ -852,20 +727,17 @@ git_auto_push = false
                 detect: "from-global".into(),
                 exclude: vec!["only-global".into()],
             }),
-            graph: Some(GraphConfig {
-                backlinks: false,
-                ..GraphConfig::default()
-            }),
             ..GlobalConfig::default()
         };
         merge_global_into_forge(&mut config, &global);
         assert_eq!(config.projects.detect, "from-global");
         assert_eq!(config.projects.exclude, vec!["only-global".to_string()]);
-        assert!(!config.graph.backlinks);
     }
 
     #[test]
-    fn test_merge_global_skips_graph_when_vault_customized() {
+    fn test_vault_toml_with_legacy_graph_block_still_parses() {
+        // Existing vault.toml files may still carry the deprecated [graph] block;
+        // unknown keys must be ignored, not rejected.
         let toml_v = r#"
 [vault]
 name = "v"
@@ -879,13 +751,9 @@ system_dirs = []
 
 [graph]
 backlinks = false
+concepts = []
 "#;
-        let mut config: ForgeConfig = toml::from_str(toml_v).expect("parse");
-        let global = GlobalConfig {
-            graph: Some(GraphConfig::default()),
-            ..GlobalConfig::default()
-        };
-        merge_global_into_forge(&mut config, &global);
-        assert!(!config.graph.backlinks);
+        let config: ForgeConfig = toml::from_str(toml_v).expect("parse with legacy [graph]");
+        assert_eq!(config.vault.name, "v");
     }
 }

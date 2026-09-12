@@ -383,7 +383,10 @@ fn link_global_templates(
 pub fn apply_global_settings(target: &Path) -> Result<()> {
     let store = GlobalConfig::settings_dir();
     if !GlobalConfig::has_settings() {
-        println!("  No global settings found. Use `obsidian-forge settings import <vault>` first.");
+        println!(
+            "  No global settings found — populate {}/.obsidian/ (plugins, snippets, themes).",
+            GlobalConfig::settings_dir().display()
+        );
         return Ok(());
     }
 
@@ -394,41 +397,6 @@ pub fn apply_global_settings(target: &Path) -> Result<()> {
     ensure_linter_config(target)?;
     ensure_community_plugin(target)?;
     println!("✅ Global settings applied → {}", target.display());
-    Ok(())
-}
-
-/// Import .obsidian/ settings from a vault into the global settings store.
-pub fn import_settings(source: &Path) -> Result<()> {
-    let src_obs = source.join(".obsidian");
-    if !src_obs.exists() {
-        anyhow::bail!("Source has no .obsidian/ directory: {}", source.display());
-    }
-
-    let store = GlobalConfig::settings_dir();
-    fs::create_dir_all(&store)?;
-
-    copy_settings(&src_obs, &store, &source.display().to_string())?;
-    println!(
-        "✅ Settings imported from {} → global store",
-        source.display()
-    );
-    Ok(())
-}
-
-/// Push global settings to a vault's .obsidian/.
-pub fn push_settings(target: &Path) -> Result<()> {
-    let store = GlobalConfig::settings_dir();
-    if !GlobalConfig::has_settings() {
-        anyhow::bail!("Global settings store is empty. Run `settings import` first.");
-    }
-
-    let tgt_obs = target.join(".obsidian");
-    fs::create_dir_all(&tgt_obs)?;
-
-    copy_settings(&store, &tgt_obs, "global store")?;
-    ensure_linter_config(target)?;
-    ensure_community_plugin(target)?;
-    println!("✅ Global settings pushed → {}", target.display());
     Ok(())
 }
 
@@ -604,7 +572,7 @@ fn register_and_print(vault_root: &Path, name: &str) {
     global.add_vault(name, &vault_root.to_string_lossy());
     if global.seed_missing_tooling_sections() {
         println!(
-            "  Seeded default [projects], [graph], [sync], [ai], [daemon] in {}",
+            "  Seeded default [projects], [sync], [ai], [daemon] in {}",
             GlobalConfig::path().display()
         );
     }

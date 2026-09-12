@@ -1,5 +1,4 @@
 mod ai;
-mod book;
 mod check_links;
 mod check_tags;
 mod config;
@@ -9,7 +8,6 @@ mod git;
 mod graph;
 mod index;
 mod init;
-mod moc;
 mod notes;
 mod prompts;
 mod vault_utils;
@@ -26,7 +24,7 @@ use std::{
 };
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-use config::{ForgeConfig, GlobalConfig, default_vault_toml_template};
+use config::{ForgeConfig, GlobalConfig};
 
 #[derive(Parser)]
 #[command(name = "obsidian-forge")]
@@ -57,26 +55,6 @@ enum Commands {
         clone_settings_from: Option<String>,
     },
 
-    /// Clone .obsidian/ settings from one vault to another
-    CloneSettings {
-        /// Source vault name or path
-        source: String,
-        /// Target vault name or path
-        target: String,
-    },
-
-    /// Manage global .obsidian/ settings store (~/.config/obsidian-forge/)
-    Settings {
-        #[command(subcommand)]
-        action: SettingsAction,
-    },
-
-    /// Manage registered vaults
-    Vault {
-        #[command(subcommand)]
-        action: VaultAction,
-    },
-
     /// Process all existing notes in Inbox once
     ProcessAll {
         /// Specific vault name (from global config)
@@ -94,19 +72,7 @@ enum Commands {
         interval: Option<u64>,
     },
 
-    /// Rebuild all project hub files (MOCs)
-    UpdateMocs {
-        #[arg(long)]
-        vault: Option<String>,
-    },
-
-    /// Strengthen Obsidian graph
-    StrengthenGraph {
-        #[arg(long)]
-        vault: Option<String>,
-    },
-
-    /// Graph operations: health, orphans, extract, tags, strengthen
+    /// Graph health report
     Graph {
         #[command(subcommand)]
         action: GraphAction,
@@ -181,14 +147,6 @@ enum Commands {
         action: DaemonAction,
     },
 
-    /// Manage book writing projects within the vault
-    Book {
-        #[command(subcommand)]
-        action: BookAction,
-        #[arg(long)]
-        vault: Option<String>,
-    },
-
     /// Launch the vault dashboard (Tauri desktop app)
     #[cfg(feature = "dashboard-ui")]
     Dashboard {
@@ -196,30 +154,6 @@ enum Commands {
         #[arg(long)]
         vault: Option<String>,
     },
-}
-
-#[derive(Subcommand)]
-enum VaultAction {
-    /// Register an existing vault
-    Add {
-        /// Path to the vault directory
-        path: String,
-        /// Custom name (defaults to directory name)
-        #[arg(long)]
-        name: Option<String>,
-    },
-    /// Unregister a vault (files are kept)
-    Remove { name: String },
-    /// List all registered vaults
-    List,
-    /// Disable a vault (excluded from sync and watch)
-    Disable { name: String },
-    /// Re-enable a vault
-    Enable { name: String },
-    /// Pause daemon watching for a vault (sync still works manually)
-    Pause { name: String },
-    /// Resume daemon watching for a vault
-    Resume { name: String },
 }
 
 #[derive(Subcommand)]
@@ -252,74 +186,6 @@ enum DaemonAction {
 enum GraphAction {
     /// Show graph statistics and health metrics
     Health,
-    /// List orphan notes (no incoming or outgoing links)
-    Orphans {
-        /// Attempt to auto-link orphans to relevant MOCs using AI
-        #[arg(long)]
-        auto_link: bool,
-        /// Exclude files under */seeded/ directories
-        #[arg(long)]
-        exclude_seeded: bool,
-        /// Minimum body length in characters (excluding frontmatter) to be included
-        #[arg(long, default_value = "0")]
-        min_chars: usize,
-    },
-    /// Extract wikilinks and (optionally) AI relationships
-    Extract {
-        /// Skip AI relationship extraction, only parse wikilinks
-        #[arg(long)]
-        no_ai: bool,
-    },
-    /// Normalize and cluster tags into hierarchical structure
-    Tags {
-        /// Show suggestions without applying changes
-        #[arg(long)]
-        dry_run: bool,
-    },
-    /// Run the full graph strengthening pipeline
-    Strengthen,
-    /// Generate the agent entry point index.md at the vault root
-    Index,
-}
-
-#[derive(Subcommand)]
-enum SettingsAction {
-    /// Import .obsidian/ settings from a vault into the global store
-    Import {
-        /// Vault name (from global config) or path
-        source: String,
-    },
-    /// Push global settings to a vault's .obsidian/
-    Push {
-        /// Vault name (from global config) or path
-        target: String,
-    },
-    /// Push global settings to ALL registered vaults
-    PushAll,
-    /// Show global settings store status
-    Status,
-}
-
-#[derive(Subcommand)]
-enum BookAction {
-    /// Initialize a new book project in 01-Projects/
-    Init {
-        name: String,
-        #[arg(long, default_value = "non-fiction")]
-        genre: String,
-        #[arg(long, default_value = "ko")]
-        lang: String,
-    },
-    /// Show all book projects status
-    Status { name: Option<String> },
-    /// Export book project to standalone directory (Velith compatible)
-    Export {
-        name: String,
-        #[arg(long, default_value = ".")]
-        output: String,
-    },
-    /// Sync vault notes tagged for this book into sources/
-    Sync { name: String },
 }
 
 #[tokio::main]
@@ -355,34 +221,9 @@ async fn main() -> Result<()> {
             }
             return Ok(());
         }
-        Commands::CloneSettings { source, target } => {
-            let source_path = resolve_vault_path(source)?;
-            let target_path = resolve_vault_path(target)?;
-            return init::clone_obsidian_settings(&source_path, &target_path);
-        }
-        Commands::Settings { action } => {
-            return handle_settings_action(action);
-        }
-        Commands::Vault { action } => {
-            return handle_vault_action(action);
-        }
         Commands::Daemon { action } => {
             check_daemon_deprecated_args();
             return handle_daemon_action(action);
-        }
-        Commands::Book { action, vault } => {
-            let vault_path = if let Some(name) = vault {
-                let global = GlobalConfig::load()?;
-                global
-                    .find_vault(name)
-                    .map(|e| PathBuf::from(&e.path))
-                    .ok_or_else(|| anyhow::anyhow!("Vault '{}' not found in global config", name))?
-            } else {
-                config::resolve_vault(cli.vault_path.clone()).unwrap_or_else(|_| {
-                    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-                })
-            };
-            return handle_book_action(action, &vault_path);
         }
         #[cfg(feature = "dashboard-ui")]
         Commands::Dashboard { vault: _ } => {
@@ -405,14 +246,6 @@ async fn main() -> Result<()> {
         Commands::ProcessAll { vault: filter } => {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
             notes::process_all(&vault, &config).await?;
-        }
-        Commands::UpdateMocs { vault: filter } => {
-            let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
-            moc::update_all_mocs(&vault, &config)?;
-        }
-        Commands::StrengthenGraph { vault: filter } => {
-            let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
-            graph::strengthen_graph(&vault, &config)?;
         }
         Commands::Graph {
             ref action,
@@ -471,83 +304,6 @@ async fn handle_graph_action(
         GraphAction::Health => {
             let health = graph::graph_health(vault, config)?;
             println!("{}", health);
-        }
-        GraphAction::Orphans {
-            auto_link,
-            exclude_seeded,
-            min_chars,
-        } => {
-            if *auto_link {
-                let g = graph::build_vault_graph(vault, config)?;
-                let linked = graph::auto_link_orphans(vault, config, &g).await?;
-                if linked.is_empty() {
-                    println!("No orphans auto-linked.");
-                } else {
-                    println!("Auto-linked {} orphans:", linked.len());
-                    for f in &linked {
-                        println!("  - {}", f);
-                    }
-                }
-            } else {
-                let orphans = graph::detect_orphans(vault, config, *exclude_seeded, *min_chars)?;
-                if orphans.is_empty() {
-                    println!("No orphan notes found.");
-                } else {
-                    println!("Found {} orphan notes:", orphans.len());
-                    for f in &orphans {
-                        println!("  - {}", f);
-                    }
-                }
-            }
-        }
-        GraphAction::Extract { no_ai } => {
-            let g = graph::build_vault_graph(vault, config)?;
-            println!(
-                "Extracted graph: {} files, {} links, {} orphans",
-                g.all_files.len(),
-                g.total_links(),
-                g.orphan_count()
-            );
-
-            if !no_ai {
-                let relationships = graph::extract_relationships(vault, config, &g).await?;
-                if relationships.is_empty() {
-                    println!("No relationships extracted.");
-                } else {
-                    println!("Extracted {} relationships:", relationships.len());
-                    for r in &relationships {
-                        println!(
-                            "  {} --{}-> {} ({:.0}%)",
-                            r.source,
-                            r.relation,
-                            r.target,
-                            r.confidence * 100.0
-                        );
-                    }
-                    graph::save_relationships_manifest(vault, &relationships)?;
-                }
-            }
-        }
-        GraphAction::Tags { dry_run } => {
-            let result = graph::normalize_tags(vault, config, *dry_run).await?;
-            if *dry_run {
-                println!("{}", result);
-                println!("\n(dry run — no changes applied)");
-            } else {
-                println!("{}", result);
-            }
-        }
-        GraphAction::Strengthen => {
-            graph::strengthen_graph(vault, config)?;
-            println!("Graph strengthening complete.");
-        }
-        GraphAction::Index => {
-            let wrote = index::generate_index(vault, config)?;
-            if wrote {
-                println!("index.md generated.");
-            } else {
-                println!("index.md unchanged (protected by config or no content diff).");
-            }
         }
     }
     Ok(())
@@ -862,186 +618,6 @@ fn is_agent_loaded(label: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Book subcommand
-// ---------------------------------------------------------------------------
-
-fn handle_book_action(action: &BookAction, vault_path: &Path) -> Result<()> {
-    match action {
-        BookAction::Init { name, genre, lang } => {
-            book::init_book_project(name, vault_path, genre, lang)?;
-        }
-        BookAction::Status { name } => {
-            book::show_book_status(name.as_deref(), vault_path)?;
-        }
-        BookAction::Export { name, output } => {
-            let output_path = book::output_path_from(output, vault_path);
-            book::export_book(name, vault_path, &output_path)?;
-        }
-        BookAction::Sync { name } => {
-            book::sync_sources(name, vault_path)?;
-        }
-    }
-    Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Settings management
-// ---------------------------------------------------------------------------
-
-fn handle_settings_action(action: &SettingsAction) -> Result<()> {
-    match action {
-        SettingsAction::Import { source } => {
-            let source_path = resolve_vault_path(source)?;
-            init::import_settings(&source_path)?;
-        }
-        SettingsAction::Push { target } => {
-            let target_path = resolve_vault_path(target)?;
-            init::push_settings(&target_path)?;
-        }
-        SettingsAction::PushAll => {
-            let global = GlobalConfig::load()?;
-            if global.vaults.is_empty() {
-                no_vaults_hint();
-                return Ok(());
-            }
-            for entry in &global.vaults {
-                let vault_path = PathBuf::from(&entry.path);
-                if vault_path.exists() {
-                    println!("\n📦 {}", entry.name);
-                    init::push_settings(&vault_path)?;
-                } else {
-                    println!("\n⚠️  Skipping {} (path not found)", entry.name);
-                }
-            }
-        }
-        SettingsAction::Status => {
-            let store = GlobalConfig::settings_dir();
-            println!("Global settings store: {}", store.display());
-            if GlobalConfig::has_settings() {
-                for dir in config::SETTINGS_DIRS {
-                    let p = store.join(dir);
-                    if p.is_dir() {
-                        let count = fs::read_dir(&p).map(|r| r.count()).unwrap_or(0);
-                        println!("  ✓ {}/  ({} items)", dir, count);
-                    } else {
-                        println!("  ✗ {}/  (not present)", dir);
-                    }
-                }
-                for file in config::SETTINGS_FILES {
-                    let p = store.join(file);
-                    if p.is_file() {
-                        println!("  ✓ {}", file);
-                    } else {
-                        println!("  ✗ {}  (not present)", file);
-                    }
-                }
-            } else {
-                println!("  (empty — run `settings import <vault>` to populate)");
-            }
-        }
-    }
-    Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Vault management
-// ---------------------------------------------------------------------------
-
-fn handle_vault_action(action: &VaultAction) -> Result<()> {
-    let mut global = GlobalConfig::load().unwrap_or_default();
-
-    match action {
-        VaultAction::Add { path, name } => {
-            let abs = fs::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path));
-            let vault_name = name.clone().unwrap_or_else(|| {
-                abs.file_name()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unnamed")
-                    .to_string()
-            });
-
-            // Create vault.toml if missing (commented examples; defaults from global + serde)
-            let vault_toml = abs.join(config::CONFIG_FILE);
-            if !vault_toml.exists() {
-                fs::write(&vault_toml, default_vault_toml_template(&vault_name))?;
-                println!("  Created vault.toml in {}", abs.display());
-            }
-
-            global.add_vault(&vault_name, &abs.to_string_lossy());
-            if global.seed_missing_tooling_sections() {
-                println!(
-                    "  Seeded default [projects], [graph], [sync], [ai], [daemon] in {}",
-                    GlobalConfig::path().display()
-                );
-            }
-            global.save()?;
-            println!("✅ Registered: {} → {}", vault_name, abs.display());
-        }
-        VaultAction::Remove { name } => {
-            if global.remove_vault(name) {
-                global.save()?;
-                println!("✅ Removed: {} (files kept)", name);
-            } else {
-                println!("⚠️  Vault not found: {}", name);
-            }
-        }
-        VaultAction::List => {
-            if global.vaults.is_empty() {
-                println!("No vaults registered. Use `obsidian-forge init` or `vault add`.");
-            } else {
-                println!("{:<20} {:<8} {:<8} PATH", "NAME", "ENABLED", "WATCH");
-                println!("{}", "-".repeat(72));
-                for v in &global.vaults {
-                    let enabled = if v.enabled { "✓" } else { "✗" };
-                    let watch = if v.watch { "✓" } else { "✗" };
-                    println!("{:<20} {:<8} {:<8} {}", v.name, enabled, watch, v.path);
-                }
-            }
-        }
-        VaultAction::Disable { name } => {
-            if let Some(v) = global.find_vault_mut(name) {
-                v.enabled = false;
-                v.watch = false;
-                global.save()?;
-                println!("✅ Disabled: {} (excluded from sync and watch)", name);
-            } else {
-                println!("⚠️  Vault not found: {}", name);
-            }
-        }
-        VaultAction::Enable { name } => {
-            if let Some(v) = global.find_vault_mut(name) {
-                v.enabled = true;
-                v.watch = true;
-                global.save()?;
-                println!("✅ Enabled: {} (sync + watch)", name);
-            } else {
-                println!("⚠️  Vault not found: {}", name);
-            }
-        }
-        VaultAction::Pause { name } => {
-            if let Some(v) = global.find_vault_mut(name) {
-                v.watch = false;
-                global.save()?;
-                println!("⏸️  Paused: {} (daemon skip, manual sync OK)", name);
-            } else {
-                println!("⚠️  Vault not found: {}", name);
-            }
-        }
-        VaultAction::Resume { name } => {
-            if let Some(v) = global.find_vault_mut(name) {
-                v.watch = true;
-                global.save()?;
-                println!("▶️  Resumed: {} (daemon active)", name);
-            } else {
-                println!("⚠️  Vault not found: {}", name);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-// ---------------------------------------------------------------------------
 // Multi-vault watch
 // ---------------------------------------------------------------------------
 
@@ -1265,7 +841,7 @@ fn resolve_single_vault(
         0 => {
             anyhow::bail!(
                 "No vaults registered. Run `of init <name>` to create one, \
-                 or `of vault add <path>` to register an existing vault."
+                 or re-run `of init <name>` on an existing directory to register it."
             );
         }
         1 => {
@@ -1312,7 +888,7 @@ async fn run_status_command(
     match enabled.len() {
         0 => anyhow::bail!(
             "No vaults registered. Run `of init <name>` to create one, \
-             or `of vault add <path>` to register an existing vault."
+             or re-run `of init <name>` on an existing directory to register it."
         ),
         1 => {
             let p = PathBuf::from(&enabled[0].path);
@@ -1494,45 +1070,6 @@ async fn run_status(vault: &Path, config: &ForgeConfig, no_ping: bool) -> Result
             }
             Err(e) => println!("❌ {}", e),
         }
-    }
-
-    // ── Graph ──
-    println!();
-    println!("Graph");
-    println!(
-        "  Backlinks:      {}",
-        if config.graph.backlinks {
-            "✓ on"
-        } else {
-            "✗ off"
-        }
-    );
-    println!(
-        "  Bridge notes:   {}",
-        if config.graph.bridge_notes {
-            "✓ on"
-        } else {
-            "✗ off"
-        }
-    );
-    println!(
-        "  Auto tags:      {}",
-        if config.graph.auto_tags {
-            "✓ on"
-        } else {
-            "✗ off"
-        }
-    );
-    println!(
-        "  Related:        {}",
-        if config.graph.related_projects {
-            "✓ on"
-        } else {
-            "✗ off"
-        }
-    );
-    if !config.graph.concepts.is_empty() {
-        println!("  Concepts:       {} defined", config.graph.concepts.len());
     }
 
     // ── Sync ──

@@ -40,17 +40,6 @@ impl VaultGraph {
             .count()
     }
 
-    pub fn orphans(&self) -> Vec<&str> {
-        self.all_files
-            .iter()
-            .filter(|f| {
-                self.outgoing.get(*f).is_none_or(|s| s.is_empty())
-                    && self.incoming.get(*f).is_none_or(|s| s.is_empty())
-            })
-            .map(|s| s.as_str())
-            .collect()
-    }
-
     pub fn total_links(&self) -> usize {
         self.outgoing.values().map(|s| s.len()).sum()
     }
@@ -446,7 +435,6 @@ config = true\n\
             .insert("b.md".into(), BTreeSet::from(["a.md".into()]));
 
         assert_eq!(graph.orphan_count(), 1);
-        assert_eq!(graph.orphans(), vec!["c.md"]);
     }
 
     #[test]
