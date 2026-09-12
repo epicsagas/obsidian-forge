@@ -121,7 +121,13 @@ codex plugin marketplace add epicsagas/plugins
 agy plugin install https://github.com/epicsagas/obsidian-forge
 ```
 
-安装后，当你询问知识库管理、PARA 路由、图谱操作或守护进程相关问题时，AI 代理会自动触发相应的技能。
+#### Grok CLI
+
+```bash
+grok plugin install epicsagas/obsidian-forge --trust
+```
+
+安装后，当你询问知识库管理、PARA 路由、完整性检查或守护进程相关问题时，AI 代理会自动触发相应的技能。
 
 ### 前置条件
 
@@ -176,7 +182,7 @@ enabled = true    # 参与同步
 watch   = true    # 由守护进程监控
 ```
 
-### 知识库完整性与图谱操作
+### 知识库完整性与完整性检查
 
 ```bash
 obsidian-forge check-tags            [--vault <name>]  # 缺失 layer/type/project 标签

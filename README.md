@@ -129,7 +129,13 @@ codex plugin marketplace add epicsagas/plugins
 agy plugin install https://github.com/epicsagas/obsidian-forge
 ```
 
-Once installed, your AI agent automatically triggers the right skill when you ask about vault management, PARA routing, graph operations, or daemon issues.
+#### Grok CLI
+
+```bash
+grok plugin install epicsagas/obsidian-forge --trust
+```
+
+Once installed, your AI agent automatically triggers the right skill when you ask about vault management, PARA routing, integrity checks, or daemon issues.
 
 ### Prerequisites
 

@@ -121,7 +121,13 @@ codex plugin marketplace add epicsagas/plugins
 agy plugin install https://github.com/epicsagas/obsidian-forge
 ```
 
-Une fois installé, votre agent IA déclenche automatiquement la bonne compétence lorsque vous posez des questions sur la gestion du coffre, le routage PARA, les opérations de graphe ou les problèmes du daemon.
+#### Grok CLI
+
+```bash
+grok plugin install epicsagas/obsidian-forge --trust
+```
+
+Une fois installé, votre agent IA déclenche automatiquement la bonne compétence lorsque vous posez des questions sur la gestion du coffre, le routage PARA, les vérifications d'intégrité ou les problèmes du daemon.
 
 ### Prérequis
 
@@ -176,7 +182,7 @@ enabled = true    # inclus dans la synchronisation
 watch   = true    # surveillé par le daemon
 ```
 
-### Intégrité du coffre et opérations de graphe
+### Intégrité du coffre et vérifications d'intégrité
 
 ```bash
 obsidian-forge check-tags            [--vault <name>]  # tags layer/type/project manquants

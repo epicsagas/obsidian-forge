@@ -121,7 +121,13 @@ codex plugin marketplace add epicsagas/plugins
 agy plugin install https://github.com/epicsagas/obsidian-forge
 ```
 
-Nach der Installation löst Ihr KI-Agent automatisch den richtigen Skill aus, wenn Sie nach Tresor-Verwaltung, PARA-Routing, Graph-Operationen oder Daemon-Problemen fragen.
+#### Grok CLI
+
+```bash
+grok plugin install epicsagas/obsidian-forge --trust
+```
+
+Nach der Installation löst Ihr KI-Agent automatisch den richtigen Skill aus, wenn Sie nach Tresor-Verwaltung, PARA-Routing, Integritätsprüfungen oder Daemon-Problemen fragen.
 
 ### Voraussetzungen
 
@@ -176,7 +182,7 @@ enabled = true    # in der Synchronisierung enthalten
 watch   = true    # vom Daemon überwacht
 ```
 
-### Tresor-Integrität & Graph-Operationen
+### Tresor-Integrität & Integritätsprüfungen
 
 ```bash
 obsidian-forge check-tags            [--vault <name>]  # fehlende layer/type/project-Tags

@@ -121,7 +121,13 @@ codex plugin marketplace add epicsagas/plugins
 agy plugin install https://github.com/epicsagas/obsidian-forge
 ```
 
-Uma vez instalado, seu agente de IA aciona automaticamente a habilidade certa quando você pergunta sobre gerenciamento de cofre, roteamento PARA, operações de grafo ou problemas do daemon.
+#### Grok CLI
+
+```bash
+grok plugin install epicsagas/obsidian-forge --trust
+```
+
+Uma vez instalado, seu agente de IA aciona automaticamente a habilidade certa quando você pergunta sobre gerenciamento de cofre, roteamento PARA, verificações de integridade ou problemas do daemon.
 
 ### Pré-requisitos
 

@@ -121,7 +121,13 @@ codex plugin marketplace add epicsagas/plugins
 agy plugin install https://github.com/epicsagas/obsidian-forge
 ```
 
-インストール後、ボールト管理、PARAルーティング、グラフ操作、またはデーモンの問題について尋ねると、AIエージェントが自動的に適切なスキルをトリガーします。
+#### Grok CLI
+
+```bash
+grok plugin install epicsagas/obsidian-forge --trust
+```
+
+インストール後、ボールト管理、PARAルーティング、整合性チェック、またはデーモンの問題について尋ねると、AIエージェントが自動的に適切なスキルをトリガーします。
 
 ### 前提条件
 
@@ -176,7 +182,7 @@ enabled = true    # 同期に含める
 watch   = true    # デーモンの監視対象にする
 ```
 
-### Vault整合性とグラフ操作
+### Vault整合性と整合性チェック
 
 ```bash
 obsidian-forge check-tags            [--vault <name>]  # 不足しているlayer/type/projectタグ

@@ -121,7 +121,13 @@ codex plugin marketplace add epicsagas/plugins
 agy plugin install https://github.com/epicsagas/obsidian-forge
 ```
 
-Kurulduktan sonra, kasa yönetimi, PARA yönlendirme, grafik işlemleri veya daemon sorunları hakkında sorular sorduğunuzda AI ajanınız otomatik olarak doğru yeteneği tetikler.
+#### Grok CLI
+
+```bash
+grok plugin install epicsagas/obsidian-forge --trust
+```
+
+Kurulduktan sonra, kasa yönetimi, PARA yönlendirme, bütünlük kontrolleri veya daemon sorunları hakkında sorular sorduğunuzda AI ajanınız otomatik olarak doğru yeteneği tetikler.
 
 ### Ön koşullar
 
