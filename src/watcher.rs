@@ -55,11 +55,15 @@ pub async fn watch_inbox(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
 }
 
 async fn handle_file_event(p: &Path, vault_root: &Path, config: &ForgeConfig) {
+    // Fresh snapshot per event — inbox events are sparse, one walk is cheap
+    // and keeps duplicate-detection context current.
+    let recent = notes::collect_recent_summaries(vault_root, config, 30);
     if notes::is_pdf(p) {
         match converter::convert_pdf_to_md(p, vault_root, config).await {
             Ok(md_path) => {
                 info!("PDF converted -> {}", md_path.display());
-                if let Err(e) = notes::process_one(&md_path, config, vault_root).await
+                if let Err(e) =
+                    notes::process_one_with_context(&md_path, config, vault_root, Some(&recent)).await
                     && !e.to_string().contains("No such file or directory")
                 {
                     error!("Processing failed: {:?}", e);
@@ -70,7 +74,7 @@ async fn handle_file_event(p: &Path, vault_root: &Path, config: &ForgeConfig) {
     } else if notes::is_markdown(p) {
         // allow(collapsible_if): let-chain requires Rust 1.88+; CI runs 1.85
         #[allow(clippy::collapsible_if)]
-        if let Err(e) = notes::process_one(p, config, vault_root).await {
+        if let Err(e) = notes::process_one_with_context(p, config, vault_root, Some(&recent)).await {
             if !e.to_string().contains("No such file or directory") {
                 error!("Processing failed: {:?}", e);
             }

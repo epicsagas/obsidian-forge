@@ -1,7 +1,12 @@
 use anyhow::Result;
+use futures::stream::{self, StreamExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs,
+    path::Path,
+};
 use tracing::{info, warn};
 use walkdir::WalkDir;
 
@@ -492,6 +497,182 @@ pub fn check_links(vault_root: &Path, config: &ForgeConfig, fix: bool) -> Result
     })
 }
 
+// ---------------------------------------------------------------------------
+// AI suggestions
+// ---------------------------------------------------------------------------
+
+/// Max source files to run AI link suggestions for in one invocation.
+const SUGGEST_FILE_CAP: usize = 50;
+/// Candidate filenames shown to the model per broken link (local prefilter).
+const CANDIDATES_PER_LINK: usize = 8;
+
+/// Rank vault stems by naive word overlap with the link target — cheap local
+/// prefilter so the AI only adjudicates plausible matches.
+fn rank_candidates<'a>(
+    target: &str,
+    stems: impl Iterator<Item = &'a String>,
+) -> Vec<String> {
+    let target_lower = target.to_lowercase();
+    let words: Vec<&str> = target_lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| w.chars().count() >= 3)
+        .collect();
+    let mut scored: Vec<(usize, &String)> = stems
+        .map(|stem| {
+            let lower = stem.to_lowercase();
+            let score = words
+                .iter()
+                .filter(|w| lower.contains(*w))
+                .count();
+            (score, stem)
+        })
+        .filter(|(score, _)| *score > 0)
+        .collect();
+    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored
+        .into_iter()
+        .take(CANDIDATES_PER_LINK)
+        .map(|(_, s)| s.clone())
+        .collect()
+}
+
+/// AI-suggest target files for unresolved wikilinks.
+///
+/// Read-only: prints `[SUGGEST]` lines per broken link. Nothing is renamed or
+/// rewritten — apply good suggestions by editing the link (or re-run
+/// `check-links --fix` for mechanical mismatches).
+pub async fn suggest_link_targets(
+    vault_root: &Path,
+    config: &ForgeConfig,
+) -> Result<String> {
+    let result = check_links(vault_root, config, false)?;
+
+    // Unresolved links grouped per source file.
+    let mut per_file: Vec<(String, Vec<String>)> = Vec::new();
+    for link in &result.broken {
+        if link.issue != LinkIssue::Unresolved {
+            continue;
+        }
+        match per_file.iter_mut().find(|(f, _)| *f == link.source) {
+            Some((_, targets)) => targets.push(link.target.clone()),
+            None => per_file.push((link.source.clone(), vec![link.target.clone()])),
+        }
+    }
+    per_file.truncate(SUGGEST_FILE_CAP);
+
+    if per_file.is_empty() {
+        return Ok("=== Link Suggestions ===\nNo unresolved links — nothing to suggest.".into());
+    }
+
+    let all_stems: Vec<String> = collect_md_files(vault_root).keys().cloned().collect();
+    let client = crate::ai::AiClient::from_config(&config.ai);
+    let concurrency = config.ai.max_concurrent.unwrap_or(5).clamp(1, 3);
+
+    let mut out = String::from("=== Link Suggestions ===\n");
+    let files_with_unresolved = result
+        .broken
+        .iter()
+        .filter(|l| l.issue == LinkIssue::Unresolved)
+        .map(|l| l.source.clone())
+        .collect::<HashSet<_>>()
+        .len();
+    out.push_str(&format!(
+        "Files with unresolved links: {} (suggesting for up to {})\n",
+        files_with_unresolved,
+        per_file.len()
+    ));
+
+    let suggestions = stream::iter(per_file)
+        .map(|(source, targets)| {
+            let client = client.clone();
+            let all_stems = all_stems.clone();
+            async move {
+                let mut pairs: Vec<(String, Vec<String>)> = targets
+                    .into_iter()
+                    .map(|t| {
+                        let cands = rank_candidates(&t, all_stems.iter());
+                        (t, cands)
+                    })
+                    .collect();
+                pairs.retain(|(_, cands)| !cands.is_empty());
+                if pairs.is_empty() {
+                    return None;
+                }
+                match suggest_one(&client, &pairs).await {
+                    Ok(resolved) => Some((source, resolved)),
+                    Err(e) => {
+                        tracing::warn!("Link suggestion failed for {}: {}", source, e);
+                        None
+                    }
+                }
+            }
+        })
+        .buffer_unordered(concurrency)
+        .filter_map(|x| async move { x })
+        .collect::<Vec<_>>()
+        .await;
+
+    for (source, resolved) in suggestions {
+        for (target, candidate) in resolved {
+            match candidate {
+                Some(c) => out.push_str(&format!(
+                    "  [SUGGEST] {source} -> [[{target}]] ⇒ {c}\n"
+                )),
+                None => out.push_str(&format!(
+                    "  [SUGGEST] {source} -> [[{target}]] ⇒ (no match)\n"
+                )),
+            }
+        }
+    }
+    out.push_str("\nNothing applied — review, then fix the links manually.\n");
+    Ok(out)
+}
+
+/// One AI call per source file: model picks the best candidate per target or
+/// returns null.
+async fn suggest_one(
+    client: &crate::ai::AiClient,
+    pairs: &[(String, Vec<String>)],
+) -> Result<Vec<(String, Option<String>)>> {
+    #[derive(serde::Deserialize)]
+    struct Resolve {
+        target: String,
+        best_match: Option<String>,
+    }
+
+    let listing: String = pairs
+        .iter()
+        .map(|(target, cands)| {
+            format!(
+                "- [[{target}]] 후보: [{}]",
+                cands.join(", ")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let prompt = format!(
+        "다음은 Obsidian 볼트의 깨진 위키링크 목록이다. 각 링크가 가리키려던 실제 노트를 후보 중에서 고르라. \
+         파일명: 확장자 제외 상대 경로. 맥락상 어느 후보도 맞지 않으면 best_match는 null.\n\n{listing}\n\n\
+         JSON 배열로만 답하라. 형식: [{{\"target\": \"링크명\", \"best_match\": \"후보 경로 또는 null\"}}]"
+    );
+
+    let resolved: Vec<Resolve> = client.generate_json(&prompt).await?;
+    let valid: Vec<String> = pairs
+        .iter()
+        .flat_map(|(_, cands)| cands.iter().cloned())
+        .collect();
+    Ok(resolved
+        .into_iter()
+        .map(|r| {
+            let best = r
+                .best_match
+                .filter(|b| !b.trim().is_empty() && valid.iter().any(|v| v == b));
+            (r.target, best)
+        })
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -632,6 +813,19 @@ mod tests {
             fs::read_to_string(tmp.path().join("My-Note.md")).unwrap(),
             "original body"
         );
+    }
+
+    #[test]
+    fn test_rank_candidates_prefilter() {
+        let stems = vec![
+            "99-Archives/projects/alcove/ARCHITECTURE".to_string(),
+            "10-Zettelkasten/MCP Protocol".to_string(),
+            "02-Areas/rust-notes".to_string(),
+        ];
+        let ranked = rank_candidates("architecture", stems.iter());
+        assert_eq!(ranked[0], "99-Archives/projects/alcove/ARCHITECTURE");
+        // No word overlap at all → no candidates.
+        assert!(rank_candidates("zzzqqq", stems.iter()).is_empty());
     }
 
     #[test]

@@ -86,6 +86,9 @@ enum Commands {
         /// Auto-fix missing tags
         #[arg(long)]
         fix: bool,
+        /// AI-suggest tags for files with issues (read-only)
+        #[arg(long)]
+        suggest: bool,
         /// Scope: "project" (project docs only) or "vault" (includes Resources)
         #[arg(long, default_value = "vault")]
         scope: check_tags::TagScope,
@@ -99,6 +102,9 @@ enum Commands {
         /// Auto-fix filename and extension mismatches
         #[arg(long)]
         fix: bool,
+        /// AI-suggest targets for unresolved links (read-only)
+        #[arg(long)]
+        suggest: bool,
         /// Specific vault name (from global config)
         #[arg(long)]
         vault: Option<String>,
@@ -109,6 +115,9 @@ enum Commands {
         /// Auto-fix detected malformations
         #[arg(long)]
         fix: bool,
+        /// AI-generate frontmatter for docs that have none
+        #[arg(long)]
+        fill_missing: bool,
         /// Specific vault name (from global config)
         #[arg(long)]
         vault: Option<String>,
@@ -256,21 +265,44 @@ async fn main() -> Result<()> {
         }
         Commands::CheckTags {
             fix,
+            suggest,
             scope,
             vault: filter,
         } => {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
-            let result = check_tags::check_tags(&vault, &config, fix, scope)?;
-            println!("{}", result);
+            if suggest {
+                let out = check_tags::suggest_tags(&vault, &config, scope).await?;
+                println!("{out}");
+            } else {
+                let result = check_tags::check_tags(&vault, &config, fix, scope)?;
+                println!("{}", result);
+            }
         }
-        Commands::CheckLinks { fix, vault: filter } => {
+        Commands::CheckLinks {
+            fix,
+            suggest,
+            vault: filter,
+        } => {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
-            let result = check_links::check_links(&vault, &config, fix)?;
-            println!("{}", result);
+            if suggest {
+                let out = check_links::suggest_link_targets(&vault, &config).await?;
+                println!("{out}");
+            } else {
+                let result = check_links::check_links(&vault, &config, fix)?;
+                println!("{}", result);
+            }
         }
-        Commands::NormalizeFrontmatter { fix, vault: filter } => {
+        Commands::NormalizeFrontmatter {
+            fix,
+            fill_missing,
+            vault: filter,
+        } => {
             let (vault, config) = resolve_single_vault(cli.vault_path, filter)?;
-            let result = frontmatter::normalize_frontmatter(&vault, &config, fix)?;
+            let result = if fill_missing {
+                frontmatter::fill_missing_frontmatter(&vault, &config).await?
+            } else {
+                frontmatter::normalize_frontmatter(&vault, &config, fix)?
+            };
             println!("{}", result);
         }
         Commands::Doctor {

@@ -25,6 +25,34 @@ pub struct AiClient {
     base_url: String,
     api_key: Option<String>,
     http: reqwest::Client,
+    /// Minimum gap between request starts (ms). 0 for local providers.
+    min_interval_ms: u64,
+}
+
+/// Global request spacing across all clones of [`AiClient`] — one shared
+/// clock per process so concurrent batch tasks cannot stomp the interval.
+fn request_gate() -> &'static tokio::sync::Mutex<std::time::Instant> {
+    static GATE: std::sync::OnceLock<tokio::sync::Mutex<std::time::Instant>> =
+        std::sync::OnceLock::new();
+    GATE.get_or_init(|| tokio::sync::Mutex::new(std::time::Instant::now() - std::time::Duration::from_secs(3600)))
+}
+
+/// Wait until at least `min_interval_ms` has passed since the previous
+/// remote request started, then claim the next slot.
+async fn acquire_request_slot(min_interval_ms: u64) {
+    if min_interval_ms == 0 {
+        return;
+    }
+    let mut last = request_gate().lock().await;
+    let now = std::time::Instant::now();
+    let elapsed = now.duration_since(*last);
+    if elapsed < std::time::Duration::from_millis(min_interval_ms) {
+        tokio::time::sleep(std::time::Duration::from_millis(
+            min_interval_ms - elapsed.as_millis() as u64,
+        ))
+        .await;
+    }
+    *last = std::time::Instant::now();
 }
 
 impl AiClient {
@@ -49,12 +77,20 @@ impl AiClient {
             _ => None,
         });
 
+        // Rate-limit guard: remote providers get a conservative default gap
+        // between request starts; local servers and ollama are unthrottled.
+        let min_interval_ms = cfg.min_request_interval_ms.unwrap_or(match cfg.provider.as_str() {
+            "ollama" | "lmstudio" => 0,
+            _ => 2000,
+        });
+
         Self {
             provider: cfg.provider.clone(),
             model: cfg.model.clone(),
             base_url,
             api_key,
             http: reqwest::Client::new(),
+            min_interval_ms,
         }
     }
 
@@ -297,6 +333,29 @@ impl AiClient {
     // -------------------------------------------------------------------------
 
     async fn complete_openai_compatible(&self, prompt: &str) -> Result<String> {
+        // Retry transient failures (429 / 5xx) with exponential backoff,
+        // honouring Retry-After. Keeps free-tier and shared-rate-limit
+        // endpoints usable for batch runs without hammering them.
+        let max_attempts = 5u32;
+        let mut attempt = 0u32;
+        loop {
+            attempt += 1;
+            match self.complete_once(prompt).await {
+                Ok(resp) => return Ok(resp),
+                Err(e) if attempt < max_attempts && is_transient(&e) => {
+                    let backoff = retry_delay(attempt, e.retry_after_ms());
+                    warn!(
+                        "AI request transient failure (attempt {}/{}), retrying in {:?}: {}",
+                        attempt, max_attempts, backoff, e
+                    );
+                    tokio::time::sleep(backoff).await;
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+    }
+
+    async fn complete_once(&self, prompt: &str) -> Result<String, AiError> {
         #[derive(Serialize)]
         struct Req<'a> {
             model: &'a str,
@@ -323,6 +382,9 @@ impl AiClient {
         }
 
         let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
+
+        // Space out request starts so batch runs stay under provider rate limits.
+        acquire_request_slot(self.min_interval_ms).await;
 
         let body = Req {
             model: &self.model,
@@ -352,28 +414,105 @@ impl AiClient {
                 .header("X-Title", "obsidian-forge");
         }
 
-        let resp = req
-            .send()
-            .await
-            .with_context(|| format!("request to {} failed", url))?;
+        let resp = req.send().await.map_err(|e| AiError::Other(e.to_string()))?;
 
-        if !resp.status().is_success() {
-            let status = resp.status();
+        let status = resp.status();
+        if !status.is_success() {
+            let retry_after = resp
+                .headers()
+                .get(reqwest::header::RETRY_AFTER)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.trim().parse::<u64>().ok())
+                .map(|s| s.saturating_mul(1000));
             let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!("AI API error {}: {}", status, body);
+            let code = status.as_u16();
+            if code == 429 || code >= 500 {
+                return Err(AiError::Transient {
+                    status: code,
+                    body: truncate_body(&body),
+                    retry_after_ms: retry_after,
+                });
+            }
+            return Err(AiError::Permanent {
+                status: code,
+                body: truncate_body(&body),
+            });
         }
 
         let parsed: Resp = resp
             .json()
             .await
-            .context("failed to parse AI API response")?;
+            .map_err(|e| AiError::Other(format!("failed to parse AI API response: {e}")))?;
 
         parsed
             .choices
             .into_iter()
             .next()
             .map(|c| c.message.content.trim().to_string())
-            .ok_or_else(|| anyhow::anyhow!("empty choices in AI API response"))
+            .ok_or(AiError::Other("empty choices in AI API response".into()))
+    }
+}
+
+/// Error carrier for [`AiClient::complete_once`] that separates transient
+/// failures (worth retrying with backoff) from permanent ones.
+#[derive(Debug)]
+enum AiError {
+    Transient {
+        status: u16,
+        body: String,
+        retry_after_ms: Option<u64>,
+    },
+    Permanent { status: u16, body: String },
+    Other(String),
+}
+
+impl std::fmt::Display for AiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AiError::Transient { status, body, .. } => write!(f, "AI API error {status}: {body}"),
+            AiError::Permanent { status, body } => write!(f, "AI API error {status}: {body}"),
+            AiError::Other(msg) => write!(f, "{msg}"),
+        }
+    }
+}
+
+impl std::error::Error for AiError {}
+
+impl AiError {
+    fn retry_after_ms(&self) -> Option<u64> {
+        match self {
+            AiError::Transient { retry_after_ms, .. } => *retry_after_ms,
+            _ => None,
+        }
+    }
+}
+
+fn is_transient(e: &AiError) -> bool {
+    matches!(e, AiError::Transient { .. })
+}
+
+/// Exponential backoff with jitter: 1s, 2s, 4s, 8s … capped at 30s, or the
+/// server-advertised Retry-After if it is longer.
+fn retry_delay(attempt: u32, retry_after_ms: Option<u64>) -> std::time::Duration {
+    let exp = std::time::Duration::from_millis(1000u64.saturating_mul(1 << (attempt - 1).min(5)));
+    let jitter_ms = (std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_millis())
+        .unwrap_or(0)) as u64;
+    let with_jitter = exp + std::time::Duration::from_millis(jitter_ms);
+    if let Some(ra) = retry_after_ms {
+        return std::time::Duration::from_millis(ra).max(with_jitter);
+    }
+    with_jitter.min(std::time::Duration::from_secs(30))
+}
+
+fn truncate_body(body: &str) -> String {
+    const MAX: usize = 300;
+    if body.chars().count() <= MAX {
+        body.to_string()
+    } else {
+        let cut: String = body.chars().take(MAX).collect();
+        format!("{cut}…")
     }
 }
 

@@ -1,7 +1,8 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
+use futures::stream::{self, StreamExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fs, path::Path, sync::OnceLock};
+use std::{collections::HashSet, fs, path::{Path, PathBuf}, sync::OnceLock};
 use tracing::info;
 use walkdir::WalkDir;
 
@@ -252,12 +253,190 @@ pub fn normalize_frontmatter(
     Ok(result)
 }
 
+// ---------------------------------------------------------------------------
+// AI fill: generate frontmatter for docs that have none
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+struct AiFrontmatter {
+    project: String,
+    title: String,
+    summary: String,
+    tags: Vec<String>,
+}
+
+/// Minimum body length (chars) for a doc to be worth an AI fill call.
+const FILL_MIN_BODY_CHARS: usize = 200;
+
+/// Generate frontmatter via AI for markdown files that have none.
+///
+/// Batch is paced by [`crate::ai`]'s global request throttle and honors
+/// `max_concurrent`, but the effective concurrency is capped at 3 so
+/// rate-limited providers are not hammered. The inbox is skipped — those
+/// files belong to the `process-all` flow.
+pub async fn fill_missing_frontmatter(
+    vault_root: &Path,
+    config: &ForgeConfig,
+) -> Result<FrontmatterResult> {
+    let mut result = FrontmatterResult::default();
+    let inbox = vault_root.join(&config.vault.inbox_dir);
+
+    let mut candidates: Vec<(PathBuf, String)> = Vec::new(); // (path, rel)
+    for entry in WalkDir::new(vault_root)
+        .into_iter()
+        .filter_entry(|e| !is_vault_excluded(e.path(), vault_root))
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file() && e.path().extension().is_some_and(|ext| ext == "md"))
+    {
+        result.scanned += 1;
+        let path = entry.path();
+        if path.starts_with(&inbox) {
+            continue;
+        }
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        if frontmatter_re().is_match(&content) {
+            continue;
+        }
+        if content.chars().count() < FILL_MIN_BODY_CHARS {
+            continue;
+        }
+        let rel = path
+            .strip_prefix(vault_root)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .to_string();
+        candidates.push((path.to_path_buf(), rel));
+    }
+
+    if candidates.is_empty() {
+        info!("No frontmatter-less docs worth filling");
+        return Ok(result);
+    }
+
+    let client = crate::ai::AiClient::from_config(&config.ai);
+    let concurrency = config.ai.max_concurrent.unwrap_or(5).clamp(1, 3);
+
+    let outcomes = stream::iter(candidates)
+        .map(|(path, rel)| {
+            let client = client.clone();
+            async move {
+                match fill_one(&path, &rel, &client).await {
+                    Ok(()) => {
+                        info!("AI-filled frontmatter: {}", rel);
+                        Some(rel)
+                    }
+                    Err(e) => {
+                        tracing::warn!("AI fill failed for {}: {}", rel, e);
+                        None
+                    }
+                }
+            }
+        })
+        .buffer_unordered(concurrency)
+        .collect::<Vec<_>>()
+        .await;
+
+    for filled in outcomes.into_iter().flatten() {
+        result.issues.push(FrontmatterIssue {
+            file: filled,
+            issue: "ai_filled".into(),
+            detail: "frontmatter generated from content".into(),
+            fixed: true,
+        });
+        result.fixed += 1;
+    }
+
+    Ok(result)
+}
+
+/// Excerpt `content` to at most `max` chars, cutting on a char boundary.
+pub fn excerpt(content: &str, max: usize) -> String {
+    if content.chars().count() <= max {
+        content.to_string()
+    } else {
+        content.chars().take(max).collect()
+    }
+}
+
+async fn fill_one(path: &Path, rel: &str, client: &crate::ai::AiClient) -> Result<()> {
+    let content = fs::read_to_string(path)?;
+
+    let prompt = format!(
+        "다음 마크다운 문서의 메타데이터를 추출해 JSON으로만 답하라. \
+         다른 설명이나 코드펜스 없이 순수 JSON 한 개만 출력할 것.\n\
+         형식: {{\"project\": \"kebab-case 프로젝트명\", \"title\": \"문서 제목\", \
+         \"summary\": \"100자 이내 요약\", \
+         \"tags\": [\"layer/raw\", \"type/...\", \"topics/...\" 3~5개 계층형 태그 — type은 prd|architecture|convention|decision|progress|debt|reference|report|spec|plan|research|strategy|note 중 하나]}}\n\n\
+         경로 힌트: {rel}\n\n---\n{}\n---",
+        excerpt(&content, 3000)
+    );
+
+    let fm: AiFrontmatter = client.generate_json(&prompt).await?;
+    if fm.project.trim().is_empty() || fm.tags.is_empty() {
+        bail!("AI returned unusable frontmatter for {}", rel);
+    }
+
+    let today = chrono_like_today();
+    let tags = fm.tags.join(", ");
+    let frontmatter = format!(
+        "---\nproject: {}\ntitle: {}\nsummary: \"{}\"\ntags: [{}]\ncreated: {}\n---\n",
+        fm.project.trim(),
+        fm.title.trim().replace('"', "'"),
+        fm.summary.trim().replace('"', "'"),
+        tags,
+        today,
+    );
+
+    fs::write(path, format!("{frontmatter}{content}"))?;
+    Ok(())
+}
+
+/// Local-date ISO string (YYYY-MM-DD) without pulling a date crate.
+fn chrono_like_today() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let days = now / 86_400;
+    // Civil-from-days algorithm (Howard Hinnant) — UTC date, good enough for a stamp.
+    let z = days as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn make_config() -> ForgeConfig {
         ForgeConfig::default_for("test-vault")
+    }
+
+    #[test]
+    fn test_excerpt_respects_char_boundary() {
+        let s = "가".repeat(500);
+        let cut = excerpt(&s, 300);
+        assert_eq!(cut.chars().count(), 300);
+        assert_eq!(excerpt(&s, 10_000), s);
+    }
+
+    #[test]
+    fn test_chrono_like_today_format() {
+        let today = chrono_like_today();
+        assert_eq!(today.len(), 10);
+        assert_eq!(today.as_bytes()[4], b'-');
+        assert_eq!(today.as_bytes()[7], b'-');
     }
 
     #[test]

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use futures::stream::{self, StreamExt};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, fs, path::Path, sync::OnceLock};
@@ -583,6 +584,113 @@ fn extract_project_name(file_path: &Path, projects_dir: &Path) -> Option<String>
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// AI suggestions
+// ---------------------------------------------------------------------------
+
+/// Max files to run AI tag suggestions for in one invocation — bounds cost
+/// on a first run over a messy vault; re-run for the next batch.
+const SUGGEST_FILE_CAP: usize = 50;
+
+/// AI-suggest tags for files that failed the mechanical tag check.
+///
+/// Read-only: runs the check in report mode, then asks the model for a tag
+/// set per file and prints the proposals. Nothing is written — review and
+/// apply with `check-tags --fix` afterwards.
+pub async fn suggest_tags(
+    vault_root: &Path,
+    config: &ForgeConfig,
+    scope: TagScope,
+) -> Result<String> {
+    let result = check_tags(vault_root, config, false, scope)?;
+
+    // Group issues per file, preserve order, cap the batch.
+    let mut files: Vec<String> = Vec::new();
+    for issue in &result.issues {
+        if !files.contains(&issue.file) {
+            files.push(issue.file.clone());
+        }
+    }
+    files.truncate(SUGGEST_FILE_CAP);
+
+    if files.is_empty() {
+        return Ok("=== Tag Suggestions ===\nNo files with tag issues — nothing to suggest.".into());
+    }
+
+    let client = crate::ai::AiClient::from_config(&config.ai);
+    let concurrency = config.ai.max_concurrent.unwrap_or(5).clamp(1, 3);
+
+    let mut out = String::from("=== Tag Suggestions ===\n");
+    out.push_str(&format!(
+        "Files with issues: {} (suggesting for up to {})\n",
+        result
+            .issues
+            .iter()
+            .map(|i| i.file.clone())
+            .collect::<HashSet<_>>()
+            .len(),
+        files.len()
+    ));
+
+    let suggestions = stream::iter(files)
+        .map(|rel| {
+            let client = client.clone();
+            let vault_root = vault_root.to_path_buf();
+            async move {
+                match suggest_one(&vault_root, &rel, &client).await {
+                    Ok(tags) => Some((rel, tags)),
+                    Err(e) => {
+                        tracing::warn!("Tag suggestion failed for {}: {}", rel, e);
+                        None
+                    }
+                }
+            }
+        })
+        .buffer_unordered(concurrency)
+        .filter_map(|x| async move { x })
+        .collect::<Vec<_>>()
+        .await;
+
+    for (rel, tags) in suggestions {
+        out.push_str(&format!("  [SUGGEST] {} — tags: [{}]\n", rel, tags.join(", ")));
+    }
+    out.push_str("\nNothing applied — review, then run `of check-tags --fix` or edit manually.\n");
+    Ok(out)
+}
+
+async fn suggest_one(
+    vault_root: &Path,
+    rel: &str,
+    client: &crate::ai::AiClient,
+) -> Result<Vec<String>> {
+    let path = vault_root.join(rel);
+    let content = fs::read_to_string(&path)?;
+    let (yaml, body) = match frontmatter_re().captures(&content) {
+        Some(c) => (
+            c.get(1).map(|m| m.as_str()).unwrap_or("").to_string(),
+            c.get(2).map(|m| m.as_str()).unwrap_or("").to_string(),
+        ),
+        None => (String::new(), content.clone()),
+    };
+    let existing = parse_tags_from_yaml(&yaml);
+
+    let prompt = format!(
+        "Obsidian 볼트 문서의 태그를 제안하라. 계층형 태그 규칙: layer/raw|wiki, type/prd|architecture|convention|decision|progress|debt|reference|report|spec|plan|research|strategy|note, project/<프로젝트명>, topics/<주제>. \
+         기존 태그를 최대한 유지하되 빠진 필수 계층을 채우고 topics 태그를 1~3개 보완하라. 7개 초과 금지.\n\
+         파일: {rel}\n기존 태그: [{}]\n\n---\n{}\n---\n\n\
+         JSON 배열 형식(문자열 배열)으로만 답하라. 예: [\"layer/raw\", \"type/prd\", \"my-project\"]",
+        existing.join(", "),
+        crate::frontmatter::excerpt(&body, 1500)
+    );
+
+    let tags: Vec<String> = client.generate_json(&prompt).await?;
+    Ok(tags
+        .into_iter()
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .collect())
+}
 
 #[cfg(test)]
 mod tests {

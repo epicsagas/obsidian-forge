@@ -48,6 +48,10 @@ pub struct Frontmatter {
     pub detail: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub questions: Option<Vec<String>>,
+    /// Relative vault path of an existing note this note appears to duplicate
+    /// (AI-judged against recent processed summaries). Advisory only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duplicate_of: Option<String>,
 }
 
 pub fn is_markdown(path: &Path) -> bool {
@@ -111,12 +115,17 @@ pub async fn process_all(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
 
     info!("Processing {} markdown files concurrently", md_files.len());
 
+    // One shared recent-summaries snapshot for the whole batch — duplicate
+    // detection rides the classification call without extra requests.
+    let recent = collect_recent_summaries(vault_root, config, 30);
+
     // Process files concurrently with buffer_unordered
     let concurrency_limit = config.ai.max_concurrent.unwrap_or(5);
     stream::iter(md_files)
         .map(|path| {
             let path = path.clone();
-            async move { process_one(&path, config, vault_root).await }
+            let recent = recent.clone();
+            async move { process_one_with_context(&path, config, vault_root, Some(&recent)).await }
         })
         .buffer_unordered(concurrency_limit)
         .collect::<Vec<_>>()
@@ -125,7 +134,63 @@ pub async fn process_all(vault_root: &Path, config: &ForgeConfig) -> Result<()> 
     Ok(())
 }
 
+/// Recently processed notes for duplicate detection: `(rel_path, summary)`,
+/// most recent first, capped small so the prompt stays cheap. `None` disables
+/// the duplicate check.
+pub type RecentSummaries = Vec<(String, String)>;
+
+/// Scan the vault for notes already processed by AI (frontmatter `summary` +
+/// `processed_at`), most recent first. One walk per call — callers running
+/// batches should compute this once and share the result.
+pub fn collect_recent_summaries(vault_root: &Path, config: &ForgeConfig, limit: usize) -> RecentSummaries {
+    let mut items: Vec<(String, String, String)> = Vec::new(); // (processed_at, rel, summary)
+    for entry in WalkDir::new(vault_root)
+        .into_iter()
+        .filter_entry(|e| !crate::vault_utils::is_vault_excluded(e.path(), vault_root))
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file() && e.path().extension().is_some_and(|ext| ext == "md"))
+    {
+        // Skip the inbox itself — unprocessed neighbours are not duplicate targets.
+        if entry.path().strip_prefix(vault_root).is_ok_and(|p| {
+            p.starts_with(&config.vault.inbox_dir)
+                || config
+                    .vault
+                    .system_dirs
+                    .iter()
+                    .any(|d| p.starts_with(d))
+        }) {
+            continue;
+        }
+        let Ok(content) = fs::read_to_string(entry.path()) else {
+            continue;
+        };
+        let Ok((Some(fm), _)) = split_frontmatter(&content) else {
+            continue;
+        };
+        if let (Some(summary), Some(processed_at)) = (fm.summary, fm.processed_at)
+            && !summary.trim().is_empty()
+            && let Some(rel) = entry.path().strip_prefix(vault_root).ok()
+        {
+            items.push((processed_at, rel.to_string_lossy().to_string(), summary));
+        }
+    }
+    items.sort_by(|a, b| b.0.cmp(&a.0));
+    items.into_iter().take(limit).map(|(_, r, s)| (r, s)).collect()
+}
+
+/// Convenience wrapper used by tests; batch paths call
+/// [`process_one_with_context`] directly so duplicate detection can ride along.
+#[cfg_attr(not(test), allow(dead_code))]
 pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -> Result<()> {
+    process_one_with_context(path, config, vault_root, None).await
+}
+
+pub async fn process_one_with_context(
+    path: &Path,
+    config: &ForgeConfig,
+    vault_root: &Path,
+    recent: Option<&RecentSummaries>,
+) -> Result<()> {
     info!("Processing: {}", path.display());
 
     let content = tokio::fs::read_to_string(path)
@@ -179,7 +244,7 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
         ollama.summarize(&body, 200),
         ollama.generate_json::<Vec<String>>(&q_prompt),
         ollama.generate_json::<Vec<String>>(&t_prompt),
-        get_ai_candidates(&body, &ollama, &prompts)
+        get_ai_candidates(&body, &ollama, &prompts, recent)
     );
 
     let summary = summary.unwrap_or_default();
@@ -213,6 +278,17 @@ pub async fn process_one(path: &Path, config: &ForgeConfig, vault_root: &Path) -
         gen_tags,
     ));
     current_fm.processed_at = Some(iso_now());
+    if let Some(dup) = cand
+        .duplicate_of
+        .filter(|d| !d.trim().is_empty() && !d.eq_ignore_ascii_case("null"))
+    {
+        warn!(
+            "Possible duplicate of '{}': {}",
+            dup,
+            path.display()
+        );
+        current_fm.duplicate_of = Some(dup);
+    }
 
     let updated = join_frontmatter(&current_fm, &body);
     tokio::fs::write(path, &updated)
@@ -236,6 +312,8 @@ struct AiCandidates {
     reasoning: Option<String>,
     subcategory: Option<String>,
     detail: Option<String>,
+    /// Vault-relative path of an existing note this one duplicates, if any.
+    duplicate_of: Option<String>,
 }
 
 fn resolve_confirmed_targets(fm: &Frontmatter) -> (String, String, String) {
@@ -276,8 +354,28 @@ async fn get_ai_candidates(
     body: &str,
     ollama: &AiClient,
     prompts: &crate::prompts::LoadedPrompts,
+    recent: Option<&RecentSummaries>,
 ) -> Result<AiCandidates> {
-    let c_prompt = prompts.category_template.replace("{content}", body);
+    let mut c_prompt = prompts.category_template.replace("{content}", body);
+    // Piggyback duplicate detection on the existing classification call —
+    // no extra request, just richer context. Keep the list small.
+    if let Some(recent) = recent
+        && !recent.is_empty()
+    {
+        let list: String = recent
+            .iter()
+            .take(30)
+            .map(|(rel, summary)| format!("- {rel}: {summary}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        c_prompt.push_str(&format!(
+            "\n\n## Duplicate check\n\
+             Recently processed notes:\n{list}\n\n\
+             If this new note substantially duplicates one of them, set \
+             \"duplicate_of\" to that note's vault-relative path; otherwise \
+             set it to null.\n"
+        ));
+    }
     ollama.generate_json(&c_prompt).await
 }
 

@@ -277,6 +277,10 @@ pub struct AiConfig {
     /// Maximum concurrent AI requests (for parallel processing)
     #[serde(default = "default_max_concurrent")]
     pub max_concurrent: Option<usize>,
+    /// Minimum gap between AI request starts (ms). Guards rate-limited remote
+    /// providers; defaults to 2000 ms for remote providers, 0 for local ones.
+    #[serde(default)]
+    pub min_request_interval_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -360,6 +364,7 @@ impl Default for AiConfig {
             base_url: None,
             api_key: None,
             max_concurrent: default_max_concurrent(),
+            min_request_interval_ms: None,
         }
     }
 }
@@ -412,6 +417,10 @@ fn merge_global_into_forge(config: &mut ForgeConfig, global: &GlobalConfig) {
             base_url: config.ai.base_url.clone().or(global_ai.base_url.clone()),
             api_key: config.ai.api_key.clone().or(global_ai.api_key.clone()),
             max_concurrent: config.ai.max_concurrent.or(global_ai.max_concurrent),
+            min_request_interval_ms: config
+                .ai
+                .min_request_interval_ms
+                .or(global_ai.min_request_interval_ms),
         };
     }
     if let Some(ref global_daemon) = global.daemon {
