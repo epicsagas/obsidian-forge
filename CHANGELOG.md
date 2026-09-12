@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-12
+
+### Added
+
+- AI frontmatter generation: `normalize-frontmatter --fill-missing` writes metadata (project, title, summary, hierarchical tags, created) for docs that have none — covers the Phase-4 "missing-frontmatter fill" of kg-overhaul-blueprint-2026-09
+- AI tag suggestions: `check-tags --suggest` proposes a reviewed tag set per file that fails the mechanical tag check (read-only; apply via `--fix` or manual edit)
+- AI link suggestions: `check-links --suggest` resolves unresolved wikilinks against a local word-overlap prefilter and prints the best candidate per link (read-only)
+- Inbox duplicate detection: classification rides the existing category call with a snapshot of the 30 most recent processed summaries and records `duplicate_of` in frontmatter when the new note substantially duplicates one — zero extra requests
+
+### Changed
+
+- AI requests are now rate-limit friendly: a process-wide minimum interval between request starts (default 2000 ms for remote providers, 0 for ollama/lmstudio, tunable via `[ai] min_request_interval_ms`) plus exponential-backoff retries with jitter on 429/5xx that honour `Retry-After`
+- AI-suggest batch paths cap effective concurrency at 3 and 50 files per invocation to bound free-tier usage
+
 ## [0.4.0] - 2026-09-12
 
 ### Removed
